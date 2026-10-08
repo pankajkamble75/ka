@@ -17,6 +17,7 @@ Registry of every open question: [`../trackers/QUESTIONS-TRACKER.md`](../tracker
 | Q5 | Internet discovery calls a paid web-search API (the specific vendor chosen on price), implemented as one provider class behind the existing `SearchProvider` protocol; the key lives in the environment, never in a stored object; a monthly query cap (`KA_SEARCH_MONTHLY_CAP`) bounds spend on top of the per-mission budget. Chosen by the author 2026-10-08; reasoning: results carry publisher and date, spend is bounded, and the class is a day's work. ✅ built by plan-13 (Brave; live use waits on Q12). | 2026-10-08 | architecture §6 |
 | Q6 | The first provider after the local folder is Microsoft 365 / SharePoint: one Microsoft Graph app registration covering OneDrive, SharePoint and Teams files, implemented as a `Connector` class behind the plan-08 contract; SharePoint permission lists map onto KA visibility; the client secret is named by `secret_ref` and read from the environment. Google Workspace and a file share follow the same pattern later. Chosen by the author 2026-10-08. ✅ built by plan-14 (fixture-verified; live use waits on Q13). | 2026-10-08 | architecture §2 |
 | Q8 | The console keeps its four tabs plus Images and gains a top-level tab, Processes, pointing at the plan-06 process profile view (list of process subjects → profile). The note's five-page layout is declined. Chosen by the author 2026-10-08; reasoning: process knowledge earns a top-level entry and nothing else moves. ✅ built by plan-15. | 2026-10-08 | architecture §8 |
+| Q12 | The search vendor is Brave; the author supplied the key on 2026-10-09 (`.env`, `KA_SEARCH_API_KEY`, gitignored) and the server runs `KA_SEARCH_PROVIDER=brave`. The live product test PT5 (research-02) passed against the real API. ✅ built (plan-13) and configured. | 2026-10-09 | architecture §6 |
 | Q3 | `auto_approve_low_impact` stays OFF by default: every graph change proposal, however small, is approved and applied by a named person on the graph-change page. Chosen by the author 2026-10-08; reasoning: the second click is cheap, the audit trail stays human, and the impact thresholds have not yet been exercised at real volume. Revisit with volume data. ✅ built (it is today's default, `ka/service.py:43`). | 2026-10-08 | architecture §5 |
 
 <details><summary>Q&A ledger — Q1</summary>
@@ -141,9 +142,7 @@ not. **Recommendation:** re-pin once, after plan-05 publishes real lineage worth
 
 **Answer (2026-10-08, the author):** not yet. Current state; revisit with real published graphs.
 
-</details>
-
-## ❓ Open
+<details><summary>Q&A ledger — Q12</summary>
 
 ### Q12 — Search vendor and key (research-02 R8; beside Q5)
 **Scenario.** Q5 chose a paid web-search API. plan-13 builds `BraveSearchProvider` against Brave's documented response shape and
@@ -151,6 +150,13 @@ verifies it with a recorded fixture. **Decision required.** Confirm Brave (or na
 `KA_SEARCH_API_KEY` on the server. **Big picture.** Until the key exists, discovery still runs with `none`/`fixture` and product test
 PT5 is NOT RUN. **Options.** Brave (recommended — documented JSON, free tier for development) / Serper / other. **Cost.** Brave: free
 to 2k queries/month, then about $3 per 1k; the monthly cap bounds it.
+
+**Answer (2026-10-09, the author):** Brave; key supplied.
+
+</details>
+
+## ❓ Open
+
 
 ### Q13 — Microsoft 365 app registration (research-02 R9; beside Q6)
 **Scenario.** Q6 chose Microsoft 365 / SharePoint first. plan-14 builds the connector with app-only Graph auth, verified against a

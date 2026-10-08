@@ -171,7 +171,7 @@ change page's "Instances pinned to this domain" table and the Dashboard count. L
 reuse ACTIVE knowledge on the scope chain, open a mission only for the gap.
 
 **Discovery (plan-07, R9).** `ka/discovery.py::DiscoveryAgent` runs first in the coordinator: the objective and questions become
-queries for a `SearchProvider` (`none` or `fixture` today; **Q5 — ✅ built by plan-13, 2026-10-09:** `BraveSearchProvider` behind this seam (`KA_SEARCH_PROVIDER=brave`), the key read from `KA_SEARCH_API_KEY` at call time and never stored or logged, `SearchMeter` counting queries per calendar month against `KA_SEARCH_MONTHLY_CAP`; without a key the selection fails closed to `none` with a note the Dashboard shows; the vendor confirmation and the key are Q12); results are canonicalised (fragments and
+queries for a `SearchProvider` (`none` or `fixture` today; **Q5 — ✅ built by plan-13, 2026-10-09:** `BraveSearchProvider` behind this seam (`KA_SEARCH_PROVIDER=brave`), the key read from `KA_SEARCH_API_KEY` at call time and never stored or logged, `SearchMeter` counting queries per calendar month against `KA_SEARCH_MONTHLY_CAP`; without a key the selection fails closed to `none` with a note the Dashboard shows; the author confirmed Brave and supplied the key on 2026-10-09 — Q12 answered; the key lives only in the server's `.env`); results are canonicalised (fragments and
 tracking parameters dropped), deduplicated, filtered by `KA_ALLOWED_DOMAINS`, `is_safe_url` and `robots.txt` (fetched through
 `safe_fetch`, cached per run; unreachable = allowed, recorded), ranked by overlap with the objective and cut at `KA_DISCOVERY_BUDGET`;
 every skip carries its reason in `ResearchRun.discovery`. The Internet agent fetches the selection only when `KA_RESEARCH_INTERNET`

@@ -12,13 +12,13 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 | research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | plan-15 | DECIDED → built by plan-15 (research-02 R7) | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | DECIDED (2026-10-08, Q9: not yet; nothing to build) | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 
-| research-02 | R8 — Decide: search vendor (recommended Brave) and supply KA_SEARCH_API_KEY (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
 | research-02 | R9 — Decide: supply the Microsoft 365 app registration (MINOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
 
 ## Closed
 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
+| research-02 | R8 — Decide: search vendor (recommended Brave) and supply KA_SEARCH_API_KEY (MAJOR) | — | DECIDED | (sha) | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
 | research-02 | R7 — Processes as the fourth console tab; Browse-by-scope mode kept (MINOR) | plan-15 | UPLOADED | 5705367 | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. plan-15: 4/4 D, 3/3 P (P2 = live flow 8/8), 2/2 N; 258 passed; console only, no protected code; PT7 GREEN. **Product-test check:** research-02 PT7 |
 | research-02 | R6 — M365 connector: app-only Graph auth, drive delta checkpoint, permissions → visibility; fixture-verified (MINOR) | plan-14 | UPLOADED | e41815c | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. plan-14: 7/7 D, 7/7 P (P7 live SKIPPED — needs the author's registration, Q13), 5/5 N; 254 passed after the follow-up fix of plan-10's gate (the upload commit itself had 1 red: see checkpoint); live flow 6/6 (fail-closed path); no protected code; PT6 fixture-driven GREEN, live NOT RUN. **Product-test check:** research-02 PT6 |
 | research-02 | R5 — Search provider: BraveSearchProvider, KA_SEARCH_API_KEY, KA_SEARCH_MONTHLY_CAP, Dashboard used/cap; fixture-verified (MAJOR) | plan-13 | UPLOADED | 0eeb9be | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. plan-13: 7/7 D, 7/7 P (+P7b live, SKIPPED — needs the author's key, Q12), 5/5 N; 243 passed; live flow 6/6 (fail-closed path); no protected code; PT5 fixture-driven GREEN, live NOT RUN. **Product-test check:** research-02 PT5 |

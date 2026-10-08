@@ -2,6 +2,20 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 04:10 UTC — Q12 answered: Brave key supplied; the live search provider is on
+
+**What changed** — docs only in git. The author added the Brave key to the server's `.env` (gitignored; never committed) under a
+custom name; it was renamed to `KA_SEARCH_API_KEY`, the variable KA reads, and `KA_SEARCH_PROVIDER=brave` was added there; the server
+was restarted reading `.env`. Registry Q12 → ANSWERED; ledger Q12 → Decided; architecture §6 notes the key is configured; research-02
+PT5 marked runnable; tracker R8 → DECIDED (Closed).
+
+**Verification** — `GET /research/providers` on the running server: requested brave, effective brave, key present, 0/1000 used.
+`test_plan13_search_provider.py::test_P7b_PT5_live_search_with_the_real_key` PASSED against the real Brave API (one query). A live
+mission recorded Brave results with publishers; the Internet gate (`KA_RESEARCH_INTERNET`) is still OFF by default, so pages are
+selected but not fetched until the author turns the gate on.
+
+**Decisions and questions** — ANSWERED: Q12 (Brave). Remaining open: Q13 (M365 registration). Plan: none; research-02 R8 → DECIDED.
+
 ## 2026-10-09 03:30 UTC — plan-15: Processes as a top-level console tab (research-02 R7, Q8)
 
 **What changed** — `ka/console/app.js`: nav entry `4 · Processes` → `#/processes` (Dashboard 5, Images 6), `TAB_LABELS` so detail pages
