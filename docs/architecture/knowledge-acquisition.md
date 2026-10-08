@@ -198,8 +198,9 @@ actors, inputs, outputs, entities, rules, events, states — each field carrying
 is published as; PENDING ones are listed apart; `coverage` reports the bound type's required and recommended slots as evidenced
 or not, from EOS's slot grammar, and nothing is ever filled in. It is a query, never a stored object. Surfaces:
 `GET /processes`, `GET /processes/{key}`, the "Processes" mode of Browse by scope, and the subject page for process subjects.
-**Q8 — ⏳ DECIDED 2026-10-08, not built:** Processes becomes a fifth top-level tab (Add knowledge · Knowledge nuggets · Browse by scope
-· Processes · Dashboard, plus Images) pointing at this view; the note's five-page layout is declined.
+**Q8 — ✅ built by plan-15, 2026-10-09:** Processes is the fourth top-level tab (Add knowledge · Knowledge nuggets · Browse by scope
+· Processes · Dashboard, plus Images) at `#/processes`, rendering this view; detail pages opened from it return to it; Browse by scope's
+Processes mode stays. The note's five-page layout is declined.
 No new tab while Q8 is parked.
 
 ## 9. Events and audit (§38, §41)

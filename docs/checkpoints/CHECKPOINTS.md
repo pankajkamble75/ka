@@ -2,6 +2,25 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 03:30 UTC — plan-15: Processes as a top-level console tab (research-02 R7, Q8)
+
+**What changed** — `ka/console/app.js`: nav entry `4 · Processes` → `#/processes` (Dashboard 5, Images 6), `TAB_LABELS` so detail pages
+return to the tab, `processesView` (scope filter + the plan-06 `processesList`), the profile crumb points at the tab; Browse by scope's
+Processes mode is untouched. `README.md` tab list; architecture §8 Q8 → ✅ built; ledger. `ka/tests/test_plan15_processes_tab.py`
+(4 source/route cases); `e2e/plan15_processes_tab_flow.py` (PT7).
+
+**Why** — the author's Q8 decision: process knowledge earns a top-level entry and nothing else moves.
+
+**Verification** — in-process 258 passed, 2 skipped (live PT5/PT6 gated on the author's credentials; exit code checked before this
+commit); ruff F clean; no protected code. Verify recount 4/4 D, 3/3 P (P2 is the live flow), 2/2 N; block 1/1. Live flow 8/8 PASS
+(six nav entries with Processes fourth; the tab lists five process subjects; profile opens; crumb and nav return to the tab; Browse mode
+renders); screenshot verified. Product tests (research-02): PT1–PT4, PT7 PASS; PT5, PT6 fixture-driven PASS, live NOT RUN (Q12, Q13).
+
+**Follow-ups / risks** — none.
+
+**Decisions and questions** — BUILT: Q8 (architecture §8 ✅). RAISED: none. Plan `plan-15`; research-02 R7 → UPLOADED. R13 of research-01
+(the console-shape decision) is now built through this plan.
+
 ## 2026-10-09 02:50 UTC — plan-14: the Microsoft 365 / SharePoint connector behind the plan-08 contract (research-02 R6, Q6)
 
 **What changed**

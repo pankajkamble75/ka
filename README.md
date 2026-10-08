@@ -109,3 +109,7 @@ docs/trackers/          RESEARCH-TRACKER, QUESTIONS-TRACKER, PENDING-TRACKER, HA
 ## Managed connectors (plan-08)
 
 Register a folder under `KA_CONNECTOR_ROOTS` as a connection on the Add knowledge tab; Sync pulls new, changed, moved and deleted files as source versions (history kept) and re-resolves what changed. Revoke stops syncing; synced sources stay. Cloud/enterprise providers are decision Q6.
+
+## Processes tab (plan-15)
+
+The console's fourth tab, Processes, lists process subjects composed from governed knowledge and opens a profile per process (the plan-06 view); Browse by scope keeps its Processes mode. Tabs: 1 Add knowledge · 2 Knowledge nuggets · 3 Browse by scope · 4 Processes · 5 Dashboard · 6 Images.

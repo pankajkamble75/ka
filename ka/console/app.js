@@ -46,6 +46,7 @@ const routes = [
   [/^#\/add$/, addView],
   [/^#\/nuggets(?:\?(.*))?$/, nuggetsView],
   [/^#\/browse(?:\?(.*))?$/, browseView],
+  [/^#\/processes(?:\?(.*))?$/, processesView],
   [/^#\/images(?:\?(.*))?$/, imagesView],
   [/^#\/subject\/([^/]+)$/, subjectView],
   [/^#\/nugget\/([^/]+)$/, nuggetView],
@@ -55,7 +56,7 @@ const routes = [
   [/^#\/change\/([^/]+)$/, changeView],
   [/^#\/scope\/([A-Z_]+)\/([^/]+)(?:\/([a-z-]+))?$/, (t, i) => { location.hash = `#/browse?scope=${t}|${i}`; return ''; }],
 ];
-const TAB_LABELS = { '#/add': '1 · Add knowledge', '#/nuggets': '2 · Knowledge nuggets', '#/browse': '3 · Browse by scope', '#/dashboard': '4 · Dashboard', '#/images': '5 · Images' };
+const TAB_LABELS = { '#/add': '1 · Add knowledge', '#/nuggets': '2 · Knowledge nuggets', '#/browse': '3 · Browse by scope', '#/processes': '4 · Processes', '#/dashboard': '5 · Dashboard', '#/images': '6 · Images' };
 function tabOf(hash) { const base = (hash || '#/').split('?')[0]; return base === '#/' || base === '#' ? '#/dashboard' : (TAB_LABELS[base] ? base : null); }
 let lastTab = null;
 try { lastTab = sessionStorage.getItem('ka.lastTab'); } catch { /* private mode */ }
@@ -86,7 +87,7 @@ function fail(msg) { const m = document.getElementById('main'); if (m) m.innerHT
 window.addEventListener('error', (e) => fail(e.message || String(e)));
 window.addEventListener('unhandledrejection', (e) => fail((e.reason && e.reason.message) || String(e.reason)));
 
-/* ------------------------------------------------------------------ nav: four tabs */
+/* ------------------------------------------------------------------ nav: five tabs + Images (plan-15 added Processes, Q8) */
 async function nav() {
   const h = location.hash || '#/';
   ensureTokenField();
@@ -98,8 +99,9 @@ async function nav() {
     <a href="#/add" class="${on('#/add') || onD('#/add')}">1 · Add knowledge</a>
     <a href="#/nuggets" class="${on('#/nuggets') || onD('#/nuggets')}">2 · Knowledge nuggets</a>
     <a href="#/browse" class="${on('#/browse') || onD('#/browse')}">3 · Browse by scope</a>
-    <a href="#/dashboard" class="${on('#/dashboard') || onD('#/dashboard')}">4 · Dashboard</a>
-    <a href="#/images" class="${on('#/images') || onD('#/images')}">5 · Images</a>
+    <a href="#/processes" class="${on('#/processes') || onD('#/processes')}">4 · Processes</a>
+    <a href="#/dashboard" class="${on('#/dashboard') || onD('#/dashboard')}">5 · Dashboard</a>
+    <a href="#/images" class="${on('#/images') || onD('#/images')}">6 · Images</a>
     <h4>You</h4><input id="who" value="${esc(who())}" title="Your name, recorded on decisions">
     <label>Access token</label><input id="tok" type="password" value="${esc(token())}" placeholder="KA_ACCESS_TOKEN" title="Required from non-loopback addresses">`;
   $('#who').addEventListener('change', (e) => { localStorage.setItem('ka.user', e.target.value); toast('Acting as ' + e.target.value); });
@@ -294,7 +296,7 @@ async function processProfileView(key) {
   const p = await api(`/processes/${encodeURIComponent(key)}`);
   const t = p.type || {};
   const typePill = t.status === 'bound' ? pill(t.value, 'ok') : t.status === 'proposed' ? pill(`${t.claimed} → ${t.value}?`, 'warn') : t.status === 'unresolved' ? pill(`${t.claimed} (unresolved)`, 'halt') : pill('type not evidenced', 'warn');
-  return `<div class="crumbs"><a href="#/browse?mode=processes">Browse by scope · Processes</a> / ${esc(p.key)}</div>
+  return `<div class="crumbs"><a href="#/processes">Processes</a> / ${esc(p.key)}</div>
   <h1>${esc(p.name)} ${typePill}</h1>
   <div class="sub mono">${esc(p.key)}${p.aliases.length ? ` · also: ${p.aliases.map(esc).join(', ')}` : ''} · ${p.scopes.map(scopePill).join(' ')}</div>
   <div class="card"><h3>Description</h3>${p.description ? `<p style="font-size:var(--fs-15)">${esc(p.description.value || p.description.statement)}</p><div class="small muted">from <a href="#/nugget/${encodeURIComponent(p.description.ref)}">${esc(p.description.ref)}</a> · ${p.description.evidence.map((e) => `${esc(e.source_title || e.source_id)} ${esc(e.span_id || e.locator || '')}`).join('; ')}</div>` : '<div class="muted">not evidenced</div>'}
@@ -309,6 +311,17 @@ async function processProfileView(key) {
   </div>
   <h2>Pending assertions <span class="muted">${p.pending.length}</span></h2>${p.pending.length ? `<table><tr><th>Nugget</th><th>Predicate</th><th>Statement</th><th>Scope</th><th>Status</th></tr>${p.pending.map((x) => `<tr><td><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a></td><td class="mono">${esc(x.predicate || '')}</td><td>${esc(x.statement)}</td><td>${scopePill(x.scope)}</td><td>${pill(x.status)}</td></tr>`).join('')}</table>` : '<div class="empty">None — nothing about this process is waiting for a decision.</div>'}`;
 }
+// [block plan-15] research-02 R7 (Q8, decided 2026-10-08): Processes is a top-level tab on the plan-06 profile view
+async function processesView(qs) {
+  const p = new URLSearchParams(qs || '');
+  const { scopes } = await api('/scopes');
+  const sel = p.get('scope') || '';
+  return `<div class="crumbs">4 · Processes</div><h1>Processes</h1><p class="sub">Every process the governed knowledge describes — composed from ACTIVE assertions, each field linked to its evidence. Open one for its profile; Browse by scope still offers the same list per scope.</p>
+  <div class="filters"><label class="small">Scope</label> <select id="pr-scope"><option value="">All scopes</option>${scopeOptions(scopes, sel.replace(':', '|'))}</select> <button data-act="pr-filter">Filter</button></div>
+  ${await processesList(sel)}`;
+}
+// [/block plan-15]
+
 async function processesList(scopeSel) {
   const [t, id] = (scopeSel || '|').split('|');
   const q = t && id ? `?scope_type=${t}&scope_id=${encodeURIComponent(id)}` : '';
@@ -659,6 +672,7 @@ async function act(b) {
     const sr = await api(`/connectors/${r.connection.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' });
     toast(`Connected · synced: ${sr.report.new} new, ${sr.report.candidates} candidates`); render(); return;
   }
+  if (a === 'pr-filter') { const v = $('#pr-scope').value; location.hash = v ? `#/processes?scope=${v}` : '#/processes'; return; }
   if (a === 'repin') {
     const r = await api(`/graph-changes/${b.dataset.id}/repin`, { method: 'POST', body: { instance_id: b.dataset.inst, by: who(), preview: !!b.dataset.preview } });
     const x = r.result;
