@@ -346,8 +346,10 @@ def _ingested(ka: KnowledgeAcquisition, got, extract: bool, actor: str) -> dict[
             cands = ka.governance.extract_from_source(got.source, got.version, got.extraction, actor=actor)
         except GovernanceError as e:
             raise HTTPException(400, str(e))
-    return {"source": got.source.model_dump(mode="json"), "source_version": got.version.model_dump(mode="json", exclude={"text"}),
+    fresh = ka.repo.source_versions.get(got.version.id) or got.version
+    return {"source": got.source.model_dump(mode="json"), "source_version": fresh.model_dump(mode="json", exclude={"text"}),
             "extraction_status": got.extraction.status.value, "extraction_note": got.extraction.note,
+            "extraction_report": fresh.extraction_report,                                  # plan-04
             "is_new_version": got.is_new_version, "candidates": [_nugget_row(c) for c in cands]}
 
 
@@ -364,7 +366,22 @@ def get_source(source_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> di
     versions = ka.repo.source_versions.where(lambda v: v.source_id == source_id)
     nuggets = ka.repo.nuggets.where(lambda n: source_id in n.source_refs)
     return {"source": s.model_dump(mode="json"), "versions": [v.model_dump(mode="json") for v in versions],
-            "nuggets": [_nugget_row(n) for n in nuggets]}
+            "nuggets": [_nugget_row(n) for n in nuggets],
+            "evidence": [e.model_dump(mode="json") for e in ka.repo.evidence.where(lambda e: e.source_id == source_id)]}   # plan-04 spans
+
+
+# [block plan-04]
+@router.post("/sources/{source_id}/reextract")
+def reextract(source_id: str, owner: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    """research-01 R16: re-run the current extractor as a NEW source version, then extract candidates from it."""
+    if ka.repo.sources.get(source_id) is None:
+        raise HTTPException(404, "source not found")
+    try:
+        got = ka.ingestion.reextract(source_id, owner=owner)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return _ingested(ka, got, True, owner)
+# [/block plan-04]
 
 
 # ---- nuggets (§31)

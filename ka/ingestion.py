@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ka.audit import Auditor
 from ka.events import EventBus
-from ka.extraction import TextExtraction, extract_text, source_type_for_filename
+from ka.extraction import EXTRACTION_VERSION, TextExtraction, extract_text, source_type_for_filename
 from ka.model import Scope, Source, SourceVersion
 from ka.repository import Repository
 from ka.security import UnsafeURL, is_safe_url, safe_fetch
@@ -108,6 +108,30 @@ class IngestionService:
         return self._ingest(title=title, data=text.encode("utf-8"), source_type=source_type, owner=owner, scope=scope,
                             authority=authority, visibility=visibility, location=location, channel=channel, metadata=metadata or {})
 
+    # [block plan-04]
+    def reextract(self, source_id: str, *, owner: str) -> Ingested:
+        """research-01 R16: run the current extractor over the stored bytes as a NEW SourceVersion (same checksum,
+        new extraction_version). The only path that bypasses same-bytes dedupe, deliberately."""
+        src = self.repo.sources.require(source_id)
+        cur = self.repo.source_versions.get(src.current_version_id or "")
+        if cur is None or not cur.stored_path or not Path(cur.stored_path).exists():
+            raise ValueError(f"source {source_id} has no stored bytes to re-extract (blocked or not fetched)")
+        data = Path(cur.stored_path).read_bytes()
+        extraction = extract_text(data, src.source_type, src.original_filename)
+        src.content_version += 1
+        ver = SourceVersion(source_id=src.id, version=src.content_version, checksum=cur.checksum, media_type=extraction.media_type,
+                            text=extraction.text, byte_size=len(data), stored_path=cur.stored_path, extraction_status=extraction.status,
+                            extraction_note=extraction.note, extraction_version=EXTRACTION_VERSION)
+        self.repo.source_versions.put(ver)
+        src.current_version_id, src.extraction_status = ver.id, extraction.status
+        self.repo.sources.put(src)
+        self.bus.emit("source.updated", source_id=src.id, source_version_id=ver.id)
+        self.auditor.record(who=owner, what="source.reextracted", why=f"extractor {EXTRACTION_VERSION}", source=src.id, scope=src.scope,
+                            before={"version": cur.version, "extraction_version": cur.extraction_version},
+                            after={"version": ver.version, "extraction_version": ver.extraction_version}, affected=[src.id, ver.id])
+        return Ingested(src, ver, extraction, is_new_version=True)
+    # [/block plan-04]
+
     # ---- core ---------------------------------------------------------------------------------
 
     def _ingest(self, *, title, data, source_type, owner, scope, authority, visibility, filename=None, location=None,
@@ -135,7 +159,7 @@ class IngestionService:
 
         ver = SourceVersion(source_id=src.id, version=src.content_version, checksum=checksum, media_type=extraction.media_type,
                             text=extraction.text, byte_size=len(data), extraction_status=extraction.status,
-                            extraction_note=extraction.note)
+                            extraction_note=extraction.note, extraction_version=EXTRACTION_VERSION)
         if data:
             self.blob_dir.mkdir(parents=True, exist_ok=True)
             blob = self.blob_dir / f"{ver.id}{Path(filename).suffix if filename else '.bin'}"

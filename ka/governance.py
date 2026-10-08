@@ -72,10 +72,11 @@ class CandidateInput:
 class GovernanceService:
     def __init__(self, repo: Repository, bus: EventBus, auditor: Auditor, registry: ScopeRegistry,
                  versioning: VersioningService, detector: ConflictDetector, extractor: CandidateExtractor,
-                 authority_policy: config.AuthorityPolicy | None = None, binder=None, subjects=None):
+                 authority_policy: config.AuthorityPolicy | None = None, binder=None, subjects=None, process_extractor=None):
         self.repo, self.bus, self.auditor, self.registry = repo, bus, auditor, registry
         self.versioning, self.detector, self.extractor = versioning, detector, extractor
         self.binder, self.subjects = binder, subjects          # plan-03: ka.binding.Binder, ka.identity.SubjectRegistry
+        self.process_extractor = process_extractor             # plan-04: ka.process_extraction.ProcessExtractor
         self.scope_engine = ScopeDecisionEngine(registry)
         self.authority = authority_policy or config.AuthorityPolicy()
         self.on_more_research: Callable[[KnowledgeNuggetVersion, str], str] | None = None   # set by ResearchOrchestrator
@@ -84,8 +85,12 @@ class GovernanceService:
     # ---------------------------------------------------------------- Extract (§11 step 1)
 
     def extract_from_source(self, source: Source, version: SourceVersion, extraction: TextExtraction, *,
-                            actor: str, default_scope: Scope | None = None, analyze: bool = True) -> list[KnowledgeNuggetVersion]:
+                            actor: str, default_scope: Scope | None = None, analyze: bool = True,
+                            process_pass: bool = True) -> list[KnowledgeNuggetVersion]:
         if not extraction.text.strip():
+            version.extraction_report = {"statements": 0, "assertions": 0, "dropped": [], "method": "none",
+                                         "extraction_version": version.extraction_version}
+            self.repo.source_versions.put(version)
             return []
         statements = self.extractor.extract(title=source.title, sections=extraction.sections, text=extraction.text)
         scope = source.scope or default_scope
@@ -93,8 +98,11 @@ class GovernanceService:
             raise GovernanceError("a source needs a scope (structure / parent domain / domain / instance) before extraction (§7)")
         out = []
         for st in statements:
+            span = next((sp for sp in extraction.spans if sp.locator == st.locator), None)
             ev = self.repo.evidence.put(Evidence(source_id=source.id, source_version_id=version.id, locator=st.locator,
-                                                 excerpt=st.excerpt, created_by=actor, visibility=source.visibility))
+                                                 excerpt=st.excerpt, created_by=actor, visibility=source.visibility,
+                                                 span_id=span.span_id if span else None, start=span.start if span else None,
+                                                 end=span.end if span else None))
             out.append(self.ingest_candidate(CandidateInput(
                 title=st.title, statement=st.statement, scope=self._scope_from_hint(scope, st),
                 source_ids=[source.id], evidence_ids=[ev.id], knowledge_type=st.knowledge_type.value,
@@ -102,6 +110,38 @@ class GovernanceService:
                 normalized_meaning=st.normalized_meaning, graph_group=st.graph_group, channel=source.channel,
                 created_by=actor, effective_from=source.effective_date, visibility=source.visibility,
             ), analyze=analyze))
+        # [block plan-04]
+        # research-01 R3: the second pass reads PROCESSES — assertions in EOS terms, each on an addressable span.
+        # It adds to the statement pass, never alters it; what the text does not state is not emitted.
+        report: dict = {"statements": len(out), "assertions": 0, "dropped": [], "method": "off",
+                        "extraction_version": version.extraction_version}
+        if process_pass and self.process_extractor is not None:
+            got = self.process_extractor.extract(source.title, extraction)
+            report["method"], report["dropped"] = got.method, list(got.dropped)
+            for a in got.assertions:
+                span = extraction.span(a.span_id)
+                if span is None:
+                    report["dropped"].append({"item": a.statement, "reason": f"span {a.span_id!r} not in this version"})
+                    continue
+                excerpt = a.excerpt if a.excerpt and a.excerpt in extraction.text[span.start:span.end] else extraction.text[span.start:span.end][:600]
+                ev = self.repo.evidence.put(Evidence(source_id=source.id, source_version_id=version.id, locator=a.locator, excerpt=excerpt,
+                                                     created_by=actor, visibility=source.visibility, span_id=span.span_id,
+                                                     start=span.start, end=span.end))
+                obj = (ObjectRef(kind=a.object_kind, value=a.object_name or a.object_value) if (a.object_kind and a.object_name)
+                       else ObjectRef(value=a.object_value or a.object_name) if (a.object_value or a.object_name) else None)
+                ktype = {"decomposes_into": "process_step", "performed_by": "relationship", "consumes": "relationship", "produces": "relationship",
+                         "acts_on": "relationship", "governed_by": "rule", "emits": "state_transition", "transitions_to": "state_transition",
+                         "typed_as": "concept"}.get(a.predicate, "business_definition" if a.predicate == "description" else "fact")
+                out.append(self.ingest_candidate(CandidateInput(
+                    title=a.statement[:80], statement=a.statement, scope=scope, source_ids=[source.id], evidence_ids=[ev.id],
+                    knowledge_type=ktype, authority_type=source.authority_type, confidence=a.confidence, channel=source.channel,
+                    created_by=actor, effective_from=source.effective_date, visibility=source.visibility, graph_group=a.subject_name,
+                    subject=Subject(kind=a.subject_kind, canonical_key=a.subject_name.lower().replace(" ", "_"), name=a.subject_name),
+                    predicate=a.predicate, object=obj, binding_method="evidenced"), analyze=analyze))
+                report["assertions"] += 1
+        version.extraction_report = report
+        self.repo.source_versions.put(version)
+        # [/block plan-04]
         return out
 
     def _scope_from_hint(self, scope: Scope, st: CandidateStatement) -> Scope:

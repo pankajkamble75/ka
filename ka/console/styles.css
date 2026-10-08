@@ -99,3 +99,6 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .backbar { margin: 0 0 var(--s-12); }
 .backbar a { display: inline-block; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); }
 .backbar a:hover { border-color: var(--accent); text-decoration: none; color: var(--accent); }
+
+/* plan-04 finding: wide tables (subject column) scroll instead of clipping */
+.main { overflow-x: auto; }

@@ -2,6 +2,55 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 15:50 UTC — plan-04: the second extraction pass reads processes, on addressable evidence (research-01 R3, R16 layout half)
+
+**What changed**
+
+- *Layout extras* `ka/extraction.py`: `Span`, `spans_for` (text = sections joined by a blank line; `text[start:end]` is the
+  section), `TextExtraction.spans`, `EXTRACTION_VERSION = "ka-extract/2"`; Word tables and spreadsheets as one section per row
+  (`table N row M`, `sheet X row M`); `ocr_pdf` / `ocr_image` hooks behind `KA_OCR` (`ka/config.py`; `pyproject.toml` extra `ocr`).
+  `ka/model.py`: `Evidence.span_id/start/end`, `SourceVersion.extraction_version/extraction_report`. `ka/ingestion.py`: `reextract`
+  (new version from the stored bytes with the current extractor; same checksum).
+- *Process pass* `ka/process_extraction.py` (new): `ProcessExtractor` — model prompt carrying the closed lists (EOS node kinds,
+  `PREDICATES`, loaded type names, slots), out-of-list output dropped and disclosed; heuristic over headings + numbered lists
+  emitting `description`, `decomposes_into`, `performed_by` and never a type; `render_statement`.
+- *Governance (protected)* `ka/governance.py::extract_from_source(process_pass=True)`: runs the pass after the statement pass,
+  evidence with spans, candidates with assertions (`binding_method="evidenced"`), `extraction_report` on the version.
+  `ka/service.py` wires the extractor.
+- *API/console* `ka/api.py`: `POST /sources/{id}/reextract`, `extraction_report` in ingestion responses, evidence in `GET /sources/{id}`.
+  `ka/console/app.js`: extraction report card with spans and a Re-extract button on the source page; span ids on nugget evidence.
+  `ka/console/styles.css`: the main pane scrolls horizontally (the subject column widened the nuggets table — verify finding).
+- *Docs/tests*: architecture §2 rows and §5a paragraph; `docs/protected.md` Verified bump; Q10 (prompt-injection defences) parked in
+  `docs/questions/knowledge-acquisition.md` + registry; `docs/implementation-plans/plan-04.md`; fixture `ka/tests/fixtures/underwriting_sop.md`;
+  `ka/tests/test_plan04_process_extraction.py` (18 cases incl. PT1; characterization `f94b0f3`); `e2e/plan04_process_extraction_flow.py`.
+
+**Why**
+
+research-01 R3: KA extracted sentences, not processes; EOS's graph is process-typed. The pass turns a SOP's heading, lead
+sentence, actor and numbered steps into assertions plan-03 can bind, on evidence that resolves to exact characters of the stored
+text (R16), and never fills what the document does not say.
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 122 passed; ruff F clean. Verify recount: 11/11 deliverables, 11/11 positive, 8/8 negative;
+  blocks 8/8, plus three unmarked one-line edits (service.py, pyproject.toml — plan-noted; styles.css — verify finding).
+- Protected: characterization `f94b0f3` before the change; covering suites byte-identical; Verified date bumped. P8 was rewritten
+  post-change to reach the pre-change behaviour through `process_pass=False` (noted in the test's docstring).
+- Live: `e2e/plan04_process_extraction_flow.py` 4/4 PASS, screenshots verified (nuggets tab with subject rows; source page report).
+- Product tests (research-01): **PT1 PASS** (this plan), PT5, PT6 PASS; PT2–PT4 FAIL (plan-05), PT7 (plan-07), PT8 (plan-08).
+
+**Follow-ups / risks**
+
+- The heuristic's child-process names come from the item's first clause; a document with long unpunctuated steps gets long names.
+- OCR is a hook; no OCR ran in this environment (libraries not installed). Q10 defences are parked, not built.
+
+**Decisions and questions**
+
+- Plan `plan-04`; research points R3 and R16 (layout half) → UPLOADED. R16's benchmark half stays OPEN for plan-09.
+- BUILT: `knowledge-acquisition.md` §5a "The second extraction pass" paragraph; §2 `SourceVersion`/`Evidence` rows.
+- RAISED: Q10 — prompt-injection defences for document text sent to the extraction model — in the questions document and
+  `QUESTIONS-TRACKER.md`.
+
 ## 2026-10-08 15:20 UTC — plan-03: process assertions on nuggets and the EOS grammar registry (research-01 R2, R8 KA half)
 
 **What changed**

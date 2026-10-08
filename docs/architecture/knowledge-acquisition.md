@@ -23,8 +23,8 @@ Sources ─► ka.ingestion ─► ka.extraction ─► ka.governance ─► ACT
 
 | Object | Notes |
 |---|---|
-| `Source`, `SourceVersion` | Raw content. Same location + owner re-ingested with a new checksum → new `SourceVersion` (`content_version` +1). Bytes under `ka_storage/blobs/`. |
-| `Evidence` | A located excerpt (`locator` = "Section 4.2", "p.3", "¶7", URL) of one source version. Carries `visibility`. |
+| `Source`, `SourceVersion` | Raw content. Same location + owner re-ingested with a new checksum → new `SourceVersion`; plan-04 adds `extraction_version` (re-extraction after an extractor upgrade is a new version, `IngestionService.reextract`) and `extraction_report` (`content_version` +1). Bytes under `ka_storage/blobs/`. |
+| `Evidence` | A located excerpt (`locator` = "Section 4.2", "p.3", "¶7", URL) of one source version. Carries `visibility`. plan-04 adds `span_id`/`start`/`end` — `SourceVersion.text[start:end]` is the section the evidence sits in (`ka/extraction.py::spans_for`). |
 | `KnowledgeNuggetVersion` | The §6 schema verbatim plus `authority_rank`, `visibility`, `graph_group`, `inherited_from`, `analysis`; plan-03 adds `subject`, `predicate`, `object` (§5a). `ref` = `KN-983:v3`. |
 | `GrammarBinding`, `SubjectRecord` | plan-03 (§5a): one binding per version per grammar release; one subject per (kind, canonical key). |
 | `KnowledgeRelationship` | §10 types, with `explanation` so a reviewer sees why. |
@@ -103,6 +103,12 @@ sha256. Files that change under the same version string make the registry stale:
 refuses, and only `refresh(force=True)` accepts them. No grammar loaded → every binding `unresolved`, never a guess.
 Subjects resolve through `ka/identity.py::SubjectRegistry` (exact key → alias → similarity within kind); element ids
 derived from canonical keys land in plan-05.
+
+**The second extraction pass (plan-04, R3).** `ka/process_extraction.py::ProcessExtractor` reads processes out of the same
+sections: with a model, a prompt carrying the closed lists (EOS node kinds, `PREDICATES`, the loaded type names, slots) whose
+out-of-list output is dropped and disclosed in `SourceVersion.extraction_report`; without one, a heuristic over headings and
+numbered lists that emits `description`, `decomposes_into`, `performed_by` and never a type. `GovernanceService.extract_from_source`
+runs it after the statement pass, so both share source, scope and the one governance door; every assertion's evidence carries a span.
 
 ## 6. Research (§3.2, §16–§18) — `ka/research.py`
 

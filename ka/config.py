@@ -69,6 +69,9 @@ declare("KA_URL_ALLOWLIST", str, "", "ka.security", "Comma-separated intranet ho
 # [block plan-03]
 declare("KA_GRAMMAR_DIR", str, "", "ka.grammar", "Directory holding EOS grammar.json and process_types.json. Default: <KA_ENTERPRISE_OS_ROOT>/knowledge_worker/graph_model.")
 # [/block plan-03]
+# [block plan-04]
+declare("KA_OCR", bool, False, "ka.extraction", "OCR text-less PDFs and images (needs the 'ocr' extra: pdf2image, pytesseract).")
+# [/block plan-04]
 
 _overrides: dict[str, Any] = {}
 

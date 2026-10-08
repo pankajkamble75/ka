@@ -24,6 +24,7 @@ from ka.ingestion import IngestionService
 from ka.lineage import LineageService
 from ka.llm import LLMProvider, select_provider
 from ka.model import Scope
+from ka.process_extraction import ProcessExtractor
 from ka.promotion import PromotionService
 from ka.repository import Repository
 from ka.research import ResearchOrchestrator
@@ -52,9 +53,10 @@ class KnowledgeAcquisition:
         self.subjects = SubjectRegistry(self.repo)
         self.binder = Binder(self.grammar, self.repo)
         # [/block plan-03]
+        self.process_extractor = ProcessExtractor(self.provider, self.grammar)    # plan-04 (block in governance)
         self.governance = GovernanceService(self.repo, self.bus, self.auditor, self.registry, self.versioning,
                                             ConflictDetector(self.provider), CandidateExtractor(self.provider),
-                                            binder=self.binder, subjects=self.subjects)
+                                            binder=self.binder, subjects=self.subjects, process_extractor=self.process_extractor)
         self.impact = GraphImpactService(self.repo, self.adapter, self.lineage, self.registry)
         self.graph_change = GraphChangeService(self.repo, self.bus, self.auditor, self.adapter, self.impact, self.lineage)
         self.graph_change.auto_approve_low_impact = auto_approve_low_impact

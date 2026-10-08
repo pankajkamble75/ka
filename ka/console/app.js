@@ -176,7 +176,7 @@ async function nuggetView(ref) {
       <dl class="kv" style="margin-top:12px"><dt>Effective from</dt><dd>${when(n.effective_from)}</dd><dt>Effective to</dt><dd>${when(n.effective_to)}</dd><dt>Supersedes</dt><dd>${n.supersedes ? `<a href="#/nugget/${encodeURIComponent(n.supersedes)}">${esc(n.supersedes)}</a>` : '—'}</dd><dt>Superseded by</dt><dd>${n.superseded_by ? `<a href="#/nugget/${encodeURIComponent(n.superseded_by)}">${esc(n.superseded_by)}</a>` : '—'}</dd><dt>Created</dt><dd>${esc(n.created_by)} · ${when(n.created_at)}</dd><dt>Channel</dt><dd>${esc(n.channel)}</dd><dt>Tags</dt><dd>${n.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(' ') || '—'}</dd></dl></div>
     <div class="card"><h3>Lineage</h3><div class="lineage">
       ${step('Sources', d.sources.map((s) => `<div><a href="#/source/${s.id}">${esc(s.title)}</a> <span class="small muted">${esc(s.source_type)} · ${esc(s.authority_type)}</span></div>`).join('') || '<span class="muted">none</span>')}
-      ${step('Evidence', d.evidence.map((e) => `<div class="quote small">${esc(e.locator || '')} — ${esc(e.excerpt)}</div>`).join('') || '<span class="muted">none</span>')}
+      ${step('Evidence', d.evidence.map((e) => `<div class="quote small">${esc(e.locator || '')}${e.span_id ? ` <span class="mono muted">${esc(e.span_id)} [${e.start}–${e.end}]</span>` : ''} — ${esc(e.excerpt)}</div>`).join('') || '<span class="muted">none</span>')}
       ${L.research_runs.length ? step('Research', L.research_runs.map((r) => `<div><a href="#/mission/${r.mission_id}">${r.mission_id}</a> · ${r.run_id} · ${esc(r.agent_id)}</div>`).join('')) : ''}
       ${L.corrections.length ? step('Corrections', L.corrections.map((c) => `<div>${c.id} by ${esc(c.submitted_by)}: ${esc(c.what_is_incorrect)} → ${esc(c.correct_value)}</div>`).join('')) : ''}
       ${step('Candidate', `<div>${esc(n.ref)} · analyzed ${when(n.analysis.analyzed_at)}${n.analysis.scope_decision ? `<div class="small muted">Scope decision: ${esc(n.analysis.scope_decision.scope)} (${n.analysis.scope_decision.confidence})</div>` : ''}</div>`)}
@@ -223,7 +223,8 @@ async function sourceView(id) {
   return `<div class="crumbs">Sources / ${esc(s.id)}</div><h1>${esc(s.title)}</h1><div class="sub"><span class="pill">${esc(s.source_type)}</span> <span class="pill">${esc(s.authority_type)}</span> <span class="pill">${esc(s.visibility)}</span> ${s.scope ? scopePill(s.scope.scope_type + ':' + s.scope.scope_id) : ''} ${pill(s.extraction_status, s.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')}</div>
   <dl class="kv card"><dt>Location</dt><dd>${esc(s.original_location || s.original_filename || '—')}</dd><dt>Owner</dt><dd>${esc(s.owner || '—')}</dd><dt>Author</dt><dd>${esc(s.author || '—')}</dd><dt>Ingested</dt><dd>${when(s.ingested_at)}</dd><dt>Effective date</dt><dd>${esc(s.effective_date || '—')}</dd><dt>Checksum</dt><dd class="mono">${esc(s.checksum)}</dd><dt>Content version</dt><dd>${s.content_version}</dd><dt>Channel</dt><dd>${esc(s.channel)}</dd></dl>
   <h2>Knowledge extracted <span class="muted">${d.nuggets.length}</span></h2>${nuggetRows(d.nuggets)}
-  <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
+  ${extractionReport(d)}
+  <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} · ${esc(v.extraction_version || 'ka-extract/1')} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
 }
 
 async function missionView(id) {
@@ -254,6 +255,19 @@ async function addView() {
 
 
 const scopeOptions = (scopes, selected = '') => scopes.map((s) => `<option value="${s.scope_type}|${esc(s.scope_id)}" ${`${s.scope_type}|${s.scope_id}` === selected ? 'selected' : ''}>${esc(s.name)} · ${s.scope_type.toLowerCase().replace('_', ' ')}</option>`).join('');
+
+// [block plan-04] extraction report, re-extract, evidence spans (research-01 R3, R16)
+function extractionReport(d) {
+  const cur = d.versions.find((v) => v.id === d.source.current_version_id) || d.versions[d.versions.length - 1];
+  const r = (cur && cur.extraction_report) || {};
+  const ev = d.evidence || [];
+  return `<div class="card"><h3>Extraction report <span class="small muted">${esc(cur ? cur.extraction_version || 'ka-extract/1' : '')}</span></h3>
+    <dl class="kv"><dt>Statements</dt><dd>${r.statements ?? '—'}</dd><dt>Process assertions</dt><dd>${r.assertions ?? '—'} <span class="small muted">(${esc(r.method || 'not run')})</span></dd>
+    <dt>Dropped</dt><dd>${(r.dropped || []).length ? `<ul class="small">${r.dropped.map((x) => `<li>${esc(x.reason)}${x.span_id ? ` <span class="mono muted">${esc(x.span_id)}</span>` : ''}${x.kept ? ' <span class="pill ok">kept</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">none</span>'}</dd>
+    <dt>Evidence spans</dt><dd class="small">${ev.length ? ev.filter((e) => e.span_id).map((e) => `<span class="pill">${esc(e.span_id)} [${e.start}–${e.end}]</span>`).filter((v, i, a) => a.indexOf(v) === i).join(' ') : '<span class="muted">none</span>'}</dd></dl>
+    <div class="actions"><button data-act="reextract" data-id="${esc(d.source.id)}">Re-extract with current extractor</button></div></div>`;
+}
+// [/block plan-04]
 
 // [block plan-03] process assertion + grammar binding (research-01 R2, R8)
 const bindPill = (b) => b ? pill(b.binding_status, { bound: 'ok', proposed: 'warn', unresolved: 'halt', stale: 'halt', not_applicable: '' }[b.binding_status] || '') : pill('unbound');
@@ -502,6 +516,7 @@ async function act(b) {
   }
   if (a === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(`Copied: ${b.dataset.text}`); } catch { prompt('Copy:', b.dataset.text); } return; }
   if (a === 'img-delete') { if (!confirm(`Delete image #${b.dataset.n}? Its number will not be reused.`)) return; await api(`/images/${b.dataset.n}/delete`, { method: 'POST' }); toast(`Deleted image #${b.dataset.n}`); render(); return; }
+  if (a === 'reextract') { const r = await api(`/sources/${b.dataset.id}/reextract?owner=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Re-extracted as v${r.source_version.version}: ${r.candidates.length} candidates`); render(); return; }
   if (a === 'rebind') { const r = await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/rebind`, { method: 'POST' }); toast(`Binding: ${r.binding.binding_status}`); render(); return; }
   if (a === 'grammar-refresh') { const r = await api('/grammar/refresh', { method: 'POST', body: { force: b.dataset.force === '1' } }); toast(`Grammar ${r.descriptor.grammar_version} · ${r.descriptor.type_table_version}`); render(); return; }
   if (a === 'rebind-all') { const r = await api('/grammar/rebind-all', { method: 'POST' }); toast(`Rebound ${r.rebound} nugget(s)`); render(); return; }

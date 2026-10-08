@@ -43,6 +43,65 @@ def source_type_for_filename(name: str) -> SourceType:
     return SourceType.COMPANY_DOCUMENT
 
 
+# [block plan-04]
+EXTRACTION_VERSION = "ka-extract/2"      # research-01 R16: recorded on every SourceVersion; re-extraction is a new version
+
+
+@dataclass
+class Span:
+    """A stable, addressable region of the stored text: `text[start:end]` is exactly the section's text."""
+    span_id: str
+    locator: str
+    start: int
+    end: int
+
+
+def spans_for(sections: list[tuple[str, str]]) -> tuple[str, list[Span]]:
+    """The reproducible join: sections joined with a blank line, spans computed from that join."""
+    text_parts, spans, pos = [], [], 0
+    for i, (locator, t) in enumerate(sections, 1):
+        if i > 1:
+            pos += 2
+        sid = f"s{i}" + (f".p{locator[2:]}" if locator.startswith("p.") and locator[2:].isdigit() else "")
+        spans.append(Span(sid, locator, pos, pos + len(t)))
+        text_parts.append(t)
+        pos += len(t)
+    return "\n\n".join(text_parts), spans
+
+
+def ocr_pdf(data: bytes) -> list[tuple[str, str]] | None:
+    """OCR a text-less PDF into (locator, text) pages. Optional dependencies; None when they are missing."""
+    try:
+        from pdf2image import convert_from_bytes   # type: ignore
+        import pytesseract                           # type: ignore
+    except ImportError:
+        return None
+    pages = []
+    for i, img in enumerate(convert_from_bytes(data), 1):
+        t = pytesseract.image_to_string(img).strip()
+        if t:
+            pages.append((f"p.{i}", t))
+    return pages
+
+
+def ocr_image(data: bytes) -> list[tuple[str, str]] | None:
+    try:
+        import io
+
+        import pytesseract                           # type: ignore
+        from PIL import Image                        # type: ignore
+    except ImportError:
+        return None
+    t = pytesseract.image_to_string(Image.open(io.BytesIO(data))).strip()
+    return [("image", t)] if t else []
+
+
+def _ocr_enabled() -> bool:
+    from ka import config
+    return bool(config.get("KA_OCR"))
+# [/block plan-04]
+
+
 @dataclass
 class TextExtraction:
     text: str
@@ -50,6 +109,17 @@ class TextExtraction:
     note: str | None = None
     media_type: str = "text/plain"
     sections: list[tuple[str, str]] = field(default_factory=list)   # (locator, text) for evidence locators
+    spans: list[Span] = field(default_factory=list)                  # plan-04: addressable regions of `text`
+
+    def __post_init__(self) -> None:
+        if self.sections:
+            self.text, self.spans = spans_for(self.sections)
+        elif self.text.strip():
+            self.sections = [("¶1", self.text.strip())]
+            self.text, self.spans = spans_for(self.sections)
+
+    def span(self, span_id: str) -> Span | None:
+        return next((sp for sp in self.spans if sp.span_id == span_id), None)
 
 
 def extract_text(data: bytes, source_type: SourceType, filename: str | None = None) -> TextExtraction:
@@ -70,6 +140,11 @@ def extract_text(data: bytes, source_type: SourceType, filename: str | None = No
         if source_type == SourceType.URL:
             return _html(data)
         if source_type == SourceType.IMAGE:
+            if _ocr_enabled():
+                got = ocr_image(data)
+                if got is None:
+                    return TextExtraction("", ExtractionStatus.UNAVAILABLE, "ocr not installed (pip install 'knowledge-acquisition[ocr]')", "image/*")
+                return TextExtraction("", ExtractionStatus.EXTRACTED if got else ExtractionStatus.UNAVAILABLE, "ocr" if got else "ocr found no text", "image/*", got)
             return TextExtraction("", ExtractionStatus.UNAVAILABLE, "image extraction not configured", "image/*")
         if source_type == SourceType.CONNECTOR:
             text = data.decode("utf-8", errors="replace")
@@ -117,6 +192,13 @@ def _pdf(data: bytes) -> TextExtraction:
         if t:
             sections.append((f"p.{i}", t))
     text = "\n\n".join(t for _, t in sections)
+    if not text and _ocr_enabled():
+        pages = ocr_pdf(data)
+        if pages is None:
+            return TextExtraction("", ExtractionStatus.UNAVAILABLE, "ocr not installed (pip install 'knowledge-acquisition[ocr]')", "application/pdf")
+        if pages:
+            return TextExtraction("", ExtractionStatus.EXTRACTED, "ocr", "application/pdf", pages)
+        return TextExtraction("", ExtractionStatus.UNAVAILABLE, "ocr found no text", "application/pdf")
     status = ExtractionStatus.EXTRACTED if text else ExtractionStatus.UNAVAILABLE
     return TextExtraction(text, status, None if text else "no text layer (scanned PDF?)", "application/pdf", sections)
 
@@ -138,8 +220,8 @@ def _docx(data: bytes) -> TextExtraction:
     if buf:
         sections.append((heading, "\n".join(buf)))
     for ti, table in enumerate(d.tables, 1):
-        rows = [" | ".join(c.text.strip() for c in r.cells) for r in table.rows]
-        sections.append((f"table {ti}", "\n".join(rows)))
+        for ri, r in enumerate(table.rows, 1):                       # plan-04: one section per row, addressable
+            sections.append((f"table {ti} row {ri}", " | ".join(c.text.strip() for c in r.cells)))
     text = "\n\n".join(t for _, t in sections)
     return TextExtraction(text, ExtractionStatus.EXTRACTED, None, MEDIA_TYPES[SourceType.WORD], sections)
 
@@ -173,13 +255,10 @@ def _xlsx(data: bytes, filename: str | None) -> TextExtraction:
     wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     sections = []
     for ws in wb.worksheets:
-        rows = []
-        for row in ws.iter_rows(values_only=True):
+        for ri, row in enumerate(ws.iter_rows(values_only=True), 1):
             cells = ["" if c is None else str(c) for c in row]
             if any(cells):
-                rows.append(" | ".join(cells))
-        if rows:
-            sections.append((f"sheet {ws.title}", "\n".join(rows)))
+                sections.append((f"sheet {ws.title} row {ri}", " | ".join(cells)))   # plan-04: row-level locators
     text = "\n\n".join(t for _, t in sections)
     return TextExtraction(text, ExtractionStatus.EXTRACTED, None, MEDIA_TYPES[SourceType.SPREADSHEET], sections)
 

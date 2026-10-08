@@ -85,6 +85,10 @@ class SourceVersion(BaseModel):
     created_at: str = Field(default_factory=now_iso)
     extraction_status: ExtractionStatus = ExtractionStatus.PENDING
     extraction_note: str | None = None
+    # [block plan-04] research-01 R16 / R3
+    extraction_version: str = "ka-extract/1"        # the extractor that produced `text`; re-extraction is a new version
+    extraction_report: dict[str, Any] = Field(default_factory=dict)   # statements / assertions / dropped / method
+    # [/block plan-04]
 
 
 class Evidence(BaseModel):
@@ -93,6 +97,9 @@ class Evidence(BaseModel):
     source_id: str
     source_version_id: str
     locator: str | None = None                       # "Section 4.2", "p.3", char offsets, URL fragment
+    span_id: str | None = None                       # plan-04: stable span in the source version's text
+    start: int | None = None
+    end: int | None = None
     excerpt: str
     created_at: str = Field(default_factory=now_iso)
     created_by: str = "system"
