@@ -24,7 +24,7 @@ from ka.lineage import LineageService
 from ka.model import ElementChange, GraphChangeExecution, GraphChangeProposal, KnowledgeNuggetVersion, Subject
 from ka.repository import Repository
 from ka.timeutil import now_iso
-from ka.vocab import BindingStatus, GraphElementKind, InheritanceState, ProposalStatus
+from ka.vocab import BindingStatus, GraphElementKind, InheritanceState, NuggetStatus, ProposalStatus
 
 
 class ChangeError(RuntimeError):
@@ -375,6 +375,46 @@ class GraphChangeService:
         self.auditor.record(who=by, what="graph.change.applied", approval=p.id, before=p.before_state, after=p.proposed_after_state,
                             affected=[p.id, ex.id] + p.affected_element_ids + ([p.eos_proposal_id] if p.eos_proposal_id else []))
         return ex
+
+    # [block plan-10] research-02 R2 (Q4): retiring a version removes the graph elements that depend on it ALONE
+    def propose_retirement(self, v: KnowledgeNuggetVersion, *, by: str = "ka.graph_change") -> GraphChangeProposal | None:
+        """Removal ops for every element whose active lineage is only `v` (or other versions of its canonical id); elements
+        another ACTIVE nugget depends on are left alone. Goes through validate → approve → apply like any proposal."""
+        deps = self.repo.dependencies_for_nugget(v.ref, active_only=False)
+        changes: list[ElementChange] = []
+        for d in deps:
+            others = [x for x in self.repo.dependencies_for_element(d.graph_id, d.element_id, active_only=True)
+                      if x.nugget_ref.rsplit(":v", 1)[0] != v.canonical_id]
+            others = [x for x in others if (ov := self.repo.version(x.nugget_ref)) is not None and ov.status == NuggetStatus.ACTIVE]
+            if others:
+                continue
+            el = self.adapter.get_graph_element(d.graph_id, d.element_id)
+            if el is None:
+                continue
+            is_edge = getattr(el, "kind", "") == "edge" or ":" in d.element_id and "->" in d.element_id
+            changes.append(ElementChange(graph_id=d.graph_id, element_id=d.element_id,
+                                         element_kind=GraphElementKind.EDGE if is_edge else GraphElementKind.NODE, operation="remove",
+                                         op="remove_edge" if is_edge else "remove_node",
+                                         before=el.model_dump(include={"name", "description", "props"}),
+                                         after={"props": {LINEAGE_KEY: [{"nugget_id": v.canonical_id, "version": v.version, "retired": True}]}}))
+        if not changes:
+            return None
+        changes.sort(key=lambda c: (c.element_kind != GraphElementKind.EDGE, c.element_id))   # edges first
+        ops = to_change_ops(changes)
+        key = idempotency_key_for([f"retire:{v.ref}"], ops)
+        prop = GraphChangeProposal(
+            knowledge_change_ids=[v.ref], affected_graph_ids=sorted({c.graph_id for c in changes}),
+            affected_element_ids=sorted({c.element_id for c in changes}),
+            before_state={f"{c.graph_id}/{c.element_id}": c.before for c in changes}, proposed_after_state={},
+            changes=changes, ops=ops, idempotency_key=key, reason=f"retirement of {v.ref}: source revoked, re-review rejected (Q4)",
+            impact_summary={"retirement": True, "elements": len(changes)}, created_by=by,
+            eos_base_version=self.adapter.base_version(v.scope), requires_approval=True)
+        self.repo.proposals.put(prop)
+        self.bus.emit("graph.change.proposed", proposal_id=prop.id, ref=v.ref)
+        self.auditor.record(who=by, what="graph.change.proposed", why=prop.reason, scope=v.scope, affected=[prop.id, v.ref])
+        self.validate(prop.id)
+        return self.repo.proposals.require(prop.id)
+    # [/block plan-10]
 
     def rollback(self, execution_id: str, *, by: str, reason: str = "") -> GraphChangeExecution:
         """Publish the inverse of an applied execution (EOS: a new proposal; in-memory: the inverse applied)."""

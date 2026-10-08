@@ -77,6 +77,11 @@ class KnowledgeAcquisition:
         self._restore_registry()
         if auto_propose_graph_changes:
             self.bus.subscribe("knowledge.approved", self._on_approved)
+        # [block plan-10] research-02 R2: a rejected re-review retires its prior version's graph elements through a proposal;
+        # the needs-attention row below points at the re-review candidates
+        self.governance.on_retire = lambda prior, by: self.graph_change.propose_retirement(prior, by=by)
+        self.connectors.governance = self.governance
+        # [/block plan-10]
         # [block plan-09] research-01 R11: an approved candidate from a gap's mission fulfils the request
         self.bus.subscribe("knowledge.approved", lambda ev: self.runtime_guard.fulfil_from_approval(ev["ref"]))
         # [/block plan-09]
@@ -238,6 +243,8 @@ class KnowledgeAcquisition:
             "promotions": [p.model_dump(mode="json") for p in self.repo.promotions.where(lambda p: p.status == "PROPOSED")],
             "acquisition_requests": [r.model_dump(mode="json") for r in self.runtime_guard.open_requests()],
             "revoked_sources_with_active_knowledge": self.connectors.revoked_with_active_knowledge(),   # plan-08
+            "revoked_source_reviews": [_nugget_row(n) | {"source_revoked": n.analysis.get("source_revoked"), "remaining_sources": n.analysis.get("remaining_sources")}
+                                       for n in pending if n.analysis.get("source_revoked")],   # plan-10
         }
 
     def domain_dashboard(self, scope: Scope) -> dict[str, Any]:
@@ -320,4 +327,6 @@ def _nugget_row(n) -> dict[str, Any]:
             "knowledge_type": n.knowledge_type.value, "channel": n.channel.value, "graph_group": n.graph_group,
             "created_at": n.created_at, "approved_at": n.approved_at, "conflict_open": bool(n.analysis.get("conflict_open")),
             "subject": n.subject.canonical_key if n.subject else None, "predicate": n.predicate,
-            "suggested_resolution": next((f.get("suggested_resolution") for f in n.analysis.get("findings", []) if f["relationship"] == "CONTRADICTS"), None)}
+            "suggested_resolution": next((f.get("suggested_resolution") for f in n.analysis.get("findings", []) if f["relationship"] == "CONTRADICTS"), None),
+            "resolved_as": n.analysis.get("resolved_as"), "duplicate_of": n.analysis.get("duplicate_of"),           # plan-10
+            "source_revoked": bool(n.analysis.get("source_revoked")), "remaining_sources": n.analysis.get("remaining_sources")}

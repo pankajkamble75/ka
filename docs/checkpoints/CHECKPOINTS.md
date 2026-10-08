@@ -2,6 +2,51 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 22:40 UTC — plan-10: duplicates resolve as Keep Existing + evidence; revocation becomes a re-review (research-02 R1, R2; Q11, Q4)
+
+**What changed**
+
+- *Governance (PROTECTED)* `ka/governance.py`: inside `decide`, a candidate flagged `duplicate_of` an ACTIVE nugget in the SAME scope never
+  becomes a second ACTIVE version — APPROVE is rewritten to an automatic KEEP_EXISTING decision (reason names Q11), the candidate is
+  REJECTED with `analysis.resolved_as="duplicate"` and `conflict_open=False`, and `attach_provenance` appends its source and evidence
+  refs to the existing nugget (provenance, not `SEMANTIC_FIELDS`; audited before/after). Explicit KEEP_EXISTING attaches too. The
+  analysis now sets `duplicate_of` for an exact same-scope duplicate even when the candidate also contradicts other nuggets. New
+  `reopen_for_revocation(source_id, by)`: each ACTIVE nugget derived from a revoked source gets a same-statement revision
+  (`propose_revision`, channel FEEDBACK) with `analysis.source_revoked` and `remaining_sources`. REJECT of such a revision retires the
+  prior version (OBSOLETE, `effective_to`, OBSOLETES relationship) and calls `on_retire`.
+- *Publication (PROTECTED, additive)* `ka/graph_change.py::propose_retirement(v, by)`: removal ops for elements whose active lineage is
+  only `v`'s canonical id; shared elements untouched; goes through validate → approve → apply. `ka/service.py` wires `on_retire`.
+- *Connectors* `ka/connectors/sync.py`: on `deleted`, after flagging, `governance.reopen_for_revocation`; refs in `SyncReport.reviews`
+  and `Connection.last_delta["reviews"]` (`counts()` unchanged). `ka/service.py`: needs-attention `revoked_source_reviews`; nugget rows
+  carry `resolved_as`, `duplicate_of`, `source_revoked`, `remaining_sources`.
+- *Console* `ka/console/app.js`: "duplicate of KN-x" and "source revoked · n remaining sources" badges on both row renderers; Dashboard
+  table "Re-reviews from revoked sources" with Approve/Reject.
+- *Docs/tests* `plan-10.md` (with the build corrections); `ka/tests/test_plan10_governance_decisions.py` (14 cases);
+  `e2e/plan10_governance_flow.py`; architecture Q11/Q4 → ✅ built; `docs/protected.md` rows re-verified.
+
+**Why** — the author's decisions Q11 and Q4 (2026-10-08): one governed fact per claim, and revocation as a governance event rather
+than a silent flag.
+
+**Verification**
+
+- Protected protocol: characterization committed first (48d4685) and green against the unchanged files; `ka/governance/` and
+  `ka/graph_change/` covering suites pass UNMODIFIED **except `test_plan06_profile.py::test_N7`**, whose assertions pinned "duplicate
+  ACTIVE assertions (Q11)" — the behaviour the author ruled out — and were rewritten to the decided behaviour (recorded in
+  `docs/protected.md` and in `test_plan10::test_N1`). Not a regression; a ruled decision superseding a pinned open question.
+- Corrections during the build: duplicates are same-scope only (`test_plan01_phase6::test_P4` showed sibling-instance repeats are
+  promotion's business); exact duplicates are flagged under conflict (the live store surfaced it).
+- `pytest ka/tests` (in-process) → 210 passed; EOS path → 7 passed; ruff F clean. Verify recount 8/8 D, 8/8 P, 6/6 N; blocks 5/5,
+  none undeclared.
+- Live: `e2e/plan10_governance_flow.py` 8/8 PASS (duplicate → automatic Keep Existing, both documents on one nugget, history badge;
+  deleted connector file → re-review on the Dashboard → Reject → prior OBSOLETE → retirement proposal); screenshots verified.
+- Product tests (research-02, 7 defined): **PT1 PASS, PT2 PASS**; PT3–PT7 FAIL/NOT RUN awaiting plans 11–15.
+
+**Follow-ups / risks** — a permission NARROWING that drops a source below its nuggets' scope requirement is still only flagged
+(plan-08); it is the undecided second half of Q4 and is listed as out of scope in the plan.
+
+**Decisions and questions** — BUILT: Q11, Q4 (architecture §2, §4, §10 now ✅ built with `path:line`). RAISED: none. Plan `plan-10`;
+research-02 R1, R2 → UPLOADED.
+
 ## 2026-10-08 21:10 UTC — question session: Q1–Q11 answered by the author
 
 **What changed**

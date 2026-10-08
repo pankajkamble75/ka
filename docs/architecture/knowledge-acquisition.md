@@ -42,7 +42,7 @@ fetch / get_permissions / checkpoint / sync_incremental / revoke) and `ka/connec
 `Connection` (model) names a kind, a root under `KA_CONNECTOR_ROOTS`, scope, authority, visibility and an optional `secret_ref`
 (the NAME of an environment variable; the value is never stored). `ka/connectors/sync.py::SyncService.sync` reconciles a delta
 through the one ingestion door: new → `Source`; modified → new `SourceVersion` of the same source, re-extracted; moved → same
-source, location updated; deleted → `Source.revoked_at`, versions kept, derived nuggets flagged (plan-08) and — **Q4, ⏳ DECIDED 2026-10-08, not built** — returned to review as candidate revisions so a person decides whether each stands on other evidence or is retired;
+source, location updated; deleted → `Source.revoked_at`, versions kept, derived nuggets flagged (plan-08) and — **Q4, ✅ built by plan-10** — returned to review as same-statement candidate revisions (`GovernanceService.reopen_for_revocation`) so a person decides: APPROVE keeps, REJECT retires the prior (OBSOLETE) and `GraphChangeService.propose_retirement` proposes removing its elements;
 permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ⏳ DECIDED 2026-10-08, not built:** the first
 provider after the folder is Microsoft 365 / SharePoint (one Graph app registration; permission lists → visibility; client secret via
 `secret_ref`); Google Workspace and a file share follow the same pattern.
@@ -90,11 +90,10 @@ CONTRADICTS; + qualifier ("international") → SPECIALIZES (both valid); candida
 candidate at a broader scope than an existing override → CONTEXTUALIZES (override preserved). The LLM, when present, only
 adds `why_conflict / both_valid / suggested_resolution` to the finding.
 
-**Duplicates (Q11 — ⏳ DECIDED 2026-10-08, not built).** When a candidate is analysed as `duplicate_of` an ACTIVE nugget, APPROVE
+**Duplicates (Q11 — ✅ built by plan-10, 2026-10-08).** When a candidate is analysed as `duplicate_of` an ACTIVE nugget, APPROVE
 does not create a second ACTIVE version. It auto-resolves as Keep Existing: the candidate closes as a duplicate, and its source
 reference and evidence are attached to the existing nugget so the second document still counts. Refusing or allowing were
-considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`, Q11 ledger). Lives in `ka/governance.py`
-(protected): characterize first, then change.
+considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`, Q11 ledger). Same scope only: the same statement approved in sibling instances is repeated instance knowledge for promotion (§25), not a duplicate. Lives in `ka/governance.py::decide` (the duplicate branch) and `attach_provenance`; characterization 48d4685.
 
 ## 5. Compilation, impact, publication (§19–§22, §26, §39, §40) — plan-05
 
@@ -225,7 +224,7 @@ agent fetch only through `is_safe_url` / `safe_fetch` (loopback, link-local, pri
 re-checked per hop; `KA_URL_ALLOWLIST` for intranet hosts). A CHANGE_SCOPE or promotion that would widen a nugget's
 visibility is refused unless the decision carries `widen_visibility=True`, and then records `visibility_change`
 (`ka/vocab.py::required_visibility`, `ka/governance.py` CHANGE_SCOPE branch, `ka/promotion.py::decide`). **Step 2** —
-identity provider and tenant model remain a two-repo plan (Q4, provider not yet named). **Retention after revocation is decided (Q4, 2026-10-08): re-review** — every ACTIVE nugget derived from a revoked source becomes a candidate revision in Pending with `source_revoked`; APPROVE keeps it on its other evidence, REJECT retires the prior version (OBSOLETE) and raises a graph proposal; never automatic, never silently live. ⏳ not built.
+identity provider and tenant model remain a two-repo plan (Q4, provider not yet named). **Retention after revocation is decided (Q4, 2026-10-08): re-review** — every ACTIVE nugget derived from a revoked source becomes a candidate revision in Pending with `source_revoked`; APPROVE keeps it on its other evidence, REJECT retires the prior version (OBSOLETE) and raises a graph proposal; never automatic, never silently live. ✅ built by plan-10 (`ka/governance.py`, `ka/graph_change.py::propose_retirement`, `ka/connectors/sync.py` trigger).
 
 `Source.visibility`/`permissions`; a nugget's `visibility` is the narrowest of its sources; research agents skip sources more restricted
 than the mission's `permitted_visibility` unless the requester owns them. Access *enforcement* at the API edge (authn) is out of scope for

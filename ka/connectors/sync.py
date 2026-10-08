@@ -38,6 +38,7 @@ class SyncReport:
     skipped: list[dict[str, Any]] = field(default_factory=list)
     candidates: int = 0
     source_ids: list[str] = field(default_factory=list)
+    reviews: list[str] = field(default_factory=list)       # plan-10: re-review candidate refs
 
     def counts(self) -> dict[str, int]:
         return {"new": self.new, "modified": self.modified, "moved": self.moved, "deleted": self.deleted,
@@ -131,6 +132,12 @@ class SyncService:
                 src.revoked_at = now_iso()
                 self.repo.sources.put(src)
                 self._flag_derived(src, "source_revoked")
+                # [block plan-10] research-02 R2 (Q4): revocation is a governance event — derived knowledge returns to review
+                try:
+                    report.reviews += self.governance.reopen_for_revocation(src.id, by=by, revoked_at=src.revoked_at)
+                except Exception as e:  # noqa: BLE001 — a re-review failure must not abort the sync
+                    report.skipped.append({"locator": loc, "reason": f"re-review failed: {type(e).__name__}: {e}"})
+                # [/block plan-10]
                 self.bus.emit("source.revoked", source_id=src.id, connection_id=conn.id)
                 self.auditor.record(who=by, what="source.revoked", why="deleted at the connector", source=src.id, scope=conn.scope, affected=[src.id])
             report.deleted += 1
@@ -149,7 +156,8 @@ class SyncService:
         conn.checkpoint, conn.last_sync_at = delta.checkpoint, now_iso()
         conn.last_delta = {"new": [i.locator for i in delta.new], "modified": [i.locator for i in delta.modified],
                            "moved": [[o, i.locator] for o, i in delta.moved], "deleted": list(delta.deleted),
-                           "permission_changed": [i.locator for i in delta.permission_changed], "skipped": report.skipped}
+                           "permission_changed": [i.locator for i in delta.permission_changed], "skipped": report.skipped,
+                           "reviews": report.reviews}   # plan-10
         conn.stats = report.counts()
         self.repo.connections.put(conn)
         self.auditor.record(who=by, what="connector.synced", why=str(report.counts()), scope=conn.scope, affected=[conn.id] + report.source_ids)

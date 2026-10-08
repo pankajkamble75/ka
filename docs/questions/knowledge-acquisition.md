@@ -143,4 +143,15 @@ not. **Recommendation:** re-pin once, after plan-05 publishes real lineage worth
 
 ## ❓ Open
 
-None — every question parked by the `ship research-01` run was answered in the 2026-10-08 question session (ledgers above).
+### Q12 — Search vendor and key (research-02 R8; beside Q5)
+**Scenario.** Q5 chose a paid web-search API. plan-13 builds `BraveSearchProvider` against Brave's documented response shape and
+verifies it with a recorded fixture. **Decision required.** Confirm Brave (or name another vendor) and put the key in
+`KA_SEARCH_API_KEY` on the server. **Big picture.** Until the key exists, discovery still runs with `none`/`fixture` and product test
+PT5 is NOT RUN. **Options.** Brave (recommended — documented JSON, free tier for development) / Serper / other. **Cost.** Brave: free
+to 2k queries/month, then about $3 per 1k; the monthly cap bounds it.
+
+### Q13 — Microsoft 365 app registration (research-02 R9; beside Q6)
+**Scenario.** Q6 chose Microsoft 365 / SharePoint first. plan-14 builds the connector with app-only Graph auth, verified against a
+recorded Graph fixture. **Decision required.** Register the app (Files.Read.All, Sites.Read.All, application permissions), and give
+KA the tenant id, client id and the name of the variable holding the client secret. **Big picture.** Until then the connector
+cannot be used live and PT6 is NOT RUN. **Cost.** an admin consent in the tenant.

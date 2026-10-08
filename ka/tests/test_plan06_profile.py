@@ -163,10 +163,13 @@ def test_N6_apply_keeps_every_nuggets_dependency_on_a_shared_element(ka):
 
 
 def test_N7_identical_active_assertions_compose_once(ka):
-    """plan-06 correction: a re-uploaded SOP approved twice makes duplicate ACTIVE assertions (Q11); the profile shows each fact once."""
+    """plan-06 correction, then Q11 (the author, 2026-10-08; built by plan-10): a re-uploaded SOP approved twice no longer makes
+    duplicate ACTIVE assertions — the second approvals resolve as Keep Existing with the new document attached as evidence — so the
+    profile shows each fact once with NOTHING to compose. (Before plan-10 this test pinned `also == 1` and `duplicates == 6`; that
+    behaviour was the open question Q11 and the author ruled it out.)"""
     _sop_profile(ka)
     _sop_profile(ka)
     p = ka.process_profile("merchant_underwriting")
     assert [a.value for a in p.activities] == ["Collect application", "Validate application", "Analyze merchant risk", "Make credit decision", "Communicate decision"]
-    assert all(len(a.also) == 1 for a in p.activities) and len(p.actors) == 1 and len(p.actors[0].also) == 1
-    assert p.counts["duplicates"] == 6 and p.counts["assertions"] == 14
+    assert all(len(a.also) == 0 for a in p.activities) and len(p.actors) == 1 and len(p.actors[0].also) == 0
+    assert p.counts["duplicates"] == 0 and p.counts["assertions"] == 7

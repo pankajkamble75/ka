@@ -10,7 +10,7 @@ and research agents cannot be the decider for their own candidates (§17).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from ka import config
 from ka.audit import Auditor
@@ -80,6 +80,9 @@ class GovernanceService:
         self.scope_engine = ScopeDecisionEngine(registry)
         self.authority = authority_policy or config.AuthorityPolicy()
         self.on_more_research: Callable[[KnowledgeNuggetVersion, str], str] | None = None   # set by ResearchOrchestrator
+        # [block plan-10] research-02 R2: set by the service to GraphChangeService.propose_retirement (a retired version's graph elements)
+        self.on_retire: Callable[[KnowledgeNuggetVersion, str], Any] | None = None
+        # [/block plan-10]
         self.research_agent_ids: set[str] = set()
 
     # ---------------------------------------------------------------- Extract (§11 step 1)
@@ -249,6 +252,11 @@ class GovernanceService:
         }
         self.versioning.transition(v, NuggetStatus.ANALYZED)
 
+        # plan-10 (Q11): an exact duplicate of an ACTIVE same-scope nugget is flagged whether or not it ALSO contradicts others —
+        # those contradictions already exist for the nugget it duplicates, so the candidate adds nothing and resolves as Keep Existing.
+        exact = next((f.existing for f in analysis.duplicates if f.existing.status == NuggetStatus.ACTIVE and f.existing.scope == v.scope), None)
+        if exact is not None:
+            v.analysis["duplicate_of"] = exact.ref
         if analysis.has_conflict():
             self.versioning.transition(v, NuggetStatus.CONFLICT)
             for f in analysis.conflicts:
@@ -261,7 +269,7 @@ class GovernanceService:
                 self.repo.nuggets.put(v)
         elif analysis.duplicates:
             dup = analysis.duplicates[0].existing
-            v.analysis["duplicate_of"] = dup.ref
+            v.analysis.setdefault("duplicate_of", dup.ref)
             self.versioning.transition(v, NuggetStatus.PENDING_REVIEW)
         else:
             self.versioning.transition(v, NuggetStatus.PENDING_REVIEW)
@@ -314,12 +322,49 @@ class GovernanceService:
                                reason=reason, comments=comments)
         before = {"status": v.status.value}
 
-        if outcome in {DecisionOutcome.APPROVE, DecisionOutcome.ACCEPT_NEW}:
+        # research-02 R1 (Q11, decided 2026-10-08): a candidate flagged duplicate_of an ACTIVE nugget never becomes a second ACTIVE
+        # version. APPROVE is resolved as an automatic Keep Existing; either way the candidate's provenance moves to the existing one.
+        dup = self.repo.version(v.analysis.get("duplicate_of") or "") if v.analysis.get("duplicate_of") else None
+        # Same scope only: the same statement in a sibling instance is repeated instance knowledge for promotion (§25), not a duplicate.
+        if dup is not None and dup.status == NuggetStatus.ACTIVE and dup.canonical_id != v.canonical_id and dup.scope == v.scope \
+                and outcome in {DecisionOutcome.APPROVE, DecisionOutcome.KEEP_EXISTING}:
+            if outcome == DecisionOutcome.APPROVE:
+                d.outcome, d.automatic = DecisionOutcome.KEEP_EXISTING, True
+                d.reason = f"duplicate of {dup.ref}; resolved as Keep Existing (Q11)" + (f" — {reason}" if reason else "")
+                outcome = DecisionOutcome.KEEP_EXISTING
+            d.related_refs = sorted(set(d.related_refs) | {dup.ref})
+            self.attach_provenance(dup.ref, v, by=by, decision_id=d.id)
+            v.analysis["resolved_as"] = "duplicate"
+            v.analysis["conflict_open"] = False            # its contradictions belong to the nugget it duplicates
+            v.governance_decision_id = d.id
+            self.versioning.transition(v, NuggetStatus.REJECTED)
+            self.bus.emit("knowledge.rejected", ref=v.ref, decision_id=d.id)
+        elif outcome in {DecisionOutcome.APPROVE, DecisionOutcome.ACCEPT_NEW}:
             self._activate(v, d, supersede=[partner] if (partner and outcome == DecisionOutcome.ACCEPT_NEW) else None)
         elif outcome in {DecisionOutcome.REJECT, DecisionOutcome.KEEP_EXISTING}:
             v.governance_decision_id = d.id
             self.versioning.transition(v, NuggetStatus.REJECTED)
             self.bus.emit("knowledge.rejected", ref=v.ref, decision_id=d.id)
+            # research-02 R2 (Q4): rejecting a re-review revision retires the prior version it was re-reviewing.
+            if outcome == DecisionOutcome.REJECT and v.analysis.get("source_revoked"):
+                prior = self.repo.active_version(v.canonical_id)
+                if prior is not None and prior.ref != v.ref:
+                    self.versioning.transition(prior, NuggetStatus.OBSOLETE)
+                    prior.comments.append({"by": by, "at": now_iso(), "text": f"retired: source revoked and re-review {v.ref} rejected — {reason}"})
+                    self.repo.nuggets.put(prior)
+                    self.repo.relationships.put(KnowledgeRelationship(from_ref=v.ref, to_ref=prior.ref, relationship_type=RelationshipType.OBSOLETES,
+                                                                      explanation=f"source revoked; re-review rejected by {by}", created_by=by))
+                    d.related_refs = sorted(set(d.related_refs) | {prior.ref})
+                    if self.on_retire is not None:
+                        try:
+                            prop = self.on_retire(prior, by)
+                            if prop is not None:
+                                d.resulting_refs.append(prop.id)
+                        except Exception as e:  # noqa: BLE001 — the retirement proposal must not undo the decision
+                            v.analysis["retirement_proposal_error"] = f"{type(e).__name__}: {e}"
+                    else:
+                        v.analysis["retirement_note"] = "no graph change service attached; retired in knowledge only"
+                    self.bus.emit("knowledge.superseded", ref=prior.ref, by_ref=v.ref, decision_id=d.id)
         elif outcome == DecisionOutcome.MERGE:
             if not partner or not merged_statement:
                 raise GovernanceError("MERGE needs a conflicting partner and a merged_statement")
@@ -433,6 +478,41 @@ class GovernanceService:
             confidence=prior.confidence, tags=prior.tags, graph_group=prior.graph_group, channel=AcquisitionChannel.FEEDBACK,
             created_by=by, canonical_id=canonical_id, change_reason=reason,
             subject=subject, predicate=predicate, object=object, binding_method=binding_method))   # plan-03: pass-through (prior's kept when None)
+
+    # [block plan-10] research-02 R1 + R2 (Q11, Q4 — decided 2026-10-08)
+    def attach_provenance(self, target_ref: str, from_version: KnowledgeNuggetVersion, *, by: str, decision_id: str | None = None) -> KnowledgeNuggetVersion:
+        """Append a candidate's sources and evidence to a governed nugget. Provenance is not meaning (SEMANTIC_FIELDS), so the
+        version stays the same; the audit carries before/after lists."""
+        target = self.repo.require_version(target_ref)
+        if target.status not in {NuggetStatus.ACTIVE, NuggetStatus.APPROVED, NuggetStatus.SUPERSEDED, NuggetStatus.OBSOLETE}:
+            raise GovernanceError(f"{target_ref} is {target.status.value}; provenance attaches to a governed version only")
+        before = {"source_refs": list(target.source_refs), "evidence_refs": list(target.evidence_refs)}
+        target.source_refs = sorted(set(target.source_refs) | set(from_version.source_refs))
+        target.evidence_refs = sorted(set(target.evidence_refs) | set(from_version.evidence_refs))
+        self.repo.nuggets.put(target)
+        self.auditor.record(who=by, what="knowledge.provenance.attached", why=f"from duplicate candidate {from_version.ref}", before=before,
+                            after={"source_refs": list(target.source_refs), "evidence_refs": list(target.evidence_refs)}, scope=target.scope,
+                            approval=decision_id, affected=[target.ref, from_version.ref])
+        return target
+
+    def reopen_for_revocation(self, source_id: str, *, by: str, revoked_at: str | None = None) -> list[str]:
+        """Q4: every ACTIVE nugget derived from a revoked source returns to review as a same-statement revision that carries
+        `source_revoked`; the prior stays ACTIVE until a person decides. A canonical id already under re-review is skipped."""
+        out: list[str] = []
+        for prior in self.repo.nuggets.where(lambda n: n.status == NuggetStatus.ACTIVE and source_id in n.source_refs):
+            if self.repo.nuggets.where(lambda n: n.canonical_id == prior.canonical_id and n.status in {NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT}):
+                continue
+            remaining_sources = [s for s in prior.source_refs if s != source_id]
+            remaining_evidence = [e for e in prior.evidence_refs if (ev := self.repo.evidence.get(e)) is None or ev.source_id != source_id]
+            rev = self.propose_revision(prior.canonical_id, statement=prior.statement, by=by,
+                                        reason=f"source {source_id} revoked; re-review on remaining evidence (Q4)",
+                                        source_ids=remaining_sources, evidence_ids=remaining_evidence)
+            rev.analysis["source_revoked"] = {"source_id": source_id, "revoked_at": revoked_at or now_iso(), "prior_ref": prior.ref}
+            rev.analysis["remaining_sources"] = len(remaining_sources)
+            self.repo.nuggets.put(rev)
+            out.append(rev.ref)
+        return out
+    # [/block plan-10]
 
     def add_comment(self, ref: str, by: str, text: str) -> KnowledgeNuggetVersion:
         v = self.repo.require_version(ref)

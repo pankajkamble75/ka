@@ -685,7 +685,7 @@ def sync_connector(connection_id: str, by: str = "user", ka: KnowledgeAcquisitio
         rep = ka.connectors.sync(connection_id, by=by)
     except ConnectorError as e:
         raise HTTPException(409 if "cannot sync" in str(e) else 400, str(e))
-    return {"report": rep.counts() | {"skipped": rep.skipped, "source_ids": rep.source_ids}, "connection": _conn_out(ka.repo.connections.require(connection_id), ka)}
+    return {"report": rep.counts() | {"skipped": rep.skipped, "source_ids": rep.source_ids, "reviews": rep.reviews}, "connection": _conn_out(ka.repo.connections.require(connection_id), ka)}
 
 
 @router.post("/connectors/{connection_id}/revoke")

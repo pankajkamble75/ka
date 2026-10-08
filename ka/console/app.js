@@ -111,7 +111,7 @@ function nuggetRows(rows, extra = '') {
   if (!rows.length) return `<div class="empty">Nothing here.</div>`;
   return `<table><tr><th>Nugget</th><th>Statement</th><th>Scope</th><th>Status</th><th>Authority</th>${extra ? '<th></th>' : ''}</tr>${rows.map((n) =>
     `<tr><td><a href="#/nugget/${encodeURIComponent(n.ref)}">${esc(n.ref)}</a><div class="small muted">${esc(n.title)}</div></td><td>${esc(n.statement)}</td><td>${scopePill(n.scope)}</td>
-     <td>${pill(n.status)}${n.conflict_open ? ' ' + pill('conflict', 'halt') : ''}</td><td class="small">${esc(n.authority)}</td>${extra ? `<td>${extra(n)}</td>` : ''}</tr>`).join('')}</table>`;
+     <td>${pill(n.status)}${n.conflict_open ? ' ' + pill('conflict', 'halt') : ''}${dupBadge(n)}${revokedBadge(n)}</td><td class="small">${esc(n.authority)}</td>${extra ? `<td>${extra(n)}</td>` : ''}</tr>`).join('')}</table>`;
 }
 
 const decideBtns = (ref) => `<span class="actions"><button class="primary" data-act="decide" data-ref="${esc(ref)}" data-outcome="APPROVE">Approve</button><button data-act="decide" data-ref="${esc(ref)}" data-outcome="REJECT">Reject</button></span>`;
@@ -371,6 +371,21 @@ async function addView() {
   </div><div id="add-result"></div><div id="co-result"></div>${await connectionsList()}`;
 }
 
+// [block plan-10] research-02 R1 + R2: a duplicate closed by Keep Existing, and a re-review from a revoked source
+function dupBadge(n) {
+  return n.resolved_as === 'duplicate' ? ` <span class="pill" title="closed as a duplicate; its evidence was attached to ${esc(n.duplicate_of || '')}">duplicate of ${esc(n.duplicate_of || '…')}</span>` : '';
+}
+function revokedBadge(n) {
+  if (!n.source_revoked) return '';
+  const left = n.remaining_sources === 0 ? 'no remaining sources' : `${n.remaining_sources} remaining source${n.remaining_sources === 1 ? '' : 's'}`;
+  return ` ${pill('source revoked', 'halt')} <span class="muted small">${left} — Approve keeps it, Reject retires the prior version</span>`;
+}
+function revokedReviewsTable(rows) {
+  return `<h3>Re-reviews from revoked sources</h3><p class="small muted">The source was deleted at its connector (Q4). Each row is a same-statement revision in <a href="#/nuggets?view=pending">Pending</a>: Approve keeps the knowledge on its remaining evidence; Reject retires the prior version and proposes removing its graph elements.</p>
+  <table><tr><th>Revision</th><th>Statement</th><th>Scope</th><th>Remaining sources</th><th></th></tr>${rows.map((r) => `<tr><td><a href="#/nugget/${encodeURIComponent(r.ref)}">${esc(r.ref)}</a></td><td>${esc(r.statement)}</td><td>${scopePill(r.scope)}</td><td class="num">${r.remaining_sources}</td><td>${decideBtns(r.ref)}</td></tr>`).join('')}</table>`;
+}
+// [/block plan-10]
+
 // [block plan-09] research-01 R11 (KA half): the gap request lifecycle in the console — principal, intent, status, Cancel
 function gapTable(rows) {
   return `<table><tr><th>Scope</th><th>Question</th><th>Gap</th><th>Principal · intent</th><th>Status</th><th></th></tr>${rows.map((r) => `<tr><td>${scopePill(r.scope.scope_type + ':' + r.scope.scope_id)}</td><td>${esc(r.question)}${r.correlation_id ? `<div class="mono muted small">${esc(r.correlation_id)}</div>` : ''}</td><td>${esc(r.gap_description)}${(r.missing_semantics || []).length ? `<div class="muted small">missing: ${r.missing_semantics.map(esc).join(', ')}</div>` : ''}</td><td class="small">${esc(r.principal || r.requested_by)} · <span class="pill">${esc(r.intent || 'answer')}</span>${r.deduplicated_count ? `<div class="muted">raised ${r.deduplicated_count + 1}×</div>` : ''}</td><td>${pill(r.status, r.status === 'FULFILLED' ? 'ok' : r.status === 'CANCELLED' ? '' : 'warn')}${r.mission_id ? `<div class="small"><a href="#/mission/${r.mission_id}">${esc(r.mission_id)}</a></div>` : ''}</td><td>${['OPEN', 'IN_RESEARCH'].includes(r.status) ? `<button data-act="cancel-gap" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`).join('')}</table>`;
@@ -423,7 +438,7 @@ async function nuggetsView(qs) {
   <div class="tabs">${tab('pending', 'Pending')}${tab('conflicts', 'Conflicts')}${tab('active', 'Active')}${tab('history', 'History')}${tab('all', 'All')}</div>
   ${rows.length ? `<table><tr><th>Nugget</th><th>Statement</th><th>Subject</th><th>Current scope</th><th>Status</th><th>Authority</th><th style="min-width:340px">Apply to</th></tr>${rows.map((n) =>
     `<tr><td><a href="#/nugget/${encodeURIComponent(n.ref)}">${esc(n.ref)}</a><div class="small muted">${esc(n.title)}</div></td><td>${esc(n.statement)}<div class="small muted">${esc(n.knowledge_type)} · ${esc(n.channel.toLowerCase())}</div></td><td>${subjCell(n)}</td>
-     <td>${scopePill(n.scope)}</td><td>${pill(n.status)}${n.conflict_open ? ' ' + pill('conflict', 'halt') : ''}</td><td class="small">${esc(n.authority)}</td><td>${applyCell(n)}</td></tr>`).join('')}</table>` : '<div class="empty">Nothing here. <a href="#/add">Add knowledge</a> to create candidates.</div>'}
+     <td>${scopePill(n.scope)}</td><td>${pill(n.status)}${n.conflict_open ? ' ' + pill('conflict', 'halt') : ''}${dupBadge(n)}${revokedBadge(n)}</td><td class="small">${esc(n.authority)}</td><td>${applyCell(n)}</td></tr>`).join('')}</table>` : '<div class="empty">Nothing here. <a href="#/add">Add knowledge</a> to create candidates.</div>'}
   <div id="apply-result"></div>`;
 }
 
@@ -506,6 +521,7 @@ async function dashboard() {
   ${a.pending_governance.length ? `<h3>Pending governance</h3>${nuggetRows(a.pending_governance, (x) => decideBtns(x.ref))}` : ''}
   ${(a.graph_impact.length || a.failed_propagation.length) ? `<h3>Graph change proposals waiting</h3>${proposalRows([...a.graph_impact, ...a.failed_propagation])}` : ''}
   ${a.promotions.length ? `<h3>Promotion proposals</h3><table><tr><th>Statement</th><th>Target</th><th>Instances</th><th></th></tr>${a.promotions.map((p) => `<tr><td>${esc(p.statement)}</td><td>${scopePill(p.target_scope.scope_type + ':' + p.target_scope.scope_id)}</td><td>${p.instance_ids.join(', ')}</td><td class="actions"><button class="primary" data-act="promote" data-id="${p.id}" data-approve="1">Promote</button><button data-act="promote" data-id="${p.id}" data-approve="0">Reject</button></td></tr>`).join('')}</table>` : ''}
+  ${(a.revoked_source_reviews || []).length ? revokedReviewsTable(a.revoked_source_reviews) : ''}
   ${(a.revoked_sources_with_active_knowledge || []).length ? `<h3>Sources revoked at their connector, with active knowledge</h3><table><tr><th>Source</th><th>Revoked</th><th>Active nuggets</th></tr>${a.revoked_sources_with_active_knowledge.map((r) => `<tr><td><a href="#/source/${r.source_id}">${esc(r.title)}</a></td><td class="small">${when(r.revoked_at)}</td><td class="small">${r.active_nuggets.map((x) => `<a href="#/nugget/${encodeURIComponent(x)}">${esc(x)}</a>`).join(', ')}<div class="muted">${esc(r.note)}</div></td></tr>`).join('')}</table>` : ''}
   ${a.acquisition_requests.length ? `<h3>Graph gaps reported by the runtime</h3>${gapTable(a.acquisition_requests)}` : ''}
   ${!Object.values(q).some((v) => v) ? '<div class="empty">All queues are empty.</div>' : ''}
