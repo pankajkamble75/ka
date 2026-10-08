@@ -10,7 +10,7 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
 | research-01 | R1 — Retire KA compiler; emit EOS ChangeOps via propose_instance_change / propose_promotion(base_version) (MAJOR) | plan-05 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
-| research-01 | R3 — Second extraction pass for process knowledge with EOS closed type/slot lists (MAJOR) | plan-04 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
+| research-01 | R3 — Second extraction pass for process knowledge with EOS closed type/slot lists (MAJOR) | plan-04 | PLANNED | — | From research-01; see `docs/research/research-01.md` §Research points. |
 | research-01 | R7 — Idempotency: KA content key; propose base key on EOS propose_instance_change (MAJOR) | plan-05 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
 | research-01 | R9 — DiscoveryAgent ahead of Internet agent; search provider decision; robots/allowlist budget (MAJOR) | plan-07 | OPEN | — | From research-01; Decision parked as Q5 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R10 — ka/connectors/ with Connector protocol; local folder first; providers decision (MAJOR) | plan-08 | OPEN | — | From research-01; Decision parked as Q6 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
@@ -19,7 +19,7 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 | research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | OPEN | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | OPEN | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R15 — Events as outbox: seq/version on events.jsonl, GET /events?after= (MINOR) | plan-09 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
-| research-01 | R16 — Investigate store at 10k/100k; layout extras (span ids, row locators, extraction_version, OCR) (MINOR) | plan-04/09 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
+| research-01 | R16 — Investigate store at 10k/100k; layout extras (span ids, row locators, extraction_version, OCR) (MINOR) | plan-04/09 | PLANNED | — | From research-01; see `docs/research/research-01.md` §Research points. |
 
 ## Closed
 

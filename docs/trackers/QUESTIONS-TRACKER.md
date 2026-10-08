@@ -13,3 +13,4 @@ Decisions parked for the author. One row per question, `Q1`, `Q2`, … Never ren
 | Q7 | research | R11 (+R7, R8 EOS halves): does EOS route found_new/grow_existing through a KA request; expose grammar with digest; accept base key? | every gap / found_new only / not yet | — (parked; EOS repo) | 2026-10-08 |
 | Q8 | research | R13: console shape — add a Processes tab or adopt the note's five pages? | add Processes (recommended) / five pages | — (parked) | 2026-10-08 |
 | Q9 | research | R14: re-pin the EOS console frontend (Q418) for a process evidence panel? | re-pin after plan-05 / not | — (parked; author only) | 2026-10-08 |
+| Q10 | implementation | Prompt-injection defences for document text sent to the extraction model (note REQ-008; raised by plan-04). | none / prompt structure + authority tiers / verifier call | — (parked by plan-04) | 2026-10-08 |
