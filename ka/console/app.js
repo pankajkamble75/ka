@@ -230,8 +230,8 @@ async function conflictView(ref) {
 async function sourceView(id) {
   const d = await api(`/sources/${id}`);
   const s = d.source;
-  return `<div class="crumbs">Sources / ${esc(s.id)}</div><h1>${esc(s.title)}</h1><div class="sub"><span class="pill">${esc(s.source_type)}</span> <span class="pill">${esc(s.authority_type)}</span> <span class="pill">${esc(s.visibility)}</span> ${s.scope ? scopePill(s.scope.scope_type + ':' + s.scope.scope_id) : ''} ${pill(s.extraction_status, s.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')}</div>
-  <dl class="kv card"><dt>Location</dt><dd>${esc(s.original_location || s.original_filename || '—')}</dd><dt>Owner</dt><dd>${esc(s.owner || '—')}</dd><dt>Author</dt><dd>${esc(s.author || '—')}</dd><dt>Ingested</dt><dd>${when(s.ingested_at)}</dd><dt>Effective date</dt><dd>${esc(s.effective_date || '—')}</dd><dt>Checksum</dt><dd class="mono">${esc(s.checksum)}</dd><dt>Content version</dt><dd>${s.content_version}</dd><dt>Channel</dt><dd>${esc(s.channel)}</dd></dl>
+  return `<div class="crumbs">Sources / ${esc(s.id)}</div><h1>${esc(s.title)}</h1><div class="sub"><span class="pill">${esc(s.source_type)}</span> <span class="pill">${esc(s.authority_type)}</span> <span class="pill">${esc(s.visibility)}</span> ${s.scope ? scopePill(s.scope.scope_type + ':' + s.scope.scope_id) : ''} ${pill(s.extraction_status, s.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} ${s.revoked_at ? pill('revoked at source', 'halt') : ''}</div>
+  <dl class="kv card"><dt>Location</dt><dd>${esc(s.original_location || s.original_filename || '—')}</dd><dt>Owner</dt><dd>${esc(s.owner || '—')}</dd><dt>Author</dt><dd>${esc(s.author || '—')}</dd><dt>Ingested</dt><dd>${when(s.ingested_at)}</dd><dt>Effective date</dt><dd>${esc(s.effective_date || '—')}</dd><dt>Checksum</dt><dd class="mono">${esc(s.checksum)}</dd><dt>Content version</dt><dd>${s.content_version}</dd><dt>Channel</dt><dd>${esc(s.channel)}</dd>${s.connection_id ? `<dt>Connection</dt><dd>${esc(s.connection_id)}${s.revoked_at ? ` · <b>revoked</b> ${when(s.revoked_at)} — versions and derived knowledge kept and flagged (Q4)` : ''}</dd>` : ''}</dl>
   <h2>Knowledge extracted <span class="muted">${d.nuggets.length}</span></h2>${nuggetRows(d.nuggets)}
   ${extractionReport(d)}
   <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} · ${esc(v.extraction_version || 'ka-extract/1')} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
@@ -362,13 +362,32 @@ async function addView() {
     <div class="card"><h3>Paste</h3><label>Title</label><input id="pa-title" value="Pasted text"><label>Text or Markdown</label><textarea id="pa-text"></textarea><label>Scope</label>${scopeSel('pa-scope')}<label>Authority</label>${authSel('pa-auth', 'User Knowledge')}<div class="actions"><button class="primary" data-act="paste">Paste & resolve</button></div></div>
     <div class="card"><h3>Write a note</h3><label>Title</label><input id="no-title" value="Note"><label>Note</label><textarea id="no-text" placeholder="Refunds above $1,000 require manager approval at this store."></textarea><label>Scope</label>${scopeSel('no-scope')}<div class="actions"><button class="primary" data-act="note">Save & resolve</button></div></div>
     <div class="card"><h3>Link</h3><label>URL (web page, GitHub, documentation)</label><input id="li-url" placeholder="https://…"><label>Scope</label>${scopeSel('li-scope')}<label>Authority</label>${authSel('li-auth', 'External Reference')}<div class="actions"><button class="primary" data-act="link">Fetch & resolve</button></div></div>
+    ${connectCard(scopeSel, authSel)}
     <div class="card"><h3>Research</h3><p class="small muted">Research agents gather evidence and propose candidates. They never change knowledge or the graph.</p><label>Scope</label>${scopeSel('rm-scope')}<label>Objective</label><textarea id="rm-obj" placeholder="Research current Visa dispute processing rules and identify anything that conflicts with Merchant Acquiring knowledge."></textarea><label>Questions (one per line)</label><textarea id="rm-q"></textarea><div class="actions"><button class="primary" data-act="mission">Start research</button></div></div>
     <div class="card"><h3>Correct existing knowledge</h3><p class="small muted">What the Enterprise Console sends on "Correct this". Becomes a candidate revision — the graph changes only after approval.</p>
       <label>Nugget ref (or graph element below)</label><input id="co-ref" placeholder="KN-002:v1"><div class="row"><div><label>Graph id</label><input id="co-graph" placeholder="merchant-acquiring"></div><div><label>Element id</label><input id="co-el" placeholder="r.refunds_above_500…"></div></div>
       <label>What is incorrect?</label><input id="co-what"><label>Correct value / meaning</label><textarea id="co-value"></textarea><label>Reason</label><input id="co-reason"><label>Supporting note / URL</label><div class="row"><input id="co-note" placeholder="note"><input id="co-url" placeholder="https://…"></div>
       <label>Scope (optional)</label><select id="co-scope"><option value="">Let the engine suggest</option>${scopeOptions(scopes)}</select><div class="actions"><button class="primary" data-act="correct">Submit correction</button></div></div>
-  </div><div id="add-result"></div><div id="co-result"></div>`;
+  </div><div id="add-result"></div><div id="co-result"></div>${await connectionsList()}`;
 }
+
+// [block plan-08] managed connectors (research-01 R10): connect a folder, sync it, revoke it; providers beyond the folder are Q6
+function connectCard(scopeSel, authSel) {
+  return `<div class="card"><h3>Connect a folder</h3><p class="small muted">A managed connection: the engine enumerates the folder, syncs new, changed, moved and deleted files as source versions (history kept), and re-resolves what changed. Cloud and enterprise providers are decision Q6.</p>
+    <label>Name</label><input id="cn-name" placeholder="Operations SOPs"><label>Folder (under a configured connector root)</label><input id="cn-root" placeholder="/root/ka/ka_storage/inbox/ops">
+    <label>Include (comma-separated globs, optional)</label><input id="cn-include" placeholder="**/*.md, **/*.pdf"><label>Scope</label>${scopeSel('cn-scope')}<label>Authority</label>${authSel('cn-auth', 'Project Documentation')}
+    <label>Visibility</label><select id="cn-vis"><option>ENTERPRISE</option><option>DOMAIN</option><option>INSTANCE</option><option>TEAM</option><option>PERSONAL</option></select>
+    <div class="actions"><button class="primary" data-act="connect">Connect & sync</button></div></div>`;
+}
+async function connectionsList() {
+  const d = await api('/connectors');
+  if (!d.connections.length) return `<div class="card small muted" style="margin-top:12px">No connections yet. Connector roots: ${d.roots.map(esc).join(', ')}</div>`;
+  return `<h2>Connections <span class="muted">${d.connections.length}</span></h2><table><tr><th>Connection</th><th>Kind</th><th>Scope</th><th>Status</th><th>Last sync</th><th>Sources</th><th></th></tr>
+  ${d.connections.map((c) => `<tr><td><b>${esc(c.name)}</b><div class="mono muted small">${esc(c.config.root || '')}</div></td><td>${esc(c.kind)}</td><td>${scopePill(c.scope.scope_type + ':' + c.scope.scope_id)}</td><td>${pill(c.status, c.status === 'active' ? 'ok' : 'warn')}</td>
+    <td class="small">${c.last_sync_at ? `${when(c.last_sync_at)}<div class="muted">new ${c.stats.new || 0} · modified ${c.stats.modified || 0} · moved ${c.stats.moved || 0} · deleted ${c.stats.deleted || 0} · permissions ${c.stats.permission_changed || 0}${c.stats.skipped ? ` · skipped ${c.stats.skipped}` : ''}</div>` : 'never'}</td>
+    <td class="num">${c.sources}</td><td>${c.status === 'active' ? `<button class="primary" data-act="sync-conn" data-id="${c.id}">Sync</button> <button class="danger" data-act="revoke-conn" data-id="${c.id}">Revoke</button>` : `revoked ${when(c.revoked_at)}`}</td></tr>`).join('')}</table>`;
+}
+// [/block plan-08]
 
 /* TAB 2 — Knowledge nuggets: review, resolve, apply to a scope. */
 async function nuggetsView(qs) {
@@ -459,6 +478,7 @@ async function dashboard() {
     <div class="tile"><div class="k">Research cost</div><div class="v">$${d.research.cost_usd}</div></div>
     <div class="tile ${d.corrections.pending ? 'warn' : ''}"><div class="k">Corrections pending</div><div class="v">${d.corrections.pending}</div></div>
     <div class="tile ${q.promotions ? 'warn' : ''}"><div class="k">Promotion proposals</div><div class="v">${q.promotions}</div></div>
+    <div class="tile"><div class="k">Connections</div><div class="v">${d.connections ? `${d.connections.active}<span class="muted small"> / ${d.connections.total}</span>` : '0'}</div></div>
   </div>
   <div class="card"><h3>EOS grammar ${d.grammar.loaded ? (d.grammar.stale ? pill('stale', 'halt') : pill('loaded', 'ok')) : pill('not loaded', 'warn')}</h3>
     <div class="small">${d.grammar.loaded ? `${esc(d.grammar.grammar_version)} · ${esc(d.grammar.type_table_version)} · ${d.grammar.types.length} process types · ${d.grammar.edges.length} edge pairs · ${d.grammar.slots.length} slots · ${d.grammar.bindings} bindings on ${d.grammar.subjects} subjects<div class="mono muted">${esc(d.grammar.source_dir)}</div>` : 'Set KA_GRAMMAR_DIR (or KA_ENTERPRISE_OS_ROOT) to bind assertions to EOS process types and edges. Until then every binding is unresolved.'}
@@ -480,6 +500,7 @@ async function dashboard() {
   ${a.pending_governance.length ? `<h3>Pending governance</h3>${nuggetRows(a.pending_governance, (x) => decideBtns(x.ref))}` : ''}
   ${(a.graph_impact.length || a.failed_propagation.length) ? `<h3>Graph change proposals waiting</h3>${proposalRows([...a.graph_impact, ...a.failed_propagation])}` : ''}
   ${a.promotions.length ? `<h3>Promotion proposals</h3><table><tr><th>Statement</th><th>Target</th><th>Instances</th><th></th></tr>${a.promotions.map((p) => `<tr><td>${esc(p.statement)}</td><td>${scopePill(p.target_scope.scope_type + ':' + p.target_scope.scope_id)}</td><td>${p.instance_ids.join(', ')}</td><td class="actions"><button class="primary" data-act="promote" data-id="${p.id}" data-approve="1">Promote</button><button data-act="promote" data-id="${p.id}" data-approve="0">Reject</button></td></tr>`).join('')}</table>` : ''}
+  ${(a.revoked_sources_with_active_knowledge || []).length ? `<h3>Sources revoked at their connector, with active knowledge</h3><table><tr><th>Source</th><th>Revoked</th><th>Active nuggets</th></tr>${a.revoked_sources_with_active_knowledge.map((r) => `<tr><td><a href="#/source/${r.source_id}">${esc(r.title)}</a></td><td class="small">${when(r.revoked_at)}</td><td class="small">${r.active_nuggets.map((x) => `<a href="#/nugget/${encodeURIComponent(x)}">${esc(x)}</a>`).join(', ')}<div class="muted">${esc(r.note)}</div></td></tr>`).join('')}</table>` : ''}
   ${a.acquisition_requests.length ? `<h3>Graph gaps reported by the runtime</h3><table><tr><th>Scope</th><th>Question</th><th>Gap</th></tr>${a.acquisition_requests.map((r) => `<tr><td>${scopePill(r.scope.scope_type + ':' + r.scope.scope_id)}</td><td>${esc(r.question)}</td><td>${esc(r.gap_description)}</td></tr>`).join('')}</table>` : ''}
   ${!Object.values(q).some((v) => v) ? '<div class="empty">All queues are empty.</div>' : ''}
   <div class="actions"><button data-act="detect-promotions">Detect repeated instance patterns</button></div>
@@ -583,6 +604,15 @@ async function act(b) {
   if (a === 'browse-mode') { location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&mode=${b.dataset.m}`; return; }
   if (a === 'browse-type') { const p = new URLSearchParams(location.hash.split('?')[1] || ''); location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&q=${encodeURIComponent($('#br-q').value)}&type=${b.dataset.t}`; return; }
   if (a === 'detect-promotions') { const { scopes } = await api('/scopes'); let n = 0; for (const s of scopes.filter((s) => s.scope_type !== 'INSTANCE')) { n += (await api(`/promotions/detect/${s.scope_type}/${encodeURIComponent(s.scope_id)}`, { method: 'POST' })).proposals.length; } toast(`${n} promotion proposal(s)`); render(); return; }
+  if (a === 'connect') {
+    const [st, sid] = $('#cn-scope').value.split('|');
+    const include = $('#cn-include').value.split(',').map((x) => x.trim()).filter(Boolean);
+    const r = await api('/connectors', { method: 'POST', body: { kind: 'local_folder', name: $('#cn-name').value, config: { root: $('#cn-root').value, ...(include.length ? { include } : {}) }, owner: who(), scope_type: st, scope_id: sid, authority: $('#cn-auth').value, visibility: $('#cn-vis').value } });
+    const sr = await api(`/connectors/${r.connection.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' });
+    toast(`Connected · synced: ${sr.report.new} new, ${sr.report.candidates} candidates`); render(); return;
+  }
+  if (a === 'sync-conn') { const sr = await api(`/connectors/${b.dataset.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Synced: ${sr.report.new} new · ${sr.report.modified} modified · ${sr.report.moved} moved · ${sr.report.deleted} deleted · ${sr.report.permission_changed} permissions · ${sr.report.candidates} candidates`); render(); return; }
+  if (a === 'revoke-conn') { if (!confirm('Revoke this connection? Synced sources stay; nothing new is pulled.')) return; await api(`/connectors/${b.dataset.id}/revoke?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast('Connection revoked'); render(); return; }
   if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run`, { method: 'POST' }); toast(`Run ${r.run.status}`); render(); return; }
   if (a === 'register-scope') {
     const [pt, pid] = ($('#sc-parent').value || ':').split(':');

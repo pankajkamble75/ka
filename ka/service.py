@@ -10,6 +10,7 @@ from typing import Any
 from ka import config
 from ka.audit import Auditor
 from ka.conflict import ConflictDetector
+from ka.connectors.sync import SyncService
 from ka.corrections import CorrectionService
 from ka.events import EventBus
 from ka.extraction import CandidateExtractor
@@ -69,6 +70,9 @@ class KnowledgeAcquisition:
         # [block plan-06]
         self.profiles = ProfileService(self.repo, self.grammar, self.lineage, self.registry)
         # [/block plan-06]
+        # [block plan-08]
+        self.connectors = SyncService(self.repo, self.ingestion, self.governance, self.auditor, self.bus)
+        # [/block plan-08]
         self.runtime_guard = RuntimeGuard(self.repo, self.bus, self.research)
         self._restore_registry()
         if auto_propose_graph_changes:
@@ -183,6 +187,7 @@ class KnowledgeAcquisition:
                          "search_provider": __import__("ka.discovery", fromlist=["select_provider"]).select_provider()[0].name,   # plan-07
                          "internet_gate": bool(config.get("KA_RESEARCH_INTERNET"))},
             "corrections": {"total": len(self.repo.corrections), "pending": len(self.corrections.pending())},
+            "connections": {"total": len(self.repo.connections), "active": len(self.repo.connections.where(lambda c: c.status == "active"))},   # plan-08
             "queues": {k: len(v) for k, v in att.items()},
             "attention": att,
             "scopes": [{"key": s.key(), "name": self.registry.names.get(s.key(), s.scope_id), "scope_type": s.scope_type.value,
@@ -229,6 +234,7 @@ class KnowledgeAcquisition:
                                    for p in self.graph_change.failed()],
             "promotions": [p.model_dump(mode="json") for p in self.repo.promotions.where(lambda p: p.status == "PROPOSED")],
             "acquisition_requests": [r.model_dump(mode="json") for r in self.runtime_guard.open_requests()],
+            "revoked_sources_with_active_knowledge": self.connectors.revoked_with_active_knowledge(),   # plan-08
         }
 
     def domain_dashboard(self, scope: Scope) -> dict[str, Any]:

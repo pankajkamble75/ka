@@ -14,6 +14,7 @@ from ka import config
 from ka.json_io import append_jsonl, read_json, read_jsonl, write_json
 from ka.model import (
     AuditRecord,
+    Connection,
     Evidence,
     GovernanceDecision,
     GrammarBinding,
@@ -104,6 +105,9 @@ class Repository:
         self.executions = Collection(r, "executions", GraphChangeExecution)
         self.promotions = Collection(r, "promotions", PromotionProposal)
         self.requests = Collection(r, "requests", KnowledgeAcquisitionRequest)
+        # [block plan-08]
+        self.connections = Collection(r, "connections", Connection)
+        # [/block plan-08]
         # [block plan-03]
         self.bindings = Collection(r, "bindings", GrammarBinding)
         self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")

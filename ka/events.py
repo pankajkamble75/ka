@@ -22,6 +22,9 @@ EVENT_NAMES = {
     "graph.impact.detected", "graph.change.proposed", "graph.change.approved",
     "graph.change.applied", "graph.change.failed",
     "graph.gap.detected", "promotion.proposed",
+    # [block plan-08]
+    "source.synced", "source.revoked", "source.permission_changed",
+    # [/block plan-08]
 }
 
 Handler = Callable[[dict[str, Any]], None]

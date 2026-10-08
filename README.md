@@ -104,3 +104,8 @@ docs/implementation-plans/plan-01.md
 docs/trackers/          RESEARCH-TRACKER, QUESTIONS-TRACKER, PENDING-TRACKER, HANDOFF
 .claude/skills/         the delivery-pipeline skills copied from enterprise-os-070626
 ```
+
+
+## Managed connectors (plan-08)
+
+Register a folder under `KA_CONNECTOR_ROOTS` as a connection on the Add knowledge tab; Sync pulls new, changed, moved and deleted files as source versions (history kept) and re-resolves what changed. Revoke stops syncing; synced sources stay. Cloud/enterprise providers are decision Q6.

@@ -21,6 +21,7 @@ PREFIXES = {
     "promotion": "PRO",
     "request": "KAR",
     "binding": "GB",
+    "connection": "CON",
 }
 
 

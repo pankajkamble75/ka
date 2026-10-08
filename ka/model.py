@@ -70,6 +70,10 @@ class Source(BaseModel):
     current_version_id: str | None = None
     authority_type: AuthorityType = AuthorityType.USER_KNOWLEDGE
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # [block plan-08] research-01 R10: synced sources know their connection; a deleted/revoked one is marked, never erased
+    connection_id: str | None = None
+    revoked_at: str | None = None
+    # [/block plan-08]
 
 
 class SourceVersion(BaseModel):
@@ -447,6 +451,28 @@ class KnowledgeAcquisitionRequest(BaseModel):
     created_at: str = Field(default_factory=now_iso)
     mission_id: str | None = None
     status: str = "OPEN"
+
+
+# ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
+
+
+class Connection(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("connection"))
+    kind: str
+    name: str
+    config: dict[str, Any] = Field(default_factory=dict)
+    owner: str
+    scope: Scope
+    authority: AuthorityType = AuthorityType.PROJECT_DOCUMENTATION
+    visibility: Visibility = Visibility.ENTERPRISE
+    secret_ref: str | None = None                   # the NAME of an environment variable; never its value
+    status: str = "active"                          # active | revoked
+    checkpoint: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=now_iso)
+    last_sync_at: str | None = None
+    last_delta: dict[str, Any] = Field(default_factory=dict)
+    stats: dict[str, int] = Field(default_factory=dict)
+    revoked_at: str | None = None
 
 
 # ---------------------------------------------------------------- audit (§41)

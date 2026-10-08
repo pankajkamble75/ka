@@ -623,6 +623,73 @@ def mission(mission_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict
     return {"mission": m.model_dump(mode="json"), "runs": runs, "candidates": cands, "sources_discovered": sources}
 
 
+# [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
+class ConnectorIn(BaseModel):
+    kind: str = "local_folder"
+    name: str
+    config: dict[str, Any] = {}
+    owner: str = "user"
+    scope_type: ScopeType
+    scope_id: str
+    authority: AuthorityType = AuthorityType.PROJECT_DOCUMENTATION
+    visibility: Visibility = Visibility.ENTERPRISE
+    secret_ref: str | None = None
+
+
+def _conn_out(c, ka: KnowledgeAcquisition) -> dict[str, Any]:
+    d = c.model_dump(mode="json")
+    d["sources"] = len(ka.repo.sources.where(lambda s: s.connection_id == c.id))
+    return d
+
+
+@router.post("/connectors", status_code=201)
+def create_connector(body: ConnectorIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.connectors import ConnectorError
+    try:
+        c = ka.connectors.create(body.kind, body.name, body.config, owner=body.owner, scope=Scope(scope_type=body.scope_type, scope_id=body.scope_id),
+                                 authority=body.authority, visibility=body.visibility, secret_ref=body.secret_ref)
+    except ConnectorError as e:
+        raise HTTPException(400, str(e))
+    return {"connection": _conn_out(c, ka)}
+
+
+@router.get("/connectors")
+def list_connectors(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.connectors import CONNECTOR_KINDS
+    from ka.connectors.local_folder import allowed_roots
+    return {"connections": [_conn_out(c, ka) for c in ka.repo.connections.all()], "kinds": list(CONNECTOR_KINDS),
+            "roots": [str(r) for r in allowed_roots()], "decision": "Q6"}
+
+
+@router.get("/connectors/{connection_id}")
+def get_connector_route(connection_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    c = ka.repo.connections.get(connection_id)
+    if c is None:
+        raise HTTPException(404, "connection not found")
+    srcs = ka.repo.sources.where(lambda s: s.connection_id == c.id)
+    return {"connection": _conn_out(c, ka), "sources": [s.model_dump(mode="json") for s in srcs]}
+
+
+@router.post("/connectors/{connection_id}/sync")
+def sync_connector(connection_id: str, by: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.connectors import ConnectorError
+    if ka.repo.connections.get(connection_id) is None:
+        raise HTTPException(404, "connection not found")
+    try:
+        rep = ka.connectors.sync(connection_id, by=by)
+    except ConnectorError as e:
+        raise HTTPException(409 if "cannot sync" in str(e) else 400, str(e))
+    return {"report": rep.counts() | {"skipped": rep.skipped, "source_ids": rep.source_ids}, "connection": _conn_out(ka.repo.connections.require(connection_id), ka)}
+
+
+@router.post("/connectors/{connection_id}/revoke")
+def revoke_connector(connection_id: str, by: str = "user", reason: str = "", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.connections.get(connection_id) is None:
+        raise HTTPException(404, "connection not found")
+    return {"connection": _conn_out(ka.connectors.revoke(connection_id, by=by, reason=reason), ka)}
+# [/block plan-08]
+
+
 # [block plan-07] discovery provider status (research-01 R9; the provider itself is Q5)
 @router.get("/research/providers")
 def research_providers(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:

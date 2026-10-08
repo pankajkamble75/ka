@@ -2,6 +2,54 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 19:25 UTC — plan-08: managed connectors — the contract, a local-folder connector, incremental sync that keeps history (research-01 R10)
+
+**What changed**
+
+- *Connectors* `ka/connectors/__init__.py` (new): `Connector` protocol (authorize / enumerate / fetch / get_permissions / checkpoint /
+  sync_incremental / revoke), `ConnectorItem`, `SyncDelta`, `ConnectorError`, `get_connector`, `CONNECTOR_KINDS`.
+  `ka/connectors/local_folder.py` (new): root containment under `KA_CONNECTOR_ROOTS` (symlinks resolved), include globs, sidecar
+  `<name>.visibility`, checkpoint by locator → checksum, delta new/modified/moved/deleted/permission-changed.
+  `ka/connectors/sync.py` (new): `SyncService.create / sync / revoke`; reconciliation through `IngestionService.connect` (so a changed
+  file is a new `SourceVersion` of the same source and is re-extracted through governance); moved keeps the source; deleted sets
+  `Source.revoked_at` and flags derived nuggets; permission change updates `Source.visibility` and flags; upload cap and fetch /
+  extraction failures are skipped with reasons; a revoked connection refuses to sync.
+- *Model/store* `ka/model.py`: `Connection`, `Source.connection_id`, `Source.revoked_at`; `ka/repository.py`: `connections`;
+  `ka/ids.py`: `CON` prefix (one line, undeclared by the plan — finding); `ka/config.py`: `KA_CONNECTOR_ROOTS`; `ka/events.py`:
+  `source.synced / source.revoked / source.permission_changed`; `ka/service.py`: wiring, `needs_attention` gains
+  `revoked_sources_with_active_knowledge`, dashboard `connections`.
+- *API/console* `ka/api.py`: `POST/GET /connectors`, `GET /connectors/{id}`, `POST …/sync` (409 when revoked), `POST …/revoke`.
+  `ka/console/app.js`: "Connect a folder" card, connections list with Sync/Revoke, source page shows connection and revocation,
+  Dashboard tile and needs-attention table.
+- *Docs/tests*: architecture §2 paragraph; README; `.env.example`; `plan-08.md`; `ka/tests/test_plan08_connectors.py` (16 cases);
+  `e2e/plan08_connector_flow.py`.
+
+**Why**
+
+research-01 R10 (note REQ-002): `connect()` only recorded a payload a caller had fetched; nothing enumerated a source system,
+noticed change, or honoured revocation. The folder is the first connector because it exercises every part of the contract with no
+credentials; the cloud and enterprise providers are the author's decision (Q6). History is never lost: versions and derived
+knowledge survive deletion and are flagged, because retiring them is Q4.
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 181 passed; ruff F clean. Verify recount: 10/10 deliverables, 10/10 positive, 6/6 negative; blocks
+  10/10 files found, one undeclared one-line edit (`ka/ids.py`).
+- No protected code touched (diff confirmed).
+- Live: `e2e/plan08_connector_flow.py` 5/5 PASS on the running server (connect via the console, sync, change the file, sync again,
+  Conflicts view lists the contradiction); screenshots verified.
+- Product tests (research-01, 8 defined): **PT1–PT8 all PASS** — PT8 turned green here.
+
+**Follow-ups / risks**
+
+- Providers beyond the folder (Q6) and retention after revocation (Q4) remain parked; scheduled sync is not built (manual + API).
+- The folder connector hashes every file on each sync (fine for inboxes; a 100k-file tree wants the mtime short-cut).
+
+**Decisions and questions**
+
+- Plan `plan-08`; research point R10 → UPLOADED.
+- BUILT: `knowledge-acquisition.md` §2 "Managed connectors" paragraph. RAISED: none new; Q4 and Q6 remain parked.
+
 ## 2026-10-08 18:40 UTC — plan-07: discovery before fetching — provider seam, allow-list and robots budget, provenance on every page (research-01 R9)
 
 **What changed**

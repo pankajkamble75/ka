@@ -37,6 +37,15 @@ Sources ─► ka.ingestion ─► ka.extraction ─► ka.governance ─► ACT
 | `KnowledgeAcquisitionRequest` | §43. |
 | `AuditRecord` | §41: who / what / when / why / before / after / source / scope / approval / affected. |
 
+**Managed connectors (plan-08, R10).** `ka/connectors/` is the provider-agnostic contract (`Connector`: authorize / enumerate /
+fetch / get_permissions / checkpoint / sync_incremental / revoke) and `ka/connectors/local_folder.py` the first implementation.
+`Connection` (model) names a kind, a root under `KA_CONNECTOR_ROOTS`, scope, authority, visibility and an optional `secret_ref`
+(the NAME of an environment variable; the value is never stored). `ka/connectors/sync.py::SyncService.sync` reconciles a delta
+through the one ingestion door: new → `Source`; modified → new `SourceVersion` of the same source, re-extracted; moved → same
+source, location updated; deleted → `Source.revoked_at`, versions and derived nuggets kept and flagged (retiring them is Q4);
+permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. Cloud and
+enterprise providers are decision Q6.
+
 ## 3. Scope and inheritance (§7–§9, §24) — `ka/scope.py`
 
 `ScopeRegistry` is configuration: `STRUCTURE ⊃ PARENT_DOMAIN ⊃ DOMAIN ⊃ INSTANCE`. enterprise-os has no Parent Domain in

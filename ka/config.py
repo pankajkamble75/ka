@@ -84,6 +84,9 @@ declare("KA_DISCOVERY_BUDGET", int, 5, "ka.discovery", "Fetches per mission from
 declare("KA_DISCOVERY_RESULTS", int, 10, "ka.discovery", "Results asked per query.")
 declare("KA_RESPECT_ROBOTS", bool, True, "ka.discovery", "Honour robots.txt for user-agent enterprise-os-ka.")
 # [/block plan-07]
+# [block plan-08]
+declare("KA_CONNECTOR_ROOTS", str, "", "ka.connectors", "Comma-separated folders a local_folder connection may point into. Default: <storage>/inbox.")
+# [/block plan-08]
 
 _overrides: dict[str, Any] = {}
 
