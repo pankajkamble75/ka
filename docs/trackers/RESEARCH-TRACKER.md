@@ -14,7 +14,7 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
-| — | Knowledge Acquisition spec (`knowledge-acquisition-requirements.md`) | plan-01 | UPLOADED | (first commit; SHA recorded in the following commit) | Phases 1–6 of §44 built as the `ka` package; verified 67 tests; see `docs/implementation-plans/plan-01.md` and checkpoint 2026-10-08. |
+| — | Knowledge Acquisition spec (`knowledge-acquisition-requirements.md`) | plan-01 | UPLOADED | 7d9504c | Phases 1–6 of §44 built as the `ka` package; verified 67 tests; see `docs/implementation-plans/plan-01.md` and checkpoint 2026-10-08. |
 
 ## Backlog
 
