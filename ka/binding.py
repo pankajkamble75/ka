@@ -122,7 +122,8 @@ class Binder:
         for v in self.repo.nuggets_by_status(NuggetStatus.ACTIVE, NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT, NuggetStatus.APPROVED):
             if v.subject is None and v.predicate is None:
                 continue
-            self.bind(v)
+            # plan-11: a governed version was approved by a person — the heuristic-only cap applies to un-reviewed candidates only
+            self.bind(v, method="approved" if v.status in {NuggetStatus.ACTIVE, NuggetStatus.APPROVED} else "inferred")
             n += 1
         return n
 # [/block plan-03]

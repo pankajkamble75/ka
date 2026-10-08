@@ -63,12 +63,14 @@ Inheritance states (§9) are *derived* from the graph: an instance element with 
 parent — identical → INHERITED, extra props → LOCALLY_EXTENDED, changed values → OVERRIDDEN, parent missing → CONFLICTING,
 parent element with no copy → LOCALLY_REMOVED. See `InMemoryGraphAdapter.calculate_inheritance` and the enterprise-os twin.
 
-**Content as an attack surface (Q10 — ⏳ DECIDED 2026-10-08, not built).** Document text is data, never instruction: the extraction
+**Content as an attack surface (Q10 — ✅ built by plan-11, 2026-10-08).** Document text is data, never instruction: the extraction
 prompt quotes it inside a delimited block with the instructions outside, and the model is told the block may contain text aimed
 at it. Trust tiers follow authority: INTERNET_RESEARCH and LLM_GENERATED sources are heuristic-only — they may yield candidate
 statements, but a typed assertion (process type, predicate, edge) from such a source stays `proposed` and never binds without a
 reviewer's decision. A verifier model call per assertion was declined for now (doubles model cost) and is revisited on a measured
-need. Ledger: `docs/questions/knowledge-acquisition.md` Q10.
+need. Ledger: `docs/questions/knowledge-acquisition.md` Q10. Lives in `ka/prompting.py` (`fence`, `UNTRUSTED_NOTICE`), the four prompts
+(`ka/extraction.py`, `ka/process_extraction.py`, `ka/research.py`, `ka/conflict.py`), `ka/binding.py::Binder.bind` (`HEURISTIC_ONLY` cap,
+lifted by `method="approved"`; `rebind_all` remembers approval) and `ka/service.py::_rebind_on_approval` (subscribed before the proposal).
 
 ## 4. The governance pipeline (§11–§13) — `ka/governance.py`
 

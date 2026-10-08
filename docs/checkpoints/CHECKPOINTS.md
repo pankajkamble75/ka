@@ -2,6 +2,30 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 23:55 UTC — plan-11 complete: fenced prompts and the heuristic-only binding cap, verified (research-02 R3, Q10)
+
+**What changed** (on top of d79ce37, the work-in-progress commit)
+
+- `ka/binding.py::rebind_all` passes `method="approved"` for ACTIVE/APPROVED versions so a grammar release does not re-cap knowledge a
+  person approved. `ka/service.py::_rebind_on_approval` re-binds only a binding that was capped (no duplicate records for enterprise sources).
+- `ka/tests/test_plan11_injection.py` (11 cases: fence, the four prompts at the model seam, the cap, the approval lift, PT3 with an
+  "obedient" model and a page carrying its own `</document>`, ordering of the re-bind before the proposal, `rebind_all`).
+- `e2e/plan11_injection_flow.py`: paste a markdown SOP with authority Internet Research → the assertion binds proposed with the reason,
+  the nugget page shows the pill, approval re-binds it bound.
+- Architecture §3 Q10 → ✅ built with the file list; the questions ledger's Q4/Q10/Q11 rows now read ✅ built.
+
+**Why** — the author's Q10 decision; finishing the plan the previous commit left unverified.
+
+**Verification** — in-process suite 221 passed; EOS path 7 passed; ruff F clean. Verify recount: 6/6 deliverables, 6/6 positive,
+5/5 negative; blocks 8/8 files found (the plan's B7 row names two files), none undeclared. No protected code touched (diff confirmed
+against the plan-10 upload). Live flow 5/5 PASS; screenshot verified. Product tests (research-02, 7 defined): PT1, PT2, PT3 PASS;
+PT4–PT7 FAIL/NOT RUN awaiting plans 12–15.
+
+**Follow-ups / risks** — the verifier model call remains declined; the fence is a convention the model is told about, not a hard boundary,
+which is why the binding cap exists alongside it.
+
+**Decisions and questions** — BUILT: Q10 (architecture §3 ✅). RAISED: none. Plan `plan-11`; research-02 R3 → UPLOADED.
+
 ## 2026-10-08 23:20 UTC — plan-11 work in progress: fenced prompts and the heuristic-only binding cap (research-02 R3, Q10) — committed at the author's request, NOT verified
 
 **What changed**
