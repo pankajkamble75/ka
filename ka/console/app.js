@@ -247,19 +247,33 @@ async function sourceView(id) {
   <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} · ${esc(v.extraction_version || 'ka-extract/1')} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
 }
 
+// [block plan-17] research-01 R18 (Q14): the mission page follows a background run — polls every 2 s while RUNNING, shows progress
+let missionPoll = null;
+function progressLine(m, runs) {
+  const r = runs[runs.length - 1];
+  if (!r || m.status !== 'RUNNING') return '';
+  const p = r.progress || {};
+  const started = p.started_at ? Math.round((Date.now() - new Date(p.started_at).getTime()) / 1000) : null;
+  return `<div class="card small"><b>Running</b> · agent ${p.agents_done ?? 0}/${p.agents_total ?? '?'}${p.current_agent ? ` · now ${esc(p.current_agent)}` : ''} · findings so far ${p.findings_so_far ?? 0}${started !== null ? ` · ${started}s elapsed` : ''} <span class="muted">— this page refreshes every 2 s until the run completes; you can leave and come back.</span></div>`;
+}
 async function missionView(id) {
   const d = await api(`/research/missions/${id}`);
   const m = d.mission;
+  clearTimeout(missionPoll);
+  if (m.status === 'RUNNING') missionPoll = setTimeout(() => { if (location.hash === `#/mission/${id}`) render(); }, 2000);
   return `<div class="crumbs"><a href="#/browse?scope=${m.scope_type}|${encodeURIComponent(m.scope_id)}">${esc(m.scope_id)}</a> / research</div><h1>${esc(m.objective)}</h1>
   <div class="sub">${pill(m.status)} ${scopePill(m.scope_type + ':' + m.scope_id)} <span class="pill">${esc(m.trigger)}</span> <span class="pill">visibility ≥ ${esc(m.permitted_visibility)}</span> · by ${esc(m.created_by)} · ${when(m.created_at)}</div>
   ${m.research_questions.length ? `<div class="card"><h3>Research questions</h3><ul>${m.research_questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></div>` : ''}
-  <div class="actions"><button class="primary" data-act="run-mission" data-id="${m.mission_id}">Run again</button></div>
+  ${progressLine(m, d.runs)}
+  <div class="actions">${m.status === 'RUNNING' ? '' : `<button class="primary" data-act="run-mission" data-id="${m.mission_id}">Run again</button>`}</div>
   <h2>Candidate nuggets <span class="muted">${d.candidates.length}</span></h2>${nuggetRows(d.candidates, (n) => ['PENDING_REVIEW', 'CONFLICT'].includes(n.status) ? decideBtns(n.ref) : '')}
   <!-- [block plan-16] research runs: reused governed knowledge (research-01 R17) -->
   <h2>Research runs</h2>${d.runs.map((r) => `<div class="card small"><b>${r.run_id}</b> ${pill(r.status)} · agent ${esc(r.agent_id)} · model ${esc(r.model || '—')} · ${when(r.started_at)} → ${when(r.completed_at)}<br>${r.sources_examined.length} sources examined · ${r.evidence_created.length} evidence · ${r.candidate_nuggets_created.length} candidates · tokens ${esc(JSON.stringify(r.token_usage))} · cost $${r.cost}${r.notes ? `<div class="muted">${esc(r.notes)}</div>` : ''}${(r.reused_refs || []).length ? `<div class="muted">reused ${r.reused_refs.length} governed/pending nugget${r.reused_refs.length === 1 ? '' : 's'} already on the scope chain: ${r.reused_refs.slice(0, 6).map((x) => `<a href="#/nugget/${encodeURIComponent(x)}">${esc(x)}</a>`).join(', ')}${r.reused_refs.length > 6 ? ' …' : ''}</div>` : ''}${r.errors.length ? `<div class="quote">${esc(r.errors.join('\n'))}</div>` : ''}${discoveryTable(r.discovery)}</div>`).join('') || '<div class="empty">Not run yet.</div>'}
   <!-- [/block plan-16] -->
   <h2>Sources discovered</h2>${d.sources_discovered.length ? `<table><tr><th>Source</th><th>Type</th><th>Authority</th></tr>${d.sources_discovered.map((s) => `<tr><td><a href="#/source/${s.id}">${esc(s.title)}</a></td><td>${esc(s.source_type)}</td><td class="small">${esc(s.authority_type)}</td></tr>`).join('')}</table>` : '<div class="empty">None recorded.</div>'}`;
 }
+
+// [/block plan-17]
 
 async function addView() {
   const { scopes } = await api('/scopes');
@@ -648,7 +662,7 @@ async function act(b) {
     toast(`Evidence recorded as source ${r.source.id}`); render(); return;
   }
   if (a === 'compare') { const r = await api(`/nuggets/${b.dataset.cid}/compare?a=${$('#cmp-a').value}&b=${$('#cmp-b').value}`); $('#cmp-out').innerHTML = Object.keys(r.diff).length ? `<table><tr><th>Field</th><th>${r.a}</th><th>${r.b}</th></tr>${Object.entries(r.diff).map(([k, [x, y]]) => `<tr><td>${esc(k)}</td><td class="before">${esc(JSON.stringify(x))}</td><td class="after">${esc(JSON.stringify(y))}</td></tr>`).join('')}</table>` : '<div class="empty">Identical.</div>'; return; }
-  if (a === 'mission') { const [st, sid] = $('#rm-scope').value.split('|'); const r = await api('/research/missions', { method: 'POST', body: { scope_type: st, scope_id: sid, objective: $('#rm-obj').value, questions: $('#rm-q').value.split('\n').filter(Boolean), by: who() } }); toast(`Mission ${r.mission.status}: ${r.mission.candidate_refs.length} candidates`); location.hash = `#/mission/${r.mission.mission_id}`; return; }
+  if (a === 'mission') { const [st, sid] = $('#rm-scope').value.split('|'); const r = await api('/research/missions', { method: 'POST', body: { wait: false, scope_type: st, scope_id: sid, objective: $('#rm-obj').value, questions: $('#rm-q').value.split('\n').filter(Boolean), by: who() } }); toast(`Mission ${r.mission.status} — the agents run in the background; this page follows along`); location.hash = `#/mission/${r.mission.mission_id}`; return; }   // plan-17 (Q14)
   if (a === 'apply') {
     const [st, sid] = b.closest('tr').querySelector('.apply-scope').value.split('|');
     const widen = !!b.closest('tr').querySelector('.widen')?.checked;
@@ -694,7 +708,7 @@ async function act(b) {
   }
   if (a === 'sync-conn') { const sr = await api(`/connectors/${b.dataset.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Synced: ${sr.report.new} new · ${sr.report.modified} modified · ${sr.report.moved} moved · ${sr.report.deleted} deleted · ${sr.report.permission_changed} permissions · ${sr.report.candidates} candidates`); render(); return; }
   if (a === 'revoke-conn') { if (!confirm('Revoke this connection? Synced sources stay; nothing new is pulled.')) return; await api(`/connectors/${b.dataset.id}/revoke?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast('Connection revoked'); render(); return; }
-  if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run`, { method: 'POST' }); toast(`Run ${r.run.status}`); render(); return; }
+  if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run?wait=false`, { method: 'POST' }); toast(`Run ${r.run.status} — following along`); render(); return; }   // plan-17
   if (a === 'register-scope') {
     const [pt, pid] = ($('#sc-parent').value || ':').split(':');
     await api('/scopes', { method: 'POST', body: { scope_type: $('#sc-type').value, scope_id: $('#sc-id').value, name: $('#sc-name').value || null, parent_type: pt || null, parent_id: pid || null } });

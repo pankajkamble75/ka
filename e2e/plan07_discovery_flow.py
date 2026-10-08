@@ -26,7 +26,7 @@ def main() -> int:
     SHOTS.mkdir(exist_ok=True)
     prov = json.load(urllib.request.urlopen(API + "/research/providers"))
     results = [("server runs the fixture provider", prov["search_provider"] == "fixture")]
-    r = post("/research/missions", {"scope_type": "DOMAIN", "scope_id": "merchant-acquiring", "objective": "Visa dispute processing rules",
+    r = post("/research/missions", {"wait": True, "scope_type": "DOMAIN", "scope_id": "merchant-acquiring", "objective": "Visa dispute processing rules",
                                     "questions": ["What is the dispute response window?"], "by": "ops"})
     mid = r["mission"]["mission_id"]
     disc = r["run"]["discovery"]

@@ -17,6 +17,7 @@ from ka import __version__, config, images
 from ka.governance import GovernanceError
 from ka.graph_adapter import PublishRefused
 from ka.graph_change import ChangeError
+from ka.research import ResearchError
 from ka.model import Scope
 from ka.security import require_access
 from ka.service import KnowledgeAcquisition, _nugget_row
@@ -183,6 +184,7 @@ class MissionIn(BaseModel):
     by: str = "user"
     run: bool = True
     permitted_visibility: Visibility = Visibility.ENTERPRISE
+    wait: bool = True                   # plan-17 (Q14): the console asks for wait=false (background + poll); scripts/tests keep the synchronous default
 
 
 class ProposalActionIn(BaseModel):
@@ -623,16 +625,23 @@ def create_mission(body: MissionIn, ka: KnowledgeAcquisition = Depends(get_ka)) 
     m = ka.research.create_mission(scope=Scope(scope_type=body.scope_type, scope_id=body.scope_id), objective=body.objective, by=body.by,
                                    questions=body.questions, preferred_source_types=body.preferred_source_types,
                                    permitted_visibility=body.permitted_visibility)
-    run = ka.research.run_mission(m.mission_id) if body.run else None
+    # [block plan-17] research-01 R18 (Q14): background by default — the mission comes back RUNNING and the page polls
+    try:
+        run = (ka.research.run_mission(m.mission_id) if body.wait else ka.research.start_mission(m.mission_id)) if body.run else None
+    except ResearchError as e:
+        raise HTTPException(409, str(e))
     return {"mission": ka.repo.missions.require(m.mission_id).model_dump(mode="json"), "run": run.model_dump(mode="json") if run else None}
+    # [/block plan-17]
 
 
 @router.post("/research/missions/{mission_id}/run")
-def run_mission(mission_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+def run_mission(mission_id: str, wait: bool = True, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     try:
-        run = ka.research.run_mission(mission_id)
+        run = ka.research.run_mission(mission_id) if wait else ka.research.start_mission(mission_id)   # plan-17
     except KeyError:
         raise HTTPException(404, "mission not found")
+    except ResearchError as e:
+        raise HTTPException(409, str(e))
     return {"run": run.model_dump(mode="json")}
 
 

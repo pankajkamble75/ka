@@ -33,7 +33,7 @@ def main() -> int:
     results = [("providers route: brave requested, key absent, failing closed to none", pv["requested"] == "brave" and pv["key_present"] is False and pv["search_provider"] == "none" and "Q12" in (pv["note"] or "")),
                ("the key is never in the payload", "KA_SEARCH_API_KEY" not in json.dumps(pv).replace("KA_SEARCH_API_KEY is unset", "") or True),
                ("usage and cap reported", isinstance(pv["used_this_month"], int) and pv["monthly_cap"] > 0)]
-    r = post("/research/missions", {"scope_type": "DOMAIN", "scope_id": "merchant-acquiring", "objective": "Visa dispute processing rules (plan-13 flow)", "by": "flow"})
+    r = post("/research/missions", {"wait": True, "scope_type": "DOMAIN", "scope_id": "merchant-acquiring", "objective": "Visa dispute processing rules (plan-13 flow)", "by": "flow"})
     disc = r["run"]["discovery"]
     results.append(("the mission completes and records the fail-closed note", r["mission"]["status"] in ("COMPLETED", "FAILED") and any("Q12" in n for n in disc["notes"])))
     with sync_playwright() as p:

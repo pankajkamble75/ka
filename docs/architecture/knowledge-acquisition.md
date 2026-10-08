@@ -172,6 +172,11 @@ reuse ACTIVE knowledge on the scope chain, open a mission only for the gap. **pl
 records matching ACTIVE/PENDING knowledge in `ResearchRun.reused_refs` without a model call and re-extracts only sources that never
 produced knowledge, most relevant first, at most `KA_RESEARCH_MAX_SOURCES` per mission.
 
+**Background missions (Q14 — ✅ built by plan-17, 2026-10-09).** Creating a mission returns at once with status RUNNING; the
+agents run on a worker thread; the mission page polls until COMPLETED or FAILED and shows progress. the API default stays synchronous (`wait=true`) for scripts and tests; the console passes `wait=false`. Lives in
+`ka/research.py::ResearchOrchestrator.start_mission` / `_execute` (progress in `ResearchRun.progress`), `ka/api.py` (`wait`, 409 on a RUNNING
+mission) and the mission page's `progressLine` + 2 s poll.
+
 **Discovery (plan-07, R9).** `ka/discovery.py::DiscoveryAgent` runs first in the coordinator: the objective and questions become
 queries for a `SearchProvider` (`none` or `fixture` today; **Q5 — ✅ built by plan-13, 2026-10-09:** `BraveSearchProvider` behind this seam (`KA_SEARCH_PROVIDER=brave`), the key read from `KA_SEARCH_API_KEY` at call time and never stored or logged, `SearchMeter` counting queries per calendar month against `KA_SEARCH_MONTHLY_CAP`; without a key the selection fails closed to `none` with a note the Dashboard shows; the author confirmed Brave and supplied the key on 2026-10-09 — Q12 answered; the key lives only in the server's `.env`); results are canonicalised (fragments and
 tracking parameters dropped), deduplicated, filtered by `KA_ALLOWED_DOMAINS`, `is_safe_url` and `robots.txt` (fetched through

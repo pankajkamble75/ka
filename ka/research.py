@@ -336,12 +336,17 @@ class SynthesisAgent:
         return out
 
 
+class ResearchError(RuntimeError):
+    pass
+
+
 class ResearchOrchestrator:
     """The Research Coordinator (§17)."""
 
     def __init__(self, repo: Repository, bus: EventBus, auditor: Auditor, ingestion: IngestionService,
                  governance: GovernanceService, registry: ScopeRegistry, provider: LLMProvider | None,
                  agents: list[ResearchAgent] | None = None):
+        self._threads: dict[str, Any] = {}          # plan-17: background mission threads by mission id
         self.repo, self.bus, self.auditor, self.ingestion = repo, bus, auditor, ingestion
         self.governance, self.registry, self.provider = governance, registry, provider
         from ka.discovery import DiscoveryAgent
@@ -361,22 +366,66 @@ class ResearchOrchestrator:
         self.auditor.record(who=by, what="research.mission.created", why=objective, scope=scope, affected=[m.mission_id])
         return m
 
-    def run_mission(self, mission_id: str) -> ResearchRun:
+    # [block plan-17] research-01 R18 (Q14, decided 2026-10-09): a mission can run in the background — created and returned at once in
+    # RUNNING, the agents on a worker thread, progress saved after each agent so the mission page can poll. `run_mission` keeps its
+    # synchronous contract (`wait=true` for scripts and tests); both paths share `_execute`.
+    def _begin(self, mission_id: str) -> tuple[ResearchMission, ResearchRun]:
         m = self.repo.missions.require(mission_id)
+        if m.status == MissionStatus.RUNNING:
+            raise ResearchError(f"mission {mission_id} is already RUNNING")
         run = ResearchRun(mission_id=m.mission_id, agent_id="coordinator", model=getattr(self.provider, "name", None))
+        run.progress = {"agents_total": len(self.agents), "agents_done": 0, "current_agent": None, "candidates_so_far": 0,
+                        "started_at": now_iso(), "updated_at": now_iso()}
         self.repo.runs.put(run)
         m.status = MissionStatus.RUNNING
         m.run_ids.append(run.run_id)
         self.repo.missions.put(m)
         self.bus.emit("research.started", mission_id=m.mission_id, run_id=run.run_id)
+        return m, run
+
+    def run_mission(self, mission_id: str) -> ResearchRun:
+        m, run = self._begin(mission_id)
+        return self._execute(m, run)
+
+    def start_mission(self, mission_id: str) -> ResearchRun:
+        """Background: returns the RUNNING run at once; the thread is kept in `_threads` so a caller (or a test) can join it."""
+        import threading
+        m, run = self._begin(mission_id)
+
+        def worker():
+            try:
+                self._execute(m, run)
+            except Exception as e:  # noqa: BLE001 — nothing may escape the worker; the run records it
+                run.errors.append(f"coordinator: {type(e).__name__}: {e}")
+                run.status, run.completed_at = RunStatus.FAILED, now_iso()
+                self.repo.runs.put(run)
+                m.status, m.completed_at = MissionStatus.FAILED, run.completed_at
+                self.repo.missions.put(m)
+        t = threading.Thread(target=worker, name=f"ka-mission-{m.mission_id}", daemon=True)
+        self._threads[m.mission_id] = t
+        t.start()
+        return run
+
+    def _execute(self, m: ResearchMission, run: ResearchRun) -> ResearchRun:
         ctx = AgentContext(mission=m, run=run, repo=self.repo, ingestion=self.ingestion, provider=self.provider)
         findings: list[Finding] = []
         for agent in self.agents:
+            run.progress["current_agent"] = agent.agent_id
+            run.progress["updated_at"] = now_iso()
+            self.repo.runs.put(run)
             try:
                 findings += agent.research(ctx)
             except Exception as e:  # noqa: BLE001 — one agent failing must not lose the others' evidence
                 run.errors.append(f"{agent.agent_id}: {type(e).__name__}: {e}")
+            run.progress["agents_done"] = run.progress.get("agents_done", 0) + 1
+            run.progress["findings_so_far"] = len(findings)
+            run.progress["updated_at"] = now_iso()
+            self.repo.runs.put(run)
+        run.progress["current_agent"] = "synthesis"
+        self.repo.runs.put(run)
         candidates = self.synthesis.synthesize(ctx, findings)
+        run.progress["candidates_so_far"] = len(candidates)
+        run.progress["current_agent"] = None
         run.token_usage = ctx.usage.as_dict()
         run.cost = round(ctx.usage.cost_usd, 6)
         run.completed_at = now_iso()
@@ -389,6 +438,8 @@ class ResearchOrchestrator:
         self.bus.emit("research.completed", mission_id=m.mission_id, run_id=run.run_id, candidates=len(candidates))
         self.auditor.record(who="coordinator", what="research.completed", why=m.objective, scope=Scope(scope_type=m.scope_type, scope_id=m.scope_id),
                             affected=[m.mission_id, run.run_id] + [c.ref for c in candidates])
+        return run
+    # [/block plan-17]
         return run
 
     def _more_research(self, v: KnowledgeNuggetVersion, reason: str) -> str:

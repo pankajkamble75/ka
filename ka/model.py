@@ -340,6 +340,9 @@ class ResearchRun(BaseModel):
     # [/block plan-07]
     # [block plan-16] governed / pending knowledge the Enterprise Content agent reused instead of re-extracting (research-01 §6)
     reused_refs: list[str] = Field(default_factory=list)
+    # [/block plan-16]
+    # [block plan-17] research-01 R18 (Q14): progress of a background run — agents done / total, current agent, candidates so far
+    progress: dict[str, Any] = Field(default_factory=dict)
     # [/block plan-07]
 
     @property

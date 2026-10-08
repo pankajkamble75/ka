@@ -18,6 +18,7 @@ Registry of every open question: [`../trackers/QUESTIONS-TRACKER.md`](../tracker
 | Q6 | The first provider after the local folder is Microsoft 365 / SharePoint: one Microsoft Graph app registration covering OneDrive, SharePoint and Teams files, implemented as a `Connector` class behind the plan-08 contract; SharePoint permission lists map onto KA visibility; the client secret is named by `secret_ref` and read from the environment. Google Workspace and a file share follow the same pattern later. Chosen by the author 2026-10-08. ✅ built by plan-14 (fixture-verified; live use waits on Q13). | 2026-10-08 | architecture §2 |
 | Q8 | The console keeps its four tabs plus Images and gains a top-level tab, Processes, pointing at the plan-06 process profile view (list of process subjects → profile). The note's five-page layout is declined. Chosen by the author 2026-10-08; reasoning: process knowledge earns a top-level entry and nothing else moves. ✅ built by plan-15. | 2026-10-08 | architecture §8 |
 | Q12 | The search vendor is Brave; the author supplied the key on 2026-10-09 (`.env`, `KA_SEARCH_API_KEY`, gitignored) and the server runs `KA_SEARCH_PROVIDER=brave`. The live product test PT5 (research-02) passed against the real API. ✅ built (plan-13) and configured. | 2026-10-09 | architecture §6 |
+| Q14 | Research missions run in the background: `POST /research/missions` creates the mission, starts the run on a worker thread and returns at once with status RUNNING; the mission page polls `GET /research/missions/{id}` until COMPLETED or FAILED and shows progress (agents done, candidates so far); the API's default stays synchronous (`wait=true`) so scripts, tests and the plan-01 contract are unchanged; the console asks for `wait=false`. Chosen by the author 2026-10-09 ("I will go with your recommendation"); reasoning: the first live mission took 508 s and a silent button plus dropped responses is the failure a RUNNING state exists to prevent. ✅ built by plan-17. | 2026-10-09 | architecture §6, §8 |
 | Q3 | `auto_approve_low_impact` stays OFF by default: every graph change proposal, however small, is approved and applied by a named person on the graph-change page. Chosen by the author 2026-10-08; reasoning: the second click is cheap, the audit trail stays human, and the impact thresholds have not yet been exercised at real volume. Revisit with volume data. ✅ built (it is today's default, `ka/service.py:43`). | 2026-10-08 | architecture §5 |
 
 <details><summary>Q&A ledger — Q1</summary>
@@ -153,6 +154,18 @@ to 2k queries/month, then about $3 per 1k; the monthly cap bounds it.
 
 **Answer (2026-10-09, the author):** Brave; key supplied.
 
+<details><summary>Q&A ledger — Q14</summary>
+
+### Q14 — Synchronous mission runs (raised by the first live mission, 2026-10-09; beside the §6 research decisions)
+**Scenario.** `POST /research/missions` creates the mission and runs every agent before answering. With the stub model that took a
+second; with the author's Anthropic key, Brave and the Internet gate on, the first live mission took 508 s (9 model calls, $0.30,
+92 candidates). The console shows nothing while it runs, and a client that times out loses the response while the server keeps going.
+**Decision required.** Whether missions run in the background (RUNNING state, the mission page polls) or stay synchronous.
+**Options.** (a) background run + poll — recommended: the mission object already carries RUNNING/COMPLETED; (b) synchronous with a
+longer client timeout; (c) cap the agents per mission. **Cost.** (a) one plan (a worker thread + a polling mission page).
+
+**Answer (2026-10-09, the author):** background run + poll. Not built yet (plan-17).
+
 </details>
 
 ## ❓ Open
@@ -163,11 +176,3 @@ to 2k queries/month, then about $3 per 1k; the monthly cap bounds it.
 recorded Graph fixture. **Decision required.** Register the app (Files.Read.All, Sites.Read.All, application permissions), and give
 KA the tenant id, client id and the name of the variable holding the client secret. **Big picture.** Until then the connector
 cannot be used live and PT6 is NOT RUN. **Cost.** an admin consent in the tenant.
-
-### Q14 — Synchronous mission runs (raised by the first live mission, 2026-10-09; beside the §6 research decisions)
-**Scenario.** `POST /research/missions` creates the mission and runs every agent before answering. With the stub model that took a
-second; with the author's Anthropic key, Brave and the Internet gate on, the first live mission took 508 s (9 model calls, $0.30,
-92 candidates). The console shows nothing while it runs, and a client that times out loses the response while the server keeps going.
-**Decision required.** Whether missions run in the background (RUNNING state, the mission page polls) or stay synchronous.
-**Options.** (a) background run + poll — recommended: the mission object already carries RUNNING/COMPLETED; (b) synchronous with a
-longer client timeout; (c) cap the agents per mission. **Cost.** (a) one plan (a worker thread + a polling mission page).

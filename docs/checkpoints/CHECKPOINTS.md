@@ -2,6 +2,25 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 08:05 UTC — plan-17: missions run in the background; the mission page polls a RUNNING state (research-01 R18, Q14)
+
+**What changed** — `ka/research.py`: `_begin` / `start_mission` (daemon thread, kept in `_threads`, refuses a mission already RUNNING) /
+`_execute` shared with the unchanged synchronous `run_mission`; `ResearchRun.progress` (`ka/model.py`) saved after each agent.
+`ka/api.py`: `wait` on `POST /research/missions` (body, default true) and `/run` (query, default true); 409 on a RUNNING mission.
+`ka/console/app.js`: Start research sends `wait:false` and lands on the mission page at once; the page shows "Running · agent k/n · now
+<agent> · findings so far · elapsed" and re-renders every 2 s until the run ends; Run again is hidden while RUNNING. Two flows that read the
+finished run (`plan07`, `plan13`) pass `wait: true`. research-01 PT10 appended; architecture §6/§8 and the ledger mark Q14 ✅ built.
+`ka/tests/test_plan17_background_missions.py` (8 cases with a gated slow agent); `e2e/plan17_background_mission_flow.py`.
+
+**Deviation from the decision's wording, recorded** — the API default stays synchronous (`wait=true`) so plan-01's API contract and its
+covering test are untouched; the console asks for `wait=false`. The user-facing behaviour is exactly the decision.
+
+**Verification** — in-process 273 passed, 2 skipped (exit checked); ruff F clean; no protected code. Verify recount 5/5 D, 5/5 P, 3/3 N;
+blocks 4/4. Live flow against the real model: landed on the mission page in under 3 s showing Running · agent 0/6; the page ended COMPLETED
+by itself with 83 candidates (7 model calls, $0.25); screenshots verified. PT10 GREEN.
+
+**Decisions and questions** — BUILT: Q14. RAISED: none. Plan `plan-17`; research-01 R18 → UPLOADED.
+
 ## 2026-10-09 06:50 UTC — first real model-backed mission on the live server (follow-up to plan-16)
 
 **What changed** — `ka/console/app.js`: the plan-16 run-card addition now carries its declared block marker (B4). Docs only otherwise.

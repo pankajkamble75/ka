@@ -443,6 +443,8 @@ tests below).
 
 | PT9 | A mission over a store holding 40+ already-extracted sources completes with at most `KA_RESEARCH_MAX_SOURCES` model extraction calls, reusing the governed knowledge that matches the question (appended 2026-10-09; R17) | R17 | yes — plan-16 |
 
-**Total product tests: 9** (PT9 appended 2026-10-09 under Q64's append-only rule). None can run today; PT1–PT4 wait on the model and publication plans (R1–R3, R7, R8), PT5–PT6 on
+| PT10 | Starting a mission returns within a second with status RUNNING; the mission page shows progress and ends COMPLETED with candidates without the client waiting on the request (appended 2026-10-09; R18) | R18 | yes — plan-17 |
+
+**Total product tests: 10** (PT9, PT10 appended 2026-10-09 under Q64's append-only rule). None can run today; PT1–PT4 wait on the model and publication plans (R1–R3, R7, R8), PT5–PT6 on
 the security and visibility fixes (R4–R6), PT7–PT8 on discovery and the first connector (R9, R10) and their provider
 decisions.
