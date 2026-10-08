@@ -73,3 +73,13 @@ per-source trust tiers that skip the model for low-authority sources) and which.
 **Options.** (a) none beyond closed lists (today); (b) prompt structure + treat INTERNET_RESEARCH/LLM_GENERATED sources as
 heuristic-only; (c) a verifier model call per assertion. **Recommendation:** (b) — cheap, and authority already exists.
 **Cost.** (b) one plan; (c) doubles model cost per document.
+
+### Q11 — Approving a candidate flagged `duplicate_of` an ACTIVE nugget (raised by plan-06)
+**Scenario.** The same SOP is uploaded twice (or two documents state the same activity). The second candidate is analysed as
+DUPLICATES of the ACTIVE first (`analysis.duplicate_of`), lands in Pending, and a reviewer — or the console's Apply — approves it.
+Today that creates a second ACTIVE assertion of the same fact; the profile composes them once and shows "+1 duplicate" (plan-06),
+and the graph element simply gains a second lineage entry.
+**Decision required.** Whether governance should (a) allow it (today), (b) refuse APPROVE on a `duplicate_of` candidate and offer
+only Keep Existing / Merge / Both-valid, or (c) auto-resolve it as Keep Existing with the new source added as evidence to the
+existing nugget. **Recommendation:** (c) — it keeps one governed fact per claim and preserves the new evidence.
+**Cost.** (c) one small governance change under the protected protocol.

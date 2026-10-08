@@ -722,6 +722,22 @@ def subject(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, A
     return {"subject": rec.model_dump(mode="json"), "nuggets": [_nugget_row(n) | {"binding": (b.model_dump(mode="json") if (b := ka.repo.binding_for(n.ref)) else None)} for n in ns]}
 
 
+# [block plan-06] process profiles (research-01 R12) — read-only composition over governed knowledge
+@router.get("/processes")
+def processes(scope_type: str | None = None, scope_id: str | None = None, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    scope = _scope(scope_type, scope_id) if scope_type and scope_id else None
+    return {"processes": ka.profiles.list_processes(scope)}
+
+
+@router.get("/processes/{key}")
+def process_profile(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        return ka.process_profile(key).model_dump(mode="json")
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+# [/block plan-06]
+
+
 # ---- images for conversations (not knowledge; see ka/images.py)
 
 class ImageIn(BaseModel):

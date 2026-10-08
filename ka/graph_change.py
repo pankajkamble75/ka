@@ -359,8 +359,10 @@ class GraphChangeService:
                 if el is None:
                     continue
                 state = self.adapter.calculate_inheritance(el.scope).get(el.element_id, InheritanceState.INHERITED)
+                # plan-06 correction: an element composed from several assertions depends on ALL of them. Only prior
+                # versions of THIS canonical id are retired; other nuggets' dependencies on the element stay active.
                 for old in self.repo.dependencies_for_element(c.graph_id, c.element_id):
-                    if old.nugget_ref != v.ref:
+                    if old.nugget_ref != v.ref and old.nugget_ref.rsplit(":v", 1)[0] == v.canonical_id:
                         self.lineage.retire(nugget_ref=old.nugget_ref, graph_id=c.graph_id, element_id=c.element_id)
                 self.lineage.register(version=v, graph_id=c.graph_id, element_id=c.element_id, element_kind=c.element_kind,
                                       scope=el.scope, graph_change_id=p.id, inheritance_state=state)

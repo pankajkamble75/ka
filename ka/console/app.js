@@ -266,6 +266,38 @@ async function addView() {
 
 const scopeOptions = (scopes, selected = '') => scopes.map((s) => `<option value="${s.scope_type}|${esc(s.scope_id)}" ${`${s.scope_type}|${s.scope_id}` === selected ? 'selected' : ''}>${esc(s.name)} · ${s.scope_type.toLowerCase().replace('_', ' ')}</option>`).join('');
 
+// [block plan-06] the process profile (research-01 R12)
+const fieldLine = (f) => `<li><a href="#/nugget/${encodeURIComponent(f.ref)}">${esc(f.value || f.statement)}</a>${f.object_key ? ` <a class="small muted" href="#/subject/${encodeURIComponent(f.object_key)}">${esc(f.object_kind || '')}</a>` : ''}
+  <span class="small muted">· ${f.evidence.map((e) => `${esc(e.source_title || e.source_id)}${e.span_id ? ` ${esc(e.span_id)}` : ''}`).join('; ') || 'no evidence'}</span>${f.published_as.length ? ` <span class="pill ok small">published</span>` : ''}${(f.also || []).length ? ` <span class="pill small" title="${esc(f.also.join(', '))}">+${f.also.length} duplicate</span>` : ''}</li>`;
+const fieldCard = (title, items, empty) => `<div class="card"><h3>${title} <span class="muted">${items.length}</span></h3>${items.length ? `<ul>${items.map(fieldLine).join('')}</ul>` : `<div class="muted small">${empty}</div>`}</div>`;
+async function processProfileView(key) {
+  const p = await api(`/processes/${encodeURIComponent(key)}`);
+  const t = p.type || {};
+  const typePill = t.status === 'bound' ? pill(t.value, 'ok') : t.status === 'proposed' ? pill(`${t.claimed} → ${t.value}?`, 'warn') : t.status === 'unresolved' ? pill(`${t.claimed} (unresolved)`, 'halt') : pill('type not evidenced', 'warn');
+  return `<div class="crumbs"><a href="#/browse?mode=processes">Browse by scope · Processes</a> / ${esc(p.key)}</div>
+  <h1>${esc(p.name)} ${typePill}</h1>
+  <div class="sub mono">${esc(p.key)}${p.aliases.length ? ` · also: ${p.aliases.map(esc).join(', ')}` : ''} · ${p.scopes.map(scopePill).join(' ')}</div>
+  <div class="card"><h3>Description</h3>${p.description ? `<p style="font-size:var(--fs-15)">${esc(p.description.value || p.description.statement)}</p><div class="small muted">from <a href="#/nugget/${encodeURIComponent(p.description.ref)}">${esc(p.description.ref)}</a> · ${p.description.evidence.map((e) => `${esc(e.source_title || e.source_id)} ${esc(e.span_id || e.locator || '')}`).join('; ')}</div>` : '<div class="muted">not evidenced</div>'}
+    ${t.ref ? `<div class="small muted" style="margin-top:8px">Type claim <a href="#/nugget/${encodeURIComponent(t.ref)}">${esc(t.ref)}</a>: ${esc(t.claimed || '')} — ${esc((t.reasons || []).join(' '))}${(t.alternatives || []).length ? ` Alternatives: ${t.alternatives.map(esc).join(', ')}` : ''}</div>` : ''}
+    ${p.published_as.length ? `<div class="small" style="margin-top:8px">Published as <span class="mono">${p.published_as.map(esc).join(', ')}</span></div>` : ''}</div>
+  <div class="card"><h3>Coverage ${t.status === 'bound' ? `<span class="muted small">against ${esc(t.value)}'s slot grammar</span>` : ''}</h3>
+    ${p.coverage.length ? `<table><tr><th>Slot</th><th>Level</th><th>Status</th><th>Evidenced by</th></tr>${p.coverage.map((c) => `<tr><td class="mono">${esc(c.slot)}</td><td>${esc(c.level)}</td><td>${pill(c.status, c.status === 'evidenced' ? 'ok' : 'warn')}</td><td class="small muted">${c.via.map(esc).join(', ') || '—'}</td></tr>`).join('')}</table>` : `<div class="muted small">${esc(p.coverage_note || '')}</div>`}</div>
+  <div class="card"><h3>Activities <span class="muted">${p.activities.length}</span></h3>${p.activities.length ? `<ol>${p.activities.map((a) => `<li>${a.has_profile ? `<a href="#/subject/${encodeURIComponent(a.child_key)}">${esc(a.value)}</a>` : esc(a.value)} <span class="small muted">· <a href="#/nugget/${encodeURIComponent(a.ref)}">${esc(a.ref)}</a> · ${a.evidence.map((e) => `${esc(e.source_title || '')} ${esc(e.span_id || '')}`).join('; ')}</span>${a.published_as.length ? ' <span class="pill ok small">published</span>' : ''}${(a.also || []).length ? ` <span class="pill small" title="${esc(a.also.join(', '))}">+${a.also.length} duplicate</span>` : ''}</li>`).join('')}</ol>` : '<div class="muted small">not evidenced</div>'}</div>
+  <div class="grid2">
+    ${fieldCard('Actors', p.actors, 'not evidenced')}${fieldCard('Inputs', p.inputs, 'not evidenced')}${fieldCard('Outputs', p.outputs, 'not evidenced')}${fieldCard('Entities acted on', p.entities, 'not evidenced')}
+    ${fieldCard('Rules', p.rules, 'not evidenced')}${fieldCard('Events', p.events, 'not evidenced')}${fieldCard('States', p.states, 'not evidenced')}${fieldCard('Related', p.related, 'none')}
+  </div>
+  <h2>Pending assertions <span class="muted">${p.pending.length}</span></h2>${p.pending.length ? `<table><tr><th>Nugget</th><th>Predicate</th><th>Statement</th><th>Scope</th><th>Status</th></tr>${p.pending.map((x) => `<tr><td><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a></td><td class="mono">${esc(x.predicate || '')}</td><td>${esc(x.statement)}</td><td>${scopePill(x.scope)}</td><td>${pill(x.status)}</td></tr>`).join('')}</table>` : '<div class="empty">None — nothing about this process is waiting for a decision.</div>'}`;
+}
+async function processesList(scopeSel) {
+  const [t, id] = (scopeSel || '|').split('|');
+  const q = t && id ? `?scope_type=${t}&scope_id=${encodeURIComponent(id)}` : '';
+  const { processes } = await api(`/processes${q}`);
+  return `<h2>Processes ${t && id ? `<span class="muted">in or above ${esc(id)}</span>` : ''} <span class="muted">${processes.length}</span></h2>
+  ${processes.length ? `<table><tr><th>Process</th><th>Type</th><th class="num">Assertions</th><th class="num">Activities</th><th class="num">Pending</th><th>Scopes</th></tr>${processes.map((x) => `<tr><td><a href="#/subject/${encodeURIComponent(x.key)}">${esc(x.name)}</a><div class="small muted mono">${esc(x.key)}</div></td><td>${x.type.status === 'bound' ? pill(x.type.value, 'ok') : pill(x.type.status, x.type.status === 'not_evidenced' ? 'warn' : 'halt')}</td><td class="num">${x.assertions}</td><td class="num">${x.activities}</td><td class="num">${x.pending}</td><td>${x.scopes.map(scopePill).join(' ')}</td></tr>`).join('')}</table>` : '<div class="empty">No process knowledge yet. Upload a procedure under Add knowledge, or state an assertion on a note.</div>'}`;
+}
+// [/block plan-06]
+
 // [block plan-04] extraction report, re-extract, evidence spans (research-01 R3, R16)
 function extractionReport(d) {
   const cur = d.versions.find((v) => v.id === d.source.current_version_id) || d.versions[d.versions.length - 1];
@@ -297,6 +329,7 @@ async function subjectView(key) {
   key = decodeURIComponent(key);
   const d = await api(`/subjects/${encodeURIComponent(key)}`);
   const s = d.subject;
+  if (s.kind === 'process') return processProfileView(key);
   return `<div class="crumbs"><a href="#/nuggets">Knowledge nuggets</a> / subject</div><h1>${esc(s.name)} <span class="pill">${esc(s.kind)}</span></h1>
   <div class="sub mono">${esc(s.canonical_key)}${s.aliases.length ? ` · also: ${s.aliases.map(esc).join(', ')}` : ''}</div>
   <h2>Assertions about this subject <span class="muted">${d.nuggets.length}</span></h2>
@@ -365,8 +398,11 @@ async function browseView(qs) {
   const q = p.get('q') || '';
   const types = ['STRUCTURE', 'PARENT_DOMAIN', 'DOMAIN', 'INSTANCE'];
   const typeFilter = p.get('type') || '';
+  const mode = p.get('mode') || '';
   let body = '';
-  if (typeFilter) {
+  if (mode === 'processes') {
+    body = await processesList(sel);             // plan-06
+  } else if (typeFilter) {
     const hits = (await api(`/search?q=${encodeURIComponent(q)}&filter=${encodeURIComponent({ STRUCTURE: 'Structure', PARENT_DOMAIN: 'Domain', DOMAIN: 'Domain', INSTANCE: 'Instance' }[typeFilter])}`)).hits
       .filter((h) => h.kind === 'nugget' && h.scope.startsWith(typeFilter + ':'));
     body = `<h2>All ${typeFilter.toLowerCase().replace('_', ' ')} knowledge <span class="muted">${hits.length}</span></h2>${hits.length ? `<table><tr><th>Nugget</th><th>Statement</th><th>Scope</th><th>Status</th></tr>${hits.map((h) => `<tr><td><a href="#/nugget/${encodeURIComponent(h.id)}">${esc(h.id)}</a></td><td>${esc(h.snippet)}</td><td>${scopePill(h.scope)}</td><td>${pill(h.status)}</td></tr>`).join('')}</table>` : '<div class="empty">No knowledge at this level.</div>'}`;
@@ -388,7 +424,7 @@ async function browseView(qs) {
   } else body = '<div class="empty">No scopes registered yet — register one on the Dashboard.</div>';
   return `<div class="crumbs">3 · Browse by scope</div><h1>Browse knowledge</h1><p class="sub">Pull the knowledge nuggets of one domain, instance or parent domain — what it holds itself and what it inherits.</p>
   <div class="row"><div><label>Scope</label><select id="br-scope">${scopeOptions(scopes, sel)}</select></div><div><label>Filter text</label><input id="br-q" value="${esc(q)}" placeholder="refund, approval, KYC…"></div><button class="primary" data-act="browse">Show</button></div>
-  <div class="filters">${types.map((t) => `<button class="${typeFilter === t ? 'on' : ''}" data-act="browse-type" data-t="${t}">All ${t.toLowerCase().replace('_', ' ')}s</button>`).join('')}<button class="${!typeFilter ? 'on' : ''}" data-act="browse-type" data-t="">One scope</button></div>${body}`;
+  <div class="filters">${types.map((t) => `<button class="${typeFilter === t && mode !== 'processes' ? 'on' : ''}" data-act="browse-type" data-t="${t}">All ${t.toLowerCase().replace('_', ' ')}s</button>`).join('')}<button class="${!typeFilter && mode !== 'processes' ? 'on' : ''}" data-act="browse-type" data-t="">One scope</button><button class="${mode === 'processes' ? 'on' : ''}" data-act="browse-mode" data-m="processes">Processes</button></div>${body}`;
 }
 
 /* TAB 4 — Dashboard: status of the knowledge acquisition engine. */
@@ -531,6 +567,7 @@ async function act(b) {
   if (a === 'grammar-refresh') { const r = await api('/grammar/refresh', { method: 'POST', body: { force: b.dataset.force === '1' } }); toast(`Grammar ${r.descriptor.grammar_version} · ${r.descriptor.type_table_version}`); render(); return; }
   if (a === 'rebind-all') { const r = await api('/grammar/rebind-all', { method: 'POST' }); toast(`Rebound ${r.rebound} nugget(s)`); render(); return; }
   if (a === 'browse') { location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&q=${encodeURIComponent($('#br-q').value)}`; return; }
+  if (a === 'browse-mode') { location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&mode=${b.dataset.m}`; return; }
   if (a === 'browse-type') { const p = new URLSearchParams(location.hash.split('?')[1] || ''); location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&q=${encodeURIComponent($('#br-q').value)}&type=${b.dataset.t}`; return; }
   if (a === 'detect-promotions') { const { scopes } = await api('/scopes'); let n = 0; for (const s of scopes.filter((s) => s.scope_type !== 'INSTANCE')) { n += (await api(`/promotions/detect/${s.scope_type}/${encodeURIComponent(s.scope_id)}`, { method: 'POST' })).proposals.length; } toast(`${n} promotion proposal(s)`); render(); return; }
   if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run`, { method: 'POST' }); toast(`Run ${r.run.status}`); render(); return; }

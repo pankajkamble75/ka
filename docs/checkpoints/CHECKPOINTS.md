@@ -2,6 +2,49 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 17:50 UTC — plan-06: the process profile — composed, evidence-linked, with coverage and the unknowns (research-01 R12)
+
+**What changed**
+
+- *Profile* `ka/profile.py` (new): `ProfileField`, `Activity`, `ProcessProfile`; `ProfileService.profile(key)` composes ACTIVE assertions
+  by predicate (description, type with binding status, activities in document order, actors/inputs/outputs/entities/rules/events/states/
+  related), every field with nugget ref, evidence spans and `published_as`; PENDING/CONFLICT listed apart; identical ACTIVE assertions
+  compose once (`also`, `counts.duplicates`); `coverage(profile)` against the bound type's required/recommended slots from EOS's slot grammar
+  (never filled in); `list_processes(scope)` lists subjects with ≥1 ACTIVE assertion in the scope chain.
+- *Service/API* `ka/service.py`: `profiles`, `process_profile`. `ka/api.py`: `GET /processes`, `GET /processes/{key}` (404 for unknown or
+  non-process subjects).
+- *Console* `ka/console/app.js`: `processProfileView` (description, type pill, coverage table, ordered activities with links to child profiles,
+  field cards, pending, published-as), `processesList`, "Processes" mode in Browse by scope, subject page delegates for process subjects.
+- *Protected correction* `ka/graph_change.py::apply`: retires only prior versions of the SAME canonical id on a shared element, so an element
+  composed from several assertions keeps every nugget's dependency (Invariants 4/5). Characterization `00fd176` (defect pinned) → fix →
+  covering suites unmodified → `docs/protected.md` bumped.
+- *Docs/tests*: architecture §8 paragraph; README row; `plan-06.md` with both corrections; Q11 parked (questions document + registry);
+  `ka/tests/test_plan06_profile.py` (14 cases); `e2e/plan06_profile_flow.py`.
+
+**Why**
+
+research-01 R12 / note REQ-012 "Processes": a reviewer needs to see what KA knows about a process as a profile with its gaps, not as a
+list of rows. The profile is a query over governed versions, never a stored object; it is the surface where PT1's claims are visible.
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 150 passed; EOS-path suite (EOS interpreter) → 7 passed after the lineage correction; ruff F clean.
+  Verify recount: 7/7 deliverables, 8/8 positive, 7/7 negative; blocks 4/4 plus the declared protected correction.
+- Live: `e2e/plan06_profile_flow.py` 6/6 PASS; screenshots verified (Processes list; profile with coverage).
+- Product tests (research-01): PT1–PT6 PASS; PT7 FAIL (plan-07), PT8 FAIL (plan-08).
+
+**Follow-ups / risks**
+
+- Duplicate ACTIVE assertions are composed once in the profile but still exist as governed versions (Q11).
+- Activity order is nugget creation order; on a store where activities were published by several documents the order is the union's.
+
+**Decisions and questions**
+
+- Plan `plan-06`; research point R12 → UPLOADED.
+- BUILT: `knowledge-acquisition.md` §8 "The process profile" paragraph.
+- RAISED: Q11 — approving a candidate flagged `duplicate_of` an ACTIVE nugget — recorded in `docs/questions/knowledge-acquisition.md`
+  and `QUESTIONS-TRACKER.md`. Q8 (tab shape) remains parked; the profile lives inside Browse by scope.
+
 ## 2026-10-08 16:45 UTC — plan-05: publish through EOS — ChangeOps by canonical identity, idempotent (research-01 R1, R2 last clause, R7 KA half)
 
 **What changed**

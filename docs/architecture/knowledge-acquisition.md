@@ -142,6 +142,14 @@ Graph changes · Add knowledge (Upload / Paste / Write / Link) · Correct this (
 Conflicts / Research / Changes / Graph impact / History (§28) · Instance view with Inherited / Instance-specific / Overrides / Extensions /
 Removed / Pending corrections (§30) · Nugget detail with every §31 field and action · Conflict resolution with the §33 layout and actions.
 
+**The process profile (plan-06, R12).** `ka/profile.py::ProfileService.profile(key)` composes, for one process subject, the ACTIVE
+assertions by predicate — description, type (bound / proposed / unresolved / not evidenced), activities in document order,
+actors, inputs, outputs, entities, rules, events, states — each field carrying its nugget ref, evidence spans and the element it
+is published as; PENDING ones are listed apart; `coverage` reports the bound type's required and recommended slots as evidenced
+or not, from EOS's slot grammar, and nothing is ever filled in. It is a query, never a stored object. Surfaces:
+`GET /processes`, `GET /processes/{key}`, the "Processes" mode of Browse by scope, and the subject page for process subjects.
+No new tab while Q8 is parked.
+
 ## 9. Events and audit (§38, §41)
 
 `ka.events.EventBus` — the §38 names, payloads are ids (a value longer than 200 chars is refused), every event appended to `events.jsonl`.

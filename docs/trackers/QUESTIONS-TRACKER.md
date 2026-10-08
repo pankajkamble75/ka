@@ -14,3 +14,4 @@ Decisions parked for the author. One row per question, `Q1`, `Q2`, … Never ren
 | Q8 | research | R13: console shape — add a Processes tab or adopt the note's five pages? | add Processes (recommended) / five pages | — (parked) | 2026-10-08 |
 | Q9 | research | R14: re-pin the EOS console frontend (Q418) for a process evidence panel? | re-pin after plan-05 / not | — (parked; author only) | 2026-10-08 |
 | Q10 | implementation | Prompt-injection defences for document text sent to the extraction model (note REQ-008; raised by plan-04). | none / prompt structure + authority tiers / verifier call | — (parked by plan-04) | 2026-10-08 |
+| Q11 | implementation | Should APPROVE of a candidate flagged duplicate_of an ACTIVE nugget be allowed, refused, or auto-resolved as Keep Existing + evidence? (raised by plan-06) | allow / refuse / auto-resolve + evidence | — (parked by plan-06) | 2026-10-08 |

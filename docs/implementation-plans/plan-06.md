@@ -157,7 +157,7 @@ Out: a new tab (Q8); editing from the profile beyond the existing nugget actions
 
 ## Plan totals
 
-**Research points covered: 1 of 16 · Deliverables: 7 · Positive cases: 8 · Negative cases: 5 · Test cases total: 13 ·
+**Research points covered: 1 of 16 · Deliverables: 7 · Positive cases: 8 · Negative cases: 7 · Test cases total: 15 ·
 Product tests served: 1 of 8 (0 turn green here).**
 
 ## Implementation Notes
@@ -166,3 +166,14 @@ Product tests served: 1 of 8 (0 turn green here).**
   `Repository.nuggets_by_subject` and `GrammarRegistry.type_grammar` exist unchanged.
 - No characterization commit is needed (no protected code).
 - Activity order: nugget `created_at` order within the subject; the fixture's five steps are ingested in document order.
+- **Correction during implementation (2026-10-08 17:20 UTC).** P2 exposed a lineage defect inherited from plan-01's `apply`
+  (`ka/graph_change.py`): when a second nugget publishes onto an element another nugget already depends on, the loop
+  `for old in dependencies_for_element: if old.nugget_ref != v.ref: retire` retires the OTHER nugget's dependency, so a node
+  composed from several assertions (canonical identity, plan-05) keeps only the last one — Invariants 4/5 broken for composed
+  elements. The fix retires only prior versions of the SAME canonical id. This touches protected `ka/graph_change/`, which this
+  plan did not declare: the protocol is followed anyway — characterization N6 (the defect, pinned pre-fix) in its own commit,
+  the fix, covering suites unmodified, Verified date bumped. Plan totals become 8 positive / 6 negative (N6 added).
+- **Second correction (17:35 UTC).** On the shared demo store the profile showed 12 activities: repeated uploads approved as
+  duplicates (`analysis.duplicate_of`) made duplicate ACTIVE assertions. The profile now composes identical ACTIVE assertions once
+  (first wins; later refs on `also`; `counts.duplicates`) — N7 added. Whether governance should allow such approvals at all is the
+  author's: parked as **Q11** (questions document + registry). Plan totals become 8 positive / 7 negative.

@@ -49,6 +49,7 @@ Without it the package runs on a deterministic heuristic extractor and a stub pr
 | — | `ka/graph_adapter.py` | §39 adapter protocol; in-memory reference adapter; `EnterpriseOSGraphAdapter` over `knowledge_worker.graph_store.GraphStore` |
 | — | `ka/corrections.py` | §23 "Correct this": lineage resolution → scope suggestion → candidate → governance → graph proposal |
 | — | `ka/promotion.py` | §25 upward promotion proposals (never automatic) and §30 instance knowledge states |
+| — | `ka/profile.py` | the process profile: a composed, evidence-linked view with coverage against the EOS type grammar (plan-06) |
 | — | `ka/runtime_guard.py` | §43: `GRAPH GAP DETECTED` → Knowledge Acquisition Request / Research Mission; retrieval door stays shut |
 | — | `ka/console/` | The Knowledge Console: Structure → Domains → Instances; Needs Attention; conflict resolution; research; lineage |
 

@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from ka.api import PREFIX, create_app, set_ka
 from ka.governance import CandidateInput
-from ka.identity import canonical_key
 from ka.model import ObjectRef, Scope, Subject
 from ka.tests.conftest import A, D, approve_all
 from ka.vocab import AuthorityType, DecisionOutcome, ScopeType
@@ -157,5 +156,17 @@ def test_N6_apply_keeps_every_nuggets_dependency_on_a_shared_element(ka):
     a = approve_all(ka, [_assert(ka, "Merchant underwriting: evaluates applications", "description", ObjectRef(value="evaluates applications"))])[0]
     assert [d.element_id for d in ka.lineage.where_used(a.ref)] == ["p.merchant_underwriting"]
     b = approve_all(ka, [_assert(ka, "Merchant underwriting is performed by: Underwriting team", "performed_by", ObjectRef(kind="actor", value="Underwriting team"))])[0]
-    assert ka.lineage.where_used(a.ref) == []                                   # ← the defect, pinned pre-fix
+    assert [d.element_id for d in ka.lineage.where_used(a.ref)] == ["p.merchant_underwriting"]      # fixed: stays active (pre-fix: [] — commit 00fd176)
     assert "p.merchant_underwriting" in [d.element_id for d in ka.lineage.where_used(b.ref)]
+    why = ka.explain_element("merchant-acquiring", "p.merchant_underwriting")
+    assert {x["ref"] for x in why["knowledge_lineage"]} == {a.ref, b.ref}
+
+
+def test_N7_identical_active_assertions_compose_once(ka):
+    """plan-06 correction: a re-uploaded SOP approved twice makes duplicate ACTIVE assertions (Q11); the profile shows each fact once."""
+    _sop_profile(ka)
+    _sop_profile(ka)
+    p = ka.process_profile("merchant_underwriting")
+    assert [a.value for a in p.activities] == ["Collect application", "Validate application", "Analyze merchant risk", "Make credit decision", "Communicate decision"]
+    assert all(len(a.also) == 1 for a in p.activities) and len(p.actors) == 1 and len(p.actors[0].also) == 1
+    assert p.counts["duplicates"] == 6 and p.counts["assertions"] == 14

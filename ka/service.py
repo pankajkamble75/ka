@@ -25,6 +25,7 @@ from ka.lineage import LineageService
 from ka.llm import LLMProvider, select_provider
 from ka.model import Scope
 from ka.process_extraction import ProcessExtractor
+from ka.profile import ProfileService
 from ka.promotion import PromotionService
 from ka.repository import Repository
 from ka.research import ResearchOrchestrator
@@ -65,6 +66,9 @@ class KnowledgeAcquisition:
                                              self.registry, self.ingestion)
         self.promotion = PromotionService(self.repo, self.bus, self.auditor, self.registry, self.governance)
         self.search = SearchService(self.repo)
+        # [block plan-06]
+        self.profiles = ProfileService(self.repo, self.grammar, self.lineage, self.registry)
+        # [/block plan-06]
         self.runtime_guard = RuntimeGuard(self.repo, self.bus, self.research)
         self._restore_registry()
         if auto_propose_graph_changes:
@@ -188,6 +192,9 @@ class KnowledgeAcquisition:
             "provider": getattr(self.provider, "name", "?"), "adapter": type(self.adapter).__name__, "storage": str(self.repo.root),
             "grammar": self.grammar.descriptor() | {"bindings": len(self.repo.bindings), "subjects": len(self.repo.subjects)},
         }
+
+    def process_profile(self, key: str):
+        return self.profiles.profile(key)          # plan-06 (block: wiring above)
 
     # ---- "Why?" (§15, §47) ----------------------------------------------------------------------------
 
