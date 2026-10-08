@@ -55,11 +55,14 @@ class Connector(Protocol):
 
 def get_connector(kind: str) -> Connector:
     from ka.connectors.local_folder import LocalFolderConnector
-    kinds: dict[str, type] = {"local_folder": LocalFolderConnector}
+    # [block plan-14] research-02 R6 (Q6): Microsoft 365 / SharePoint behind the same contract
+    from ka.connectors.m365 import M365Connector
+    kinds: dict[str, type] = {"local_folder": LocalFolderConnector, "m365": M365Connector}
+    # [/block plan-14]
     if kind not in kinds:
         raise ConnectorError(f"unknown connector kind {kind!r}; known: {', '.join(kinds)}")
     return kinds[kind]()
 
 
-CONNECTOR_KINDS = ("local_folder",)
+CONNECTOR_KINDS = ("local_folder", "m365")   # plan-14 (Q6): m365 behind the same contract — declared in the block above
 # [/block plan-08]

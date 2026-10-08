@@ -2,6 +2,37 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 02:50 UTC — plan-14: the Microsoft 365 / SharePoint connector behind the plan-08 contract (research-02 R6, Q6)
+
+**What changed**
+
+- `ka/connectors/m365.py` (new): `M365Connector` — client-credentials token from the secret the connection's `secret_ref` names (memory
+  only), drive delta with paged `@odata.nextLink` and the `@odata.deltaLink` as the checkpoint, items keyed by Graph id with the
+  drive-relative path as the name (so a move changes the name), content fetch, permissions → visibility (anonymous/organization link
+  or an "Everyone" group → ENTERPRISE, a group → TEAM, named users → PERSONAL, never above the connection's ceiling), a full permission
+  sweep every `KA_M365_PERMISSION_SWEEP_EVERY` syncs, `revoke` drops the token. Graph 401/403 → `ConnectorError`.
+- `ka/connectors/__init__.py`: `m365` registered. `ka/config.py`: the sweep setting. `ka/console/app.js`: "Connect Microsoft 365 /
+  SharePoint" card (tenant, client, drive, secret variable name, include globs, scope, authority, visibility ceiling) with the refusal
+  reason shown inline.
+- Fixture `ka/tests/fixtures/m365_graph_fixture.json` (token, two delta pages, an incremental delta with modified/deleted/moved, content,
+  permissions incl. a sweep narrowing); `ka/tests/test_plan14_m365_connector.py` (12 cases; the live PT6 SKIPS without the registration);
+  `e2e/plan14_m365_flow.py` (kinds list, card, refusal without the secret variable, API 400, nothing stored). `.env.example`;
+  architecture §2 Q6 → ✅ built; the Q6 row restored in the ledger's Decided table.
+- `ka/tests/test_plan08_connectors.py::test_P9`: the exact kinds-list assertion `== ["local_folder"]` relaxed to membership — Q6 added a
+  kind; plan-08 is not a protected area.
+
+**Why** — the author's Q6 decision. The registration is Q13 and the author's.
+
+**Verification** — in-process 254 passed, 2 skipped (the two live product tests gated on the author's credentials); ruff F clean; no
+protected code and `SyncService` untouched (diff confirmed). Verify recount 7/7 D, 7/7 P, 5/5 N; blocks 4/4 files. Live flow 6/6 PASS;
+screenshot verified. Product tests (research-02): PT1–PT4 PASS; PT5, PT6 fixture-driven PASS, live NOT RUN (Q12, Q13); PT7 awaiting plan-15.
+
+**Follow-ups / risks** — the permission mapping is a heuristic over Graph permission shapes; the sweep interval trades Graph calls
+for freshness. Delegated (per-user) OAuth is out of scope.
+
+**Decisions and questions** — BUILT: Q6 (architecture §2 ✅). OPEN: Q13 unchanged (names `test_P7_PT6_live…`). Plan `plan-14`;
+research-02 R6 → UPLOADED.
+
 ## 2026-10-09 02:05 UTC — plan-13: Brave behind the discovery seam, key in the environment, monthly cap (research-02 R5, Q5)
 
 **What changed**

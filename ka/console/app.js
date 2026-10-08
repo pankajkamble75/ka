@@ -374,6 +374,7 @@ async function addView() {
     <div class="card"><h3>Write a note</h3><label>Title</label><input id="no-title" value="Note"><label>Note</label><textarea id="no-text" placeholder="Refunds above $1,000 require manager approval at this store."></textarea><label>Scope</label>${scopeSel('no-scope')}<div class="actions"><button class="primary" data-act="note">Save & resolve</button></div></div>
     <div class="card"><h3>Link</h3><label>URL (web page, GitHub, documentation)</label><input id="li-url" placeholder="https://…"><label>Scope</label>${scopeSel('li-scope')}<label>Authority</label>${authSel('li-auth', 'External Reference')}<div class="actions"><button class="primary" data-act="link">Fetch & resolve</button></div></div>
     ${connectCard(scopeSel, authSel)}
+    ${m365Card(scopeSel, authSel)}
     <div class="card"><h3>Research</h3><p class="small muted">Research agents gather evidence and propose candidates. They never change knowledge or the graph.</p><label>Scope</label>${scopeSel('rm-scope')}<label>Objective</label><textarea id="rm-obj" placeholder="Research current Visa dispute processing rules and identify anything that conflicts with Merchant Acquiring knowledge."></textarea><label>Questions (one per line)</label><textarea id="rm-q"></textarea><div class="actions"><button class="primary" data-act="mission">Start research</button></div></div>
     <div class="card"><h3>Correct existing knowledge</h3><p class="small muted">What the Enterprise Console sends on "Correct this". Becomes a candidate revision — the graph changes only after approval.</p>
       <label>Nugget ref (or graph element below)</label><input id="co-ref" placeholder="KN-002:v1"><div class="row"><div><label>Graph id</label><input id="co-graph" placeholder="merchant-acquiring"></div><div><label>Element id</label><input id="co-el" placeholder="r.refunds_above_500…"></div></div>
@@ -402,6 +403,17 @@ function gapTable(rows) {
   return `<table><tr><th>Scope</th><th>Question</th><th>Gap</th><th>Principal · intent</th><th>Status</th><th></th></tr>${rows.map((r) => `<tr><td>${scopePill(r.scope.scope_type + ':' + r.scope.scope_id)}</td><td>${esc(r.question)}${r.correlation_id ? `<div class="mono muted small">${esc(r.correlation_id)}</div>` : ''}</td><td>${esc(r.gap_description)}${(r.missing_semantics || []).length ? `<div class="muted small">missing: ${r.missing_semantics.map(esc).join(', ')}</div>` : ''}</td><td class="small">${esc(r.principal || r.requested_by)} · <span class="pill">${esc(r.intent || 'answer')}</span>${r.deduplicated_count ? `<div class="muted">raised ${r.deduplicated_count + 1}×</div>` : ''}</td><td>${pill(r.status, r.status === 'FULFILLED' ? 'ok' : r.status === 'CANCELLED' ? '' : 'warn')}${r.mission_id ? `<div class="small"><a href="#/mission/${r.mission_id}">${esc(r.mission_id)}</a></div>` : ''}</td><td>${['OPEN', 'IN_RESEARCH'].includes(r.status) ? `<button data-act="cancel-gap" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`).join('')}</table>`;
 }
 // [/block plan-09]
+
+// [block plan-14] research-02 R6 (Q6): Microsoft 365 / SharePoint behind the same connector contract; the registration is Q13
+function m365Card(scopeSel, authSel) {
+  return `<div class="card"><h3>Connect Microsoft 365 / SharePoint</h3><p class="small muted">One Graph app registration (client credentials) covering OneDrive, SharePoint and Teams files. The client secret is never stored: name the environment variable that holds it. Permissions map onto visibility (tenant-wide → Enterprise, a group → Team, a single user → Personal), never wider than the ceiling you choose. The app registration itself is decision Q13.</p>
+    <label>Name</label><input id="ms-name" placeholder="Finance SharePoint"><div class="row"><div><label>Tenant id</label><input id="ms-tenant"></div><div><label>Client id</label><input id="ms-client"></div></div>
+    <div class="row"><div><label>Drive id</label><input id="ms-drive"></div><div><label>Secret variable name</label><input id="ms-secret" placeholder="M365_CLIENT_SECRET"></div></div>
+    <label>Include (comma-separated globs, optional)</label><input id="ms-include" placeholder="**/*.md, **/*.docx"><label>Scope</label>${scopeSel('ms-scope')}<label>Authority</label>${authSel('ms-auth', 'Project Documentation')}
+    <label>Visibility ceiling</label><select id="ms-vis"><option>ENTERPRISE</option><option>DOMAIN</option><option>INSTANCE</option><option>TEAM</option><option>PERSONAL</option></select>
+    <div class="actions"><button class="primary" data-act="connect-m365">Connect & sync</button></div><div id="ms-result"></div></div>`;
+}
+// [/block plan-14]
 
 // [block plan-08] managed connectors (research-01 R10): connect a folder, sync it, revoke it; providers beyond the folder are Q6
 function connectCard(scopeSel, authSel) {
@@ -654,6 +666,16 @@ async function act(b) {
     toast(x.applied ? `Repinned ${x.instance_id} → ${x.to_version}` : `Not repinned: ${x.note || 'blocked'}`); render(); return;
   }
   if (a === 'cancel-gap') { const reason = prompt('Reason for cancelling this gap request?') || ''; await api(`/runtime/requests/${b.dataset.id}/cancel?by=${encodeURIComponent(who())}&reason=${encodeURIComponent(reason)}`, { method: 'POST' }); toast('Gap request cancelled'); render(); return; }
+  if (a === 'connect-m365') {
+    const [st, sid] = $('#ms-scope').value.split('|');
+    const include = $('#ms-include').value.split(',').map((x) => x.trim()).filter(Boolean);
+    try {
+      const r = await api('/connectors', { method: 'POST', body: { kind: 'm365', name: $('#ms-name').value, config: { tenant_id: $('#ms-tenant').value, client_id: $('#ms-client').value, drive_id: $('#ms-drive').value, ...(include.length ? { include } : {}) }, secret_ref: $('#ms-secret').value || null, owner: who(), scope_type: st, scope_id: sid, authority: $('#ms-auth').value, visibility: $('#ms-vis').value } });
+      const sr = await api(`/connectors/${r.connection.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' });
+      toast(`Connected · synced: ${sr.report.new} new, ${sr.report.candidates} candidates`); render();
+    } catch (e) { $('#ms-result').innerHTML = `<div class="quote small">Not connected: ${esc(e.message || String(e))}</div>`; }
+    return;
+  }
   if (a === 'sync-conn') { const sr = await api(`/connectors/${b.dataset.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Synced: ${sr.report.new} new · ${sr.report.modified} modified · ${sr.report.moved} moved · ${sr.report.deleted} deleted · ${sr.report.permission_changed} permissions · ${sr.report.candidates} candidates`); render(); return; }
   if (a === 'revoke-conn') { if (!confirm('Revoke this connection? Synced sources stay; nothing new is pulled.')) return; await api(`/connectors/${b.dataset.id}/revoke?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast('Connection revoked'); render(); return; }
   if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run`, { method: 'POST' }); toast(`Run ${r.run.status}`); render(); return; }

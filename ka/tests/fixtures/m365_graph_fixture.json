@@ -1,0 +1,43 @@
+{
+  "token": {"access_token": "eyJ-FIXTURE-TOKEN-0001", "expires_in": 3600, "token_type": "Bearer"},
+  "delta_full": {
+    "value": [
+      {"id": "FOLDER01", "name": "Policies", "folder": {"childCount": 2}, "parentReference": {"path": "/drive/root:"}, "lastModifiedDateTime": "2026-09-01T10:00:00Z"},
+      {"id": "ITEM0001", "name": "refunds.md", "size": 61, "eTag": "\"e1\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-A1"}}, "parentReference": {"path": "/drive/root:/Policies"}, "lastModifiedDateTime": "2026-09-02T10:00:00Z"},
+      {"id": "ITEM0002", "name": "chargebacks.md", "size": 58, "eTag": "\"e2\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-B1"}}, "parentReference": {"path": "/drive/root:/Policies"}, "lastModifiedDateTime": "2026-09-03T10:00:00Z"},
+      {"id": "ITEM0003", "name": "settlement.md", "size": 54, "eTag": "\"e3\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-C1"}}, "parentReference": {"path": "/drive/root:"}, "lastModifiedDateTime": "2026-09-04T10:00:00Z"},
+      {"id": "ITEM0004", "name": "huge.bin", "size": 5000000, "eTag": "\"e4\"", "file": {"mimeType": "application/octet-stream", "hashes": {"quickXorHash": "QX-D1"}}, "parentReference": {"path": "/drive/root:"}, "lastModifiedDateTime": "2026-09-04T11:00:00Z"}
+    ],
+    "@odata.nextLink": "https://graph.microsoft.com/v1.0/drives/DRIVE1/root/delta?$skiptoken=PAGE2"
+  },
+  "delta_page2": {
+    "value": [
+      {"id": "ITEM0005", "name": "onboarding.md", "size": 57, "eTag": "\"e5\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-E1"}}, "parentReference": {"path": "/drive/root:/Policies"}, "lastModifiedDateTime": "2026-09-05T10:00:00Z"}
+    ],
+    "@odata.deltaLink": "https://graph.microsoft.com/v1.0/drives/DRIVE1/root/delta?token=T1"
+  },
+  "delta_T1": {
+    "value": [
+      {"id": "ITEM0001", "name": "refunds.md", "size": 63, "eTag": "\"e1b\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-A2"}}, "parentReference": {"path": "/drive/root:/Policies"}, "lastModifiedDateTime": "2026-09-10T10:00:00Z"},
+      {"id": "ITEM0002", "name": "chargebacks.md", "deleted": {"state": "deleted"}, "parentReference": {"path": "/drive/root:/Policies"}},
+      {"id": "ITEM0003", "name": "settlement.md", "size": 54, "eTag": "\"e3\"", "file": {"mimeType": "text/markdown", "hashes": {"quickXorHash": "QX-C1"}}, "parentReference": {"path": "/drive/root:/Archive"}, "lastModifiedDateTime": "2026-09-04T10:00:00Z"}
+    ],
+    "@odata.deltaLink": "https://graph.microsoft.com/v1.0/drives/DRIVE1/root/delta?token=T2"
+  },
+  "delta_T2": {"value": [], "@odata.deltaLink": "https://graph.microsoft.com/v1.0/drives/DRIVE1/root/delta?token=T3"},
+  "content": {
+    "ITEM0001": "Merchant refunds above $500 require manager approval at Contoso.\n",
+    "ITEM0001@v2": "Merchant refunds above $1,000 require manager approval at Contoso.\n",
+    "ITEM0002": "Merchant chargebacks must be answered within 30 days at Contoso.\n",
+    "ITEM0003": "Settlement occurs two business days after clearing at Contoso.\n",
+    "ITEM0005": "Merchant onboarding is performed by the Onboarding team.\n"
+  },
+  "permissions": {
+    "ITEM0001": {"value": [{"id": "p1", "link": {"scope": "organization", "type": "view"}}]},
+    "ITEM0002": {"value": [{"id": "p2", "grantedToV2": {"group": {"displayName": "Ops Team", "id": "g1"}}}]},
+    "ITEM0003": {"value": [{"id": "p3", "grantedToV2": {"user": {"displayName": "A Person", "id": "u1"}}}]},
+    "ITEM0005": {"value": [{"id": "p5", "grantedToV2": {"group": {"displayName": "Everyone except external users", "id": "g0"}}}]},
+    "ITEM0003@sweep": {"value": [{"id": "p3b", "grantedToV2": {"user": {"displayName": "A Person", "id": "u1"}}}]},
+    "ITEM0001@sweep": {"value": [{"id": "p1b", "grantedToV2": {"group": {"displayName": "Finance", "id": "g2"}}}]}
+  }
+}

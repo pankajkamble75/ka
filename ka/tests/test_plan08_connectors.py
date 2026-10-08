@@ -200,7 +200,7 @@ def test_P9_routes_create_list_get_sync_revoke_then_sync_is_409(client):
     assert r.status_code == 201, r.text
     cid = r.json()["connection"]["id"]
     lst = c.get(f"{PREFIX}/connectors").json()
-    assert [x["id"] for x in lst["connections"]] == [cid] and lst["kinds"] == ["local_folder"] and lst["decision"] == "Q6" and str(root) in lst["roots"]
+    assert [x["id"] for x in lst["connections"]] == [cid] and "local_folder" in lst["kinds"] and lst["decision"] == "Q6"   # plan-14 added m365 to kinds (Q6) and str(root) in lst["roots"]
     r = c.post(f"{PREFIX}/connectors/{cid}/sync?by=ops")
     assert r.status_code == 200 and r.json()["report"]["new"] == 1
     got = c.get(f"{PREFIX}/connectors/{cid}").json()

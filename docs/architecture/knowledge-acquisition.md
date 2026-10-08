@@ -43,9 +43,11 @@ fetch / get_permissions / checkpoint / sync_incremental / revoke) and `ka/connec
 (the NAME of an environment variable; the value is never stored). `ka/connectors/sync.py::SyncService.sync` reconciles a delta
 through the one ingestion door: new → `Source`; modified → new `SourceVersion` of the same source, re-extracted; moved → same
 source, location updated; deleted → `Source.revoked_at`, versions kept, derived nuggets flagged (plan-08) and — **Q4, ✅ built by plan-10** — returned to review as same-statement candidate revisions (`GovernanceService.reopen_for_revocation`) so a person decides: APPROVE keeps, REJECT retires the prior (OBSOLETE) and `GraphChangeService.propose_retirement` proposes removing its elements;
-permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ⏳ DECIDED 2026-10-08, not built:** the first
-provider after the folder is Microsoft 365 / SharePoint (one Graph app registration; permission lists → visibility; client secret via
-`secret_ref`); Google Workspace and a file share follow the same pattern.
+permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ✅ built by plan-14, 2026-10-09:** `ka/connectors/m365.py::M365Connector`
+(`kind="m365"`): client-credentials token from the secret the connection's `secret_ref` names (memory only), the drive's `@odata.deltaLink`
+as the checkpoint, moves by path, permissions → visibility (tenant-wide/anonymous link or an "Everyone" group → ENTERPRISE, a group → TEAM,
+named users → PERSONAL, never above the connection's ceiling), a full permission sweep every `KA_M365_PERMISSION_SWEEP_EVERY` syncs.
+Verified against a recorded Graph fixture; live use waits on the registration (Q13). Google Workspace and a file share follow the same pattern.
 
 **Store size (plan-09, R16 benchmark half).** `tools/bench_store.py` fills a fresh repository and times cold load, status and
 scope queries, search, put and get; the measured 10k and 100k rows are in `docs/research/benchmarks/store-bench-2026-10-08.md`.
