@@ -2,6 +2,20 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 06:50 UTC — first real model-backed mission on the live server (follow-up to plan-16)
+
+**What changed** — `ka/console/app.js`: the plan-16 run-card addition now carries its declared block marker (B4). Docs only otherwise.
+
+**Live result** — `POST /research/missions` "Visa dispute response time limits for merchants", provider anthropic (`claude-sonnet-4-6`),
+Brave search, Internet gate on: HTTP 200 in 508 s; 9 model calls; 15,392 prompt + 16,769 completion tokens; cost $0.30; 5 pages fetched
+within the budget; 24 sources examined; 92 evidence spans; 92 candidates in Pending (authority Internet Research → heuristic-only bindings
+under Q10); 253 reused refs recorded. Before plan-16 the same request never returned (45 extraction calls).
+
+**Follow-ups / risks** — 253 reused refs was too loose a match (a single shared word over a 249-nugget store); corrected in this commit — a reuse
+now needs at least two shared content words (or all of them for a one- or two-word question); plan-16's tests pass unchanged. 508 s is dominated by the
+Internet agent's page reads; the run is synchronous inside the POST, so the console should show a running state or the run should move
+off the request thread — a question for the author, not a silent change (registered as Q14 in `docs/trackers/QUESTIONS-TRACKER.md` and `docs/questions/knowledge-acquisition.md`).
+
 ## 2026-10-09 06:20 UTC — plan-16: the Enterprise Content agent reuses governed knowledge; the model is spent only on the gap (research-01 R17)
 
 **What changed** — `ka/research.py::EnterpriseContentAgent.research`: (1) ACTIVE / PENDING / CONFLICT nuggets on the scope chain, within

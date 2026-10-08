@@ -145,6 +145,7 @@ class EnterpriseContentAgent:
         chain = {scope.key()} | {s.key() for s in self.registry.ancestors(scope)} | {s.key() for s in self.registry.descendants(scope)}
         allowed = VISIBILITY_ORDER.index(ctx.mission.permitted_visibility)
         words = {w for w in normalize(ctx.mission.objective + " " + " ".join(ctx.mission.research_questions)).split() if len(w) > 2}
+        need = min(2, len(words))                       # one shared word over a large store is noise; two is a signal
 
         def visible(vis, owner) -> bool:
             return not (VISIBILITY_ORDER.index(vis) < allowed and owner != ctx.mission.created_by)   # §42
@@ -157,7 +158,7 @@ class EnterpriseContentAgent:
             if v.scope.key() not in chain or not visible(v.visibility, v.created_by):
                 continue
             overlap = len(words & set(normalize(v.statement).split()))
-            if overlap:
+            if overlap >= need and overlap > 0:
                 reused.append((overlap, v))
         reused.sort(key=lambda t: (-t[0], t[1].ref))
         ctx.run.reused_refs = [v.ref for _, v in reused]

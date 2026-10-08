@@ -163,3 +163,11 @@ to 2k queries/month, then about $3 per 1k; the monthly cap bounds it.
 recorded Graph fixture. **Decision required.** Register the app (Files.Read.All, Sites.Read.All, application permissions), and give
 KA the tenant id, client id and the name of the variable holding the client secret. **Big picture.** Until then the connector
 cannot be used live and PT6 is NOT RUN. **Cost.** an admin consent in the tenant.
+
+### Q14 — Synchronous mission runs (raised by the first live mission, 2026-10-09; beside the §6 research decisions)
+**Scenario.** `POST /research/missions` creates the mission and runs every agent before answering. With the stub model that took a
+second; with the author's Anthropic key, Brave and the Internet gate on, the first live mission took 508 s (9 model calls, $0.30,
+92 candidates). The console shows nothing while it runs, and a client that times out loses the response while the server keeps going.
+**Decision required.** Whether missions run in the background (RUNNING state, the mission page polls) or stay synchronous.
+**Options.** (a) background run + poll — recommended: the mission object already carries RUNNING/COMPLETED; (b) synchronous with a
+longer client timeout; (c) cap the agents per mission. **Cost.** (a) one plan (a worker thread + a polling mission page).
