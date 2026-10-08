@@ -441,6 +441,8 @@ tests below).
 | PT7 | A mission with a general process question, with discovery enabled and the Internet gate on, yields candidates whose sources are fetched URLs with publisher and retrieval time, none of authority `LLM_GENERATED` presented as an internet source | R9 | no — needs R9 and a search provider decision |
 | PT8 | Dropping a changed SOP into the watched local folder produces a new `SourceVersion` of the same source, re-runs extraction, and surfaces the contradiction with the prior version's effective dates in the Knowledge nuggets Conflicts view | R10 | no — needs R10 |
 
-**Total product tests: 8.** None can run today; PT1–PT4 wait on the model and publication plans (R1–R3, R7, R8), PT5–PT6 on
+| PT9 | A mission over a store holding 40+ already-extracted sources completes with at most `KA_RESEARCH_MAX_SOURCES` model extraction calls, reusing the governed knowledge that matches the question (appended 2026-10-09; R17) | R17 | yes — plan-16 |
+
+**Total product tests: 9** (PT9 appended 2026-10-09 under Q64's append-only rule). None can run today; PT1–PT4 wait on the model and publication plans (R1–R3, R7, R8), PT5–PT6 on
 the security and visibility fixes (R4–R6), PT7–PT8 on discovery and the first connector (R9, R10) and their provider
 decisions.

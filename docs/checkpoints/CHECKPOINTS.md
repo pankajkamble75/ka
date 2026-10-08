@@ -2,6 +2,25 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 06:20 UTC — plan-16: the Enterprise Content agent reuses governed knowledge; the model is spent only on the gap (research-01 R17)
+
+**What changed** — `ka/research.py::EnterpriseContentAgent.research`: (1) ACTIVE / PENDING / CONFLICT nuggets on the scope chain, within
+the mission's permitted visibility, whose statements share a word with the question are recorded in `ResearchRun.reused_refs` (new field,
+`ka/model.py`) with their sources in `sources_examined` — no model call; (2) only sources that never produced knowledge (and are not
+RESEARCH-channel) are re-extracted, most relevant first, at most `KA_RESEARCH_MAX_SOURCES` (new setting, default 3); the rest are noted on
+the run. Console run card lists the reused nuggets. research-01 gains PT9 (append-only); architecture §6 carries the rule's mechanism.
+`ka/tests/test_plan16_research_reuse.py` (7 cases).
+
+**Why** — exposed the moment the author's Anthropic key was live: a mission over the 45-source domain made 45 model extraction calls
+(4,000 tokens / 120 s each), outliving every client timeout and re-deriving knowledge ingestion had already governed. research-01 §6
+already said "reuse ACTIVE knowledge; a mission is for the gap"; the agent had not been built that way.
+
+**Verification** — in-process 265 passed, 2 skipped (exit code checked); ruff F clean; no protected code (diff confirmed). Verify recount
+4/4 D, 4/4 P, 3/3 N; blocks 4/4 files. plan-01 `phase5` tests pass unmodified (their sources are ingested raw, so they remain
+re-extraction cases). PT9 GREEN. The first real model-backed mission on the live server is running now and is recorded in the next note.
+
+**Decisions and questions** — none raised. Plan `plan-16`; research-01 R17 → UPLOADED.
+
 ## 2026-10-09 05:05 UTC — Anthropic provider fix and test isolation from the server's `.env`
 
 **What changed**

@@ -37,7 +37,7 @@ from ka.vocab import (
     MissionStatus,
     RunStatus,
     SourceType,
-    Visibility,
+    Visibility, NuggetStatus,
 )
 
 
@@ -129,7 +129,12 @@ def _findings_from(ctx: AgentContext, items: list[dict[str, Any]], source_id: st
 
 
 class EnterpriseContentAgent:
-    """Reads sources already in the repository within the mission's scope chain and permitted visibility."""
+    """Reads what the repository already holds within the mission's scope chain and permitted visibility.
+
+    # [block plan-16] research-01 §6 ("reuse ACTIVE knowledge on the scope chain; a mission is for the gap"): governed and pending
+    # knowledge that matches the question is REUSED and recorded on the run — no model call; the model is spent only on sources
+    # that never produced knowledge, most relevant first, capped by KA_RESEARCH_MAX_SOURCES.
+    """
     agent_id = "agent.enterprise_content"
 
     def __init__(self, registry: ScopeRegistry):
@@ -139,19 +144,51 @@ class EnterpriseContentAgent:
         scope = Scope(scope_type=ctx.mission.scope_type, scope_id=ctx.mission.scope_id)
         chain = {scope.key()} | {s.key() for s in self.registry.ancestors(scope)} | {s.key() for s in self.registry.descendants(scope)}
         allowed = VISIBILITY_ORDER.index(ctx.mission.permitted_visibility)
-        out: list[Finding] = []
-        extractor = CandidateExtractor(ctx.provider)
-        for src in ctx.repo.sources.all():
-            if src.channel == AcquisitionChannel.RESEARCH or not src.scope or src.scope.key() not in chain:
+        words = {w for w in normalize(ctx.mission.objective + " " + " ".join(ctx.mission.research_questions)).split() if len(w) > 2}
+
+        def visible(vis, owner) -> bool:
+            return not (VISIBILITY_ORDER.index(vis) < allowed and owner != ctx.mission.created_by)   # §42
+
+        # 1. reuse — governed and pending knowledge already on the chain that speaks to the question
+        derived_from: set[str] = set()
+        reused: list[tuple[int, KnowledgeNuggetVersion]] = []
+        for v in ctx.repo.nuggets_by_status(NuggetStatus.ACTIVE, NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT):
+            derived_from.update(v.source_refs)
+            if v.scope.key() not in chain or not visible(v.visibility, v.created_by):
                 continue
-            if VISIBILITY_ORDER.index(src.visibility) < allowed and src.owner != ctx.mission.created_by:
-                continue   # §42 — a source more restricted than the requester's clearance, and not their own
+            overlap = len(words & set(normalize(v.statement).split()))
+            if overlap:
+                reused.append((overlap, v))
+        reused.sort(key=lambda t: (-t[0], t[1].ref))
+        ctx.run.reused_refs = [v.ref for _, v in reused]
+        for _, v in reused:
+            for sid in v.source_refs:
+                if sid not in ctx.run.sources_examined:
+                    ctx.run.sources_examined.append(sid)
+
+        # 2. the gap — sources on the chain that never produced knowledge; relevant sections only; capped
+        cap = int(config.get("KA_RESEARCH_MAX_SOURCES"))
+        gap: list[tuple[int, Any, Any, list[tuple[str, str]]]] = []
+        for src in ctx.repo.sources.all():
+            if src.channel == AcquisitionChannel.RESEARCH or not src.scope or src.scope.key() not in chain or src.id in derived_from:
+                continue
+            if not visible(src.visibility, src.owner):
+                continue
             ver = ctx.repo.source_versions.get(src.current_version_id or "")
             if ver is None or not ver.text.strip():
                 continue
-            ctx.run.sources_examined.append(src.id)
-            words = set(normalize(ctx.mission.objective + " " + " ".join(ctx.mission.research_questions)).split())
-            relevant = [(loc, t) for loc, t in _sections(ver.text) if words & set(normalize(t).split())] or _sections(ver.text)[:3]
+            sections = _sections(ver.text)
+            relevant = [(loc, t) for loc, t in sections if words & set(normalize(t).split())]
+            score = sum(len(words & set(normalize(t).split())) for _, t in relevant)
+            gap.append((score, src, ver, relevant or sections[:3]))
+        gap.sort(key=lambda t: (-t[0], t[1].id))
+        if len(gap) > cap:
+            ctx.run.notes = (ctx.run.notes + " " if ctx.run.notes else "") + f"{len(gap) - cap} never-extracted source(s) left for a later mission (KA_RESEARCH_MAX_SOURCES={cap})"
+        out: list[Finding] = []
+        extractor = CandidateExtractor(ctx.provider)
+        for _, src, ver, relevant in gap[:cap]:
+            if src.id not in ctx.run.sources_examined:
+                ctx.run.sources_examined.append(src.id)
             for st in extractor.extract(title=src.title, sections=relevant, text=""):
                 out.append(Finding(statement=st.statement, title=st.title, excerpt=st.excerpt, source_id=src.id, source_version_id=ver.id,
                                    locator=st.locator, authority=src.authority_type, confidence=st.confidence,
@@ -159,6 +196,7 @@ class EnterpriseContentAgent:
             if ctx.provider is not None:
                 ctx.usage.add(ctx.provider.last_usage)
         return out
+    # [/block plan-16]
 
 
 def _sections(text: str) -> list[tuple[str, str]]:

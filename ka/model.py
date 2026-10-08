@@ -338,6 +338,9 @@ class ResearchRun(BaseModel):
     # [block plan-07] research-01 R9: what discovery searched, selected, fetched and skipped (with reasons)
     discovery: dict[str, Any] = Field(default_factory=dict)
     # [/block plan-07]
+    # [block plan-16] governed / pending knowledge the Enterprise Content agent reused instead of re-extracting (research-01 §6)
+    reused_refs: list[str] = Field(default_factory=list)
+    # [/block plan-07]
 
     @property
     def id(self) -> str:

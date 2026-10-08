@@ -94,6 +94,9 @@ declare("KA_SEARCH_MONTHLY_CAP", int, 1000, "ka.discovery", "Search queries allo
 # [block plan-14]
 declare("KA_M365_PERMISSION_SWEEP_EVERY", int, 10, "ka.connectors.m365", "Re-read permissions of every known item every N syncs (a permission change does not bump the Graph delta).")
 # [/block plan-14]
+# [block plan-16]
+declare("KA_RESEARCH_MAX_SOURCES", int, 3, "ka.research", "Never-extracted sources the Enterprise Content agent re-extracts with the model per mission (most relevant first).")
+# [/block plan-16]
 
 _overrides: dict[str, Any] = {}
 

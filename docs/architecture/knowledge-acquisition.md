@@ -168,7 +168,9 @@ change page's "Instances pinned to this domain" table and the Dashboard count. L
 (clusters by similarity, one candidate per cluster, authority = max of the cluster, every finding kept as `Evidence`) →
 `GovernanceService.ingest_candidate(channel=RESEARCH)`. Runs record sources, evidence, candidates, tokens, cost, errors.
 `GovernanceService.research_agent_ids` makes `decide(by=<agent>)` fail (§17). `knowledge_for_domain` is the §18 Domain Builder entry:
-reuse ACTIVE knowledge on the scope chain, open a mission only for the gap.
+reuse ACTIVE knowledge on the scope chain, open a mission only for the gap. **plan-16 (2026-10-09):** the Enterprise Content agent
+records matching ACTIVE/PENDING knowledge in `ResearchRun.reused_refs` without a model call and re-extracts only sources that never
+produced knowledge, most relevant first, at most `KA_RESEARCH_MAX_SOURCES` per mission.
 
 **Discovery (plan-07, R9).** `ka/discovery.py::DiscoveryAgent` runs first in the coordinator: the objective and questions become
 queries for a `SearchProvider` (`none` or `fixture` today; **Q5 — ✅ built by plan-13, 2026-10-09:** `BraveSearchProvider` behind this seam (`KA_SEARCH_PROVIDER=brave`), the key read from `KA_SEARCH_API_KEY` at call time and never stored or logged, `SearchMeter` counting queries per calendar month against `KA_SEARCH_MONTHLY_CAP`; without a key the selection fails closed to `none` with a note the Dashboard shows; the author confirmed Brave and supplied the key on 2026-10-09 — Q12 answered; the key lives only in the server's `.env`); results are canonicalised (fragments and
