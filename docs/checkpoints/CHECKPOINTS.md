@@ -2,6 +2,35 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 02:05 UTC — plan-13: Brave behind the discovery seam, key in the environment, monthly cap (research-02 R5, Q5)
+
+**What changed**
+
+- `ka/discovery.py`: `BraveSearchProvider` (injectable `fetch_json`; maps `web.results[]` → url/title/snippet/publisher/published_at;
+  any transport or shape failure → `[]` with `last_note`), `SearchMeter` (`<storage>/search_usage.json`, per calendar month),
+  `select_provider` handles `brave` and fails closed to `none` with the Q12 note when `KA_SEARCH_API_KEY` is unset, `provider_status()`
+  (requested provider, key PRESENCE, used/cap, month — never the key); the run's discovery notes carry the provider's `last_note`.
+- `ka/config.py`: `KA_SEARCH_API_KEY` (read at call time), `KA_SEARCH_MONTHLY_CAP` (1000). `ka/api.py` providers route and
+  `ka/service.py` dashboard carry the status fields; `ka/console/app.js` Dashboard line shows requested vs effective provider, key
+  presence and searches this month / cap.
+- Fixture `ka/tests/fixtures/brave_response.json`; `ka/tests/test_plan13_search_provider.py` (13 cases incl. the live PT5 that
+  SKIPS without the key); `e2e/plan13_search_provider_flow.py` (server with `brave` requested and no key: fail-closed path end to end);
+  `.env.example`; architecture §6 Q5 → ✅ built; ledger.
+
+**Why** — the author's Q5 decision; Brave per research-02 §5. The key itself is Q12 and is the author's.
+
+**Verification** — in-process suite 243 passed, 1 skipped (PT5 live: needs KA_SEARCH_API_KEY); ruff F clean; no protected code (diff
+confirmed). Verify recount 7/7 D, 7/7 P (+P7b), 5/5 N; blocks 4/4 files found (the plan's B3 api.py block is an inline comment inside
+plan-07's route block rather than a separate block — declared, found as a marked line; noted). Live flow 6/6 PASS; screenshot verified
+(Dashboard: "requested brave — KA_SEARCH_API_KEY missing, Q12; failing closed · searches this month 0 / 1000"). Product tests
+(research-02): PT1–PT4 PASS; PT5 fixture-driven PASS, live NOT RUN (Q12); PT6, PT7 awaiting plans 14–15.
+
+**Follow-ups / risks** — set `KA_SEARCH_API_KEY` on the server once Brave is confirmed (Q12); the cap is a count of queries, not of
+spend — Brave's free tier (2k/month) sits above the default cap of 1000.
+
+**Decisions and questions** — BUILT: Q5 (architecture §6 ✅). OPEN: Q12 unchanged (now names `test_P7b_PT5_live…` as the test it unblocks).
+Plan `plan-13`; research-02 R5 → UPLOADED.
+
 ## 2026-10-09 01:05 UTC — plan-12: repin after a domain write — explicit, per instance, by a named person (research-02 R4, Q2)
 
 **What changed**

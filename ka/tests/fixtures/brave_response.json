@@ -1,0 +1,13 @@
+{
+  "type": "search",
+  "query": {"original": "Visa dispute processing rules"},
+  "web": {
+    "type": "search",
+    "results": [
+      {"title": "Visa dispute processing rules", "url": "https://rules.example.com/visa/disputes?utm_source=brave", "description": "Visa dispute processing rules: response windows and evidence requirements.", "page_age": "2026-03-01T00:00:00", "profile": {"name": "Example Rules Co", "url": "https://rules.example.com"}, "meta_url": {"hostname": "rules.example.com"}},
+      {"title": "Dispute response window", "url": "https://rules.example.com/visa/windows", "description": "The dispute response window is 30 days.", "meta_url": {"hostname": "rules.example.com"}},
+      {"title": "Cooking recipes", "url": "https://other.example.org/unrelated", "description": "soup", "profile": {"name": "Other"}},
+      {"title": "no url row", "description": "ignored"}
+    ]
+  }
+}

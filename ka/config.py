@@ -87,6 +87,10 @@ declare("KA_RESPECT_ROBOTS", bool, True, "ka.discovery", "Honour robots.txt for 
 # [block plan-08]
 declare("KA_CONNECTOR_ROOTS", str, "", "ka.connectors", "Comma-separated folders a local_folder connection may point into. Default: <storage>/inbox.")
 # [/block plan-08]
+# [block plan-13]
+declare("KA_SEARCH_API_KEY", str, "", "ka.discovery", "Brave Search API key, read at call time; never stored or logged. Q12.")
+declare("KA_SEARCH_MONTHLY_CAP", int, 1000, "ka.discovery", "Search queries allowed per calendar month across all missions.")
+# [/block plan-13]
 
 _overrides: dict[str, Any] = {}
 

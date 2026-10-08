@@ -76,14 +76,111 @@ class FixtureSearchProvider:
                              published_at=r.get("published_at"), query=query, rank=i + 1) for i, r in enumerate(rows[:limit])]
 
 
+# [block plan-13] research-02 R5 (Q5, decided 2026-10-08): one real provider behind the seam — Brave Search — with the key read
+# from the environment at call time (never stored, never logged) and a monthly query cap on top of the per-mission budget.
+BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
+
+
+class SearchMeter:
+    """Queries per calendar month, in `<storage>/search_usage.json` as {"YYYY-MM": count}. A new month starts at 0."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = Path(path) if path else config.storage_root() / "search_usage.json"
+
+    @staticmethod
+    def month() -> str:
+        return now_iso()[:7]
+
+    def _load(self) -> dict[str, int]:
+        try:
+            return json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        except (OSError, ValueError):
+            return {}
+
+    def used(self) -> int:
+        return int(self._load().get(self.month(), 0))
+
+    def record(self, n: int = 1) -> int:
+        data = self._load()
+        data[self.month()] = int(data.get(self.month(), 0)) + n
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+        return data[self.month()]
+
+    def remaining(self, cap: int) -> int:
+        return max(0, int(cap) - self.used())
+
+
+def _default_fetch_json(url: str, headers: dict[str, str]) -> dict[str, Any]:
+    import httpx
+    r = httpx.get(url, headers=headers, timeout=20.0)
+    r.raise_for_status()
+    return r.json()
+
+
+class BraveSearchProvider:
+    """Brave Web Search API → `SearchResult`s. `fetch_json(url, headers)` is injectable so the mapping is verified against a
+    recorded response; any transport or shape failure answers [] and leaves the reason in `last_note`."""
+    name = "brave"
+
+    def __init__(self, fetch_json: Callable[[str, dict[str, str]], dict[str, Any]] | None = None, meter: SearchMeter | None = None):
+        self.fetch_json = fetch_json or _default_fetch_json
+        self.meter = meter or SearchMeter()
+        self.last_note: str | None = None
+
+    def search(self, query: str, *, limit: int) -> list[SearchResult]:
+        self.last_note = None
+        cap = int(config.get("KA_SEARCH_MONTHLY_CAP"))
+        used = self.meter.used()
+        if used >= cap:
+            self.last_note = f"monthly cap reached ({used}/{cap}); no search this month"
+            return []
+        key = config.get("KA_SEARCH_API_KEY") or ""
+        if not key:
+            self.last_note = "KA_SEARCH_API_KEY is unset (Q12)"
+            return []
+        url = f"{BRAVE_ENDPOINT}?{urlencode({'q': query, 'count': max(1, min(int(limit), 20))})}"
+        try:
+            data = self.fetch_json(url, {"Accept": "application/json", "X-Subscription-Token": key})
+        except Exception as e:  # noqa: BLE001 — a failed search is a missing search, never a failed mission
+            self.last_note = f"search failed: {type(e).__name__}"
+            return []
+        self.meter.record(1)
+        web = (data or {}).get("web") if isinstance(data, dict) else None
+        rows = web.get("results", []) if isinstance(web, dict) else []
+        rows = rows if isinstance(rows, list) else []
+        out: list[SearchResult] = []
+        for i, r in enumerate(rows[:limit]):
+            if not isinstance(r, dict) or not r.get("url"):
+                continue
+            publisher = (r.get("profile") or {}).get("name") or (r.get("meta_url") or {}).get("hostname")
+            out.append(SearchResult(url=r["url"], title=r.get("title", "") or "", snippet=r.get("description", "") or "", publisher=publisher,
+                                    published_at=r.get("page_age") or r.get("age"), query=query, rank=i + 1))
+        if not out:
+            self.last_note = "search returned no usable results"
+        return out
+
+
 def select_provider() -> tuple[SearchProvider, str | None]:
-    """The configured provider, failing closed to `none` with a note on an unknown value."""
+    """The configured provider, failing closed to `none` with a note on an unknown value or a missing key."""
     choice = (config.get("KA_SEARCH_PROVIDER") or "none").strip().lower()
     if choice == "fixture":
         return FixtureSearchProvider(config.get("KA_SEARCH_FIXTURE") or ""), None
     if choice == "none":
         return NullSearchProvider(), None
+    if choice == "brave":
+        if not config.get("KA_SEARCH_API_KEY"):
+            return NullSearchProvider(), "brave configured but KA_SEARCH_API_KEY is unset (Q12); failing closed to none"
+        return BraveSearchProvider(), None
     return NullSearchProvider(), f"unknown KA_SEARCH_PROVIDER {choice!r}; failing closed to none"
+
+
+def provider_status() -> dict[str, Any]:
+    """What the console may show: the requested provider, whether a key is PRESENT (never its value), the month's usage."""
+    meter = SearchMeter()
+    return {"requested": (config.get("KA_SEARCH_PROVIDER") or "none").strip().lower(), "key_present": bool(config.get("KA_SEARCH_API_KEY")),
+            "monthly_cap": int(config.get("KA_SEARCH_MONTHLY_CAP")), "used_this_month": meter.used(), "month": meter.month()}
+# [/block plan-13]
 
 
 def canonical_url(url: str) -> str:
@@ -202,6 +299,8 @@ class DiscoveryAgent:
                 disc["notes"].append(f"provider failed on {q!r}: {type(e).__name__}")
         sel = self.select(ctx.mission.objective, results, budget=budget, allowed_domains=allowed, respect_robots=respect)
         disc["results"] = sel.considered
+        if getattr(self.provider, "last_note", None):          # plan-13: the provider says why it answered nothing (cap, key, failure)
+            disc["notes"].append(f"provider {self.provider.name}: {self.provider.last_note}")
         disc["notes"] += self.robots.notes
         if gate and not respect and sel.selected:
             disc["notes"].append("robots.txt ignored (KA_RESPECT_ROBOTS=0)")

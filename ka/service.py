@@ -203,7 +203,12 @@ class KnowledgeAcquisition:
                       "elements_with_lineage": len({(d.graph_id, d.element_id) for d in self.repo.dependencies.where(lambda d: d.active)})},
             "research": {"missions_by_status": missions, "runs": len(self.repo.runs), "cost_usd": round(sum(r.cost for r in self.repo.runs), 4),
                          "search_provider": __import__("ka.discovery", fromlist=["select_provider"]).select_provider()[0].name,   # plan-07
-                         "internet_gate": bool(config.get("KA_RESEARCH_INTERNET"))},
+                         "internet_gate": bool(config.get("KA_RESEARCH_INTERNET")),
+                         # [block plan-13] research-02 R5 (Q5): requested provider, key presence, monthly usage — never the key
+                         **{"search_requested": (st := __import__("ka.discovery", fromlist=["provider_status"]).provider_status())["requested"],
+                            "search_key_present": st["key_present"], "search_used": st["used_this_month"], "search_cap": st["monthly_cap"], "search_month": st["month"]}
+                         # [/block plan-13]
+                         },
             "corrections": {"total": len(self.repo.corrections), "pending": len(self.corrections.pending())},
             "connections": {"total": len(self.repo.connections), "active": len(self.repo.connections.where(lambda c: c.status == "active"))},   # plan-08
             "queues": {k: len(v) for k, v in att.items()},

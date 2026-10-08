@@ -728,7 +728,8 @@ def revoke_connector(connection_id: str, by: str = "user", reason: str = "", ka:
 def research_providers(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     from ka.discovery import select_provider
     provider, note = select_provider()
-    return {"search_provider": provider.name, "note": note, "fixture": config.get("KA_SEARCH_FIXTURE") or None,
+    from ka.discovery import provider_status   # plan-13 (Q5): requested provider, key PRESENCE, used/cap — never the key
+    return {"search_provider": provider.name, "note": note, "fixture": config.get("KA_SEARCH_FIXTURE") or None, **provider_status(),
             "internet_gate": bool(config.get("KA_RESEARCH_INTERNET")), "respect_robots": bool(config.get("KA_RESPECT_ROBOTS")),
             "allowed_domains": [d.strip() for d in (config.get("KA_ALLOWED_DOMAINS") or "").split(",") if d.strip()],
             "budget": config.get("KA_DISCOVERY_BUDGET"), "results_per_query": config.get("KA_DISCOVERY_RESULTS"), "decision": "Q5"}
