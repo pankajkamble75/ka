@@ -12,6 +12,16 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 | research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | DECIDED (2026-10-08, Q8: add a Processes tab; plan-able) | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | DECIDED (2026-10-08, Q9: not yet; nothing to build) | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 
+| research-02 | R1 — Duplicates: APPROVE on a duplicate_of ACTIVE candidate → automatic KEEP_EXISTING; evidence appended to the existing nugget (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT1 |
+| research-02 | R2 — Revocation re-review: same-statement candidate revision; APPROVE supersedes, REJECT retires prior (OBSOLETE) + graph removal proposal (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT2 |
+| research-02 | R3 — Injection defence: delimited untrusted block in prompts; INTERNET_RESEARCH/LLM_GENERATED bindings recorded proposed (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT3 |
+| research-02 | R4 — Repin: GraphAdapter.repin → store.repin; GraphChangeService.repin by a named person; console per-instance Preview/Repin (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT4 |
+| research-02 | R5 — Search provider: BraveSearchProvider, KA_SEARCH_API_KEY, KA_SEARCH_MONTHLY_CAP, Dashboard used/cap; fixture-verified (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT5 |
+| research-02 | R6 — M365 connector: app-only Graph auth, drive delta checkpoint, permissions → visibility; fixture-verified (MINOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT6 |
+| research-02 | R7 — Processes as the fourth console tab; Browse-by-scope mode kept (MINOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
+| research-02 | R8 — Decide: search vendor (recommended Brave) and supply KA_SEARCH_API_KEY (MAJOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
+| research-02 | R9 — Decide: supply the Microsoft 365 app registration (MINOR) | — | OPEN | — | From research-02 (KA-DEC-001); opened 2026-10-08 by ship. **Product-test check:** research-02 PT7 |
+
 ## Closed
 
 | Research | Point | Plan | State | SHA | Notes |
