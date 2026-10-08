@@ -293,13 +293,7 @@ async function browseView(qs) {
     const { sources } = await api(`/scopes/${t}/${encodeURIComponent(id)}/sources`);
     const { missions } = await api(`/research/missions?scope_type=${t}&scope_id=${encodeURIComponent(id)}`);
     const isInst = t === 'INSTANCE';
-    body = `<div class="tiles">
-      <div class="tile"><div class="k">Active</div><div class="v">${d.active_nuggets}</div></div>
-      <div class="tile ${d.pending_review ? 'warn' : ''}"><div class="k">Pending</div><div class="v">${d.pending_review}</div></div>
-      <div class="tile ${d.conflicts ? 'halt' : ''}"><div class="k">Conflicts</div><div class="v">${d.conflicts}</div></div>
-      <div class="tile"><div class="k">Graph elements</div><div class="v">${d.affected_graph_elements}</div></div>
-      <div class="tile"><div class="k">Sources</div><div class="v">${d.sources}</div></div>
-      ${isInst ? `<div class="tile"><div class="k">Inherited</div><div class="v">${d.counts.inherited}</div></div><div class="tile"><div class="k">Overrides</div><div class="v">${d.counts.overrides}</div></div>` : `<div class="tile"><div class="k">Instances using</div><div class="v">${d.instances_using.length}</div></div>`}</div>
+    body = `
       ${isInst ? `<h2>Inherited from parents</h2>${nuggetRows(filt(d.inherited))}<h2>Instance-specific</h2>${nuggetRows(filt(d.instance_specific))}<h2>Overrides</h2>${nuggetRows(filt(d.overrides))}${d.extensions.length ? `<h2>Extensions</h2>${nuggetRows(filt(d.extensions))}` : ''}`
                : `<h2>Active knowledge by area</h2>${Object.entries(d.knowledge_by_graph_group).map(([g, rows]) => filt(rows).length ? `<h3>${esc(g)} <span class="muted">${filt(rows).length}</span></h3>${nuggetRows(filt(rows))}` : '').join('') || '<div class="empty">No active knowledge yet.</div>'}
                   ${d.instances_using.length ? `<h2>Instances inheriting this</h2>${d.instances_using.map((s) => `<a class="pill scope" href="#/browse?scope=${s.scope_type}|${encodeURIComponent(s.scope_id)}">${esc(s.scope_id)}</a> `).join('')}` : ''}`}
