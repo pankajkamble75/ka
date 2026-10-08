@@ -9,11 +9,11 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
-| research-01 | R11 — Decide: EOS routes found_new/grow_existing through KA gap request; grow GapIn (MAJOR) | plan-09 | OPEN | — | From research-01; Decision parked as Q7 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
+| research-01 | R11 — Decide: EOS routes found_new/grow_existing through KA gap request; grow GapIn (MAJOR) | plan-09 | PLANNED | — | From research-01; Decision parked as Q7 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | OPEN | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | OPEN | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
-| research-01 | R15 — Events as outbox: seq/version on events.jsonl, GET /events?after= (MINOR) | plan-09 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
-| research-01 | R16 — Investigate store at 10k/100k; layout extras (span ids, row locators, extraction_version, OCR) (MINOR) | plan-04/09 | OPEN (layout half UPLOADED in plan-04; benchmark half for plan-09) | — | From research-01; verify: layout extras recounted with plan-04; benchmark half still OPEN for plan-09; plan-04 built the layout extras; the store benchmark stays with plan-09; see `docs/research/research-01.md` §Research points. |
+| research-01 | R15 — Events as outbox: seq/version on events.jsonl, GET /events?after= (MINOR) | plan-09 | PLANNED | — | From research-01; see `docs/research/research-01.md` §Research points. |
+| research-01 | R16 — Investigate store at 10k/100k; layout extras (span ids, row locators, extraction_version, OCR) (MINOR) | plan-04/09 | PLANNED (layout half UPLOADED in plan-04; benchmark half planned in plan-09) | — | From research-01; verify: layout extras recounted with plan-04; benchmark half still OPEN for plan-09; plan-04 built the layout extras; the store benchmark stays with plan-09; see `docs/research/research-01.md` §Research points. |
 
 ## Closed
 
