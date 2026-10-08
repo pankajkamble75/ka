@@ -60,6 +60,12 @@ declare("KA_PROMOTION_MIN_INSTANCES", int, 3, "ka.promotion", "§25: instances t
 declare("KA_HIGH_IMPACT_INSTANCES", int, 5, "ka.graph_change", "A proposal touching at least this many instances requires explicit approval.")
 declare("KA_ENTERPRISE_OS_ROOT", str, "", "ka.graph_adapter", "Path to an enterprise-os checkout; enables the live GraphStore adapter.")
 declare("KW_STORAGE_ROOT", str, "", "ka.graph_adapter", "Enterprise OS storage root (its graph_v2 lives under it).")
+# [block plan-02]
+declare("KA_ACCESS_POLICY", str, "token", "ka.security", "loopback | token | open. token: loopback peers pass, others need the bearer token.")
+declare("KA_ACCESS_TOKEN", str, "", "ka.security", "Bearer token non-loopback peers must present (secret). Empty = non-loopback refused.")
+declare("KA_MAX_UPLOAD_MB", int, 25, "ka.api", "Largest upload body accepted by /sources/upload and /corrections/upload.")
+declare("KA_URL_ALLOWLIST", str, "", "ka.security", "Comma-separated intranet hostnames link()/research may fetch even if private.")
+# [/block plan-02]
 
 _overrides: dict[str, Any] = {}
 

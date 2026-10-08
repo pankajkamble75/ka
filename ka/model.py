@@ -205,6 +205,9 @@ class GovernanceDecision(BaseModel):
     automatic: bool = False
     resulting_refs: list[str] = Field(default_factory=list)  # versions created by the decision
     llm_recommendation: dict[str, Any] | None = None
+    # [block plan-02]
+    visibility_change: dict[str, str] | None = None          # {"from": "PERSONAL", "to": "DOMAIN"} when a decision widened it
+    # [/block plan-02]
 
 
 class KnowledgeCorrection(BaseModel):

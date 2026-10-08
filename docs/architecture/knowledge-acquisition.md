@@ -116,6 +116,16 @@ Removed / Pending corrections (§30) · Nugget detail with every §31 field and 
 
 ## 10. Security (§42)
 
+**Step 1 — built by plan-02 (2026-10-08).** Every `/api/knowledge-acquisition/*` route runs `require_access`
+(`ka/security.py`) under `KA_ACCESS_POLICY`: `token` (default, Q1's recommendation) admits loopback peers and non-loopback
+peers presenting `Authorization: Bearer <KA_ACCESS_TOKEN>`; `loopback` copies enterprise-os's containment; `open` is the
+pre-plan-02 behaviour. Uploads are capped by `KA_MAX_UPLOAD_MB` (`ka/api.py::_read_capped`, 413). `link()` and the Internet
+agent fetch only through `is_safe_url` / `safe_fetch` (loopback, link-local, private, reserved addresses refused; redirects
+re-checked per hop; `KA_URL_ALLOWLIST` for intranet hosts). A CHANGE_SCOPE or promotion that would widen a nugget's
+visibility is refused unless the decision carries `widen_visibility=True`, and then records `visibility_change`
+(`ka/vocab.py::required_visibility`, `ka/governance.py` CHANGE_SCOPE branch, `ka/promotion.py::decide`). **Step 2** —
+identity provider, tenant model, retention after revocation — remains Q4.
+
 `Source.visibility`/`permissions`; a nugget's `visibility` is the narrowest of its sources; research agents skip sources more restricted
 than the mission's `permitted_visibility` unless the requester owns them. Access *enforcement* at the API edge (authn) is out of scope for
 plan-01 and tracked as a question.

@@ -8,13 +8,12 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
-
 from ka.audit import Auditor
 from ka.events import EventBus
 from ka.extraction import TextExtraction, extract_text, source_type_for_filename
 from ka.model import Scope, Source, SourceVersion
 from ka.repository import Repository
+from ka.security import UnsafeURL, is_safe_url, safe_fetch
 from ka.vocab import AcquisitionChannel, AuthorityType, ExtractionStatus, SourceType, Visibility
 
 
@@ -58,24 +57,36 @@ class IngestionService:
         st = SourceType.GITHUB if "github.com" in url else SourceType.URL
         data = prefetched
         note = None
+        # [block plan-02]
         if data is None and fetch:
-            try:
-                r = httpx.get(url, timeout=timeout, follow_redirects=True, headers={"User-Agent": "enterprise-os-ka/0.1"})
-                r.raise_for_status()
-                data = r.content
-                if "text/plain" in r.headers.get("content-type", "") or "markdown" in r.headers.get("content-type", ""):
-                    st = SourceType.MARKDOWN if url.endswith(".md") else SourceType.TEXT
-            except Exception as e:  # noqa: BLE001
-                note = f"fetch failed: {type(e).__name__}: {e}"
+            ok, why = is_safe_url(url)
+            if not ok:
+                note = f"blocked: {why}"
                 data = b""
+                self.auditor.record(who=owner, what="source.blocked", why=why, scope=scope, affected=[url])
+            else:
+                try:
+                    fetched = safe_fetch(url, timeout=timeout)
+                    data = fetched.content
+                    if "text/plain" in fetched.content_type or "markdown" in fetched.content_type:
+                        st = SourceType.MARKDOWN if url.endswith(".md") else SourceType.TEXT
+                except UnsafeURL as e:
+                    note = f"blocked: {e}"
+                    data = b""
+                    self.auditor.record(who=owner, what="source.blocked", why=str(e), scope=scope, affected=[url])
+                except Exception as e:  # noqa: BLE001
+                    note = f"fetch failed: {type(e).__name__}: {e}"
+                    data = b""
+        # [/block plan-02]
         elif data is None:
             data = b""
             note = "not fetched"
         got = self._ingest(title=title or url, data=data, source_type=st, owner=owner, scope=scope, authority=authority,
                            visibility=visibility, location=url)
         if note:
-            got.version.extraction_status = ExtractionStatus.FAILED if "failed" in note else ExtractionStatus.PENDING
+            got.version.extraction_status = ExtractionStatus.FAILED if ("failed" in note or "blocked" in note) else ExtractionStatus.PENDING
             got.version.extraction_note = note
+            got.extraction.status, got.extraction.note = got.version.extraction_status, note   # the API reports the extraction object
             self.repo.source_versions.put(got.version)
             got.source.extraction_status = got.version.extraction_status
             self.repo.sources.put(got.source)

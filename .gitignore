@@ -6,3 +6,4 @@ __pycache__/
 ka_storage/
 .env
 .claude/permission-log.jsonl
+e2e/shots/

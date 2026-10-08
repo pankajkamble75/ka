@@ -118,7 +118,7 @@ class KnowledgeAcquisition:
 
     # ---- one-step "apply to scope" for the console (§11 decision + §24 scope) --------------------------
 
-    def apply_nugget(self, ref: str, *, scope: Scope | None, by: str, reason: str = "") -> dict[str, Any]:
+    def apply_nugget(self, ref: str, *, scope: Scope | None, by: str, reason: str = "", widen_visibility: bool = False) -> dict[str, Any]:
         """Approve a candidate at its own scope, or re-scope it first (CHANGE_SCOPE) and approve the result.
         Still one governance decision per step — this is a convenience, not a bypass."""
         from ka.governance import GovernanceError
@@ -126,7 +126,8 @@ class KnowledgeAcquisition:
         v = self.repo.require_version(ref)
         steps: list[dict[str, Any]] = []
         if scope is not None and scope.key() != v.scope.key():
-            d = self.governance.decide(ref, DecisionOutcome.CHANGE_SCOPE, by=by, reason=reason or f"applied to {scope.key()}", new_scope=scope)
+            d = self.governance.decide(ref, DecisionOutcome.CHANGE_SCOPE, by=by, reason=reason or f"applied to {scope.key()}", new_scope=scope,
+                                       widen_visibility=widen_visibility)
             steps.append({"decision": d.outcome.value, "from": ref, "to": d.resulting_refs[0]})
             v = self.repo.require_version(d.resulting_refs[0])
         if v.status == NuggetStatus.REJECTED:

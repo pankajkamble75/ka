@@ -28,6 +28,7 @@ from ka.llm import LLMProvider, LLMUsage, complete_json
 from ka.model import Evidence, KnowledgeNuggetVersion, ResearchMission, ResearchRun, Scope
 from ka.repository import Repository
 from ka.scope import ScopeRegistry
+from ka.security import is_safe_url
 from ka.timeutil import now_iso
 from ka.vocab import (
     VISIBILITY_ORDER,
@@ -202,6 +203,12 @@ class InternetResearchAgent:
         urls = [u for u in ctx.mission.preferred_source_types + ctx.mission.research_questions if u.startswith("http")]
         out: list[Finding] = []
         for url in urls[:5]:
+            # [block plan-02]
+            ok, why = is_safe_url(url)
+            if not ok:
+                ctx.run.errors.append(f"{url}: blocked: {why}")
+                continue
+            # [/block plan-02]
             try:
                 got = ctx.ingestion.link(url=url, owner=ctx.mission.created_by,
                                          scope=Scope(scope_type=ctx.mission.scope_type, scope_id=ctx.mission.scope_id),

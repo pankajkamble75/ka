@@ -31,6 +31,7 @@ from ka.vocab import (
     ScopeType,
     Visibility,
     narrowest_visibility,
+    widens_visibility,
 )
 
 
@@ -230,7 +231,8 @@ class GovernanceService:
     # ---------------------------------------------------------------- Governance Decision (§11 step 9, §33)
 
     def decide(self, ref: str, outcome: DecisionOutcome, *, by: str, reason: str = "", comments: str | None = None,
-               merged_statement: str | None = None, new_scope: Scope | None = None, existing_ref: str | None = None) -> GovernanceDecision:
+               merged_statement: str | None = None, new_scope: Scope | None = None, existing_ref: str | None = None,
+               widen_visibility: bool = False) -> GovernanceDecision:
         v = self.repo.require_version(ref)
         if by in self.research_agent_ids:
             raise GovernanceError("research agents cannot approve their own knowledge (§17)")
@@ -276,13 +278,24 @@ class GovernanceService:
         elif outcome == DecisionOutcome.CHANGE_SCOPE:
             if new_scope is None:
                 raise GovernanceError("CHANGE_SCOPE needs new_scope")
+            # [block plan-02]
+            # research-01 R6: re-scoping may not widen who can see the knowledge unless the decision says so.
+            needed = widens_visibility(v.visibility, new_scope.scope_type)
+            if needed is not None and not widen_visibility:
+                raise GovernanceError(f"re-scoping {v.ref} to {new_scope.key()} would widen its visibility "
+                                      f"{v.visibility.value} → {needed.value}; pass widen_visibility=True to decide that explicitly")
+            new_visibility = needed if needed is not None else v.visibility
+            if needed is not None:
+                d.visibility_change = {"from": v.visibility.value, "to": needed.value}
+            # [/block plan-02]
             v.governance_decision_id = d.id
             self.versioning.transition(v, NuggetStatus.REJECTED)
             re_scoped = self.ingest_candidate(CandidateInput(
                 title=v.title, statement=v.statement, scope=new_scope, source_ids=v.source_refs, evidence_ids=v.evidence_refs,
                 knowledge_type=v.knowledge_type.value, authority_type=v.authority_type, confidence=v.confidence, tags=v.tags,
                 normalized_meaning=v.normalized_meaning, graph_group=v.graph_group, channel=v.channel, created_by=by,
-                change_reason=f"re-scoped from {v.scope.key()} by {by}: {reason}", effective_from=v.effective_from))
+                change_reason=f"re-scoped from {v.scope.key()} by {by}: {reason}", effective_from=v.effective_from,
+                visibility=new_visibility))
             d.resulting_refs.append(re_scoped.ref)
         elif outcome == DecisionOutcome.REQUEST_MORE_RESEARCH:
             if self.on_more_research is None:

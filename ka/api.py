@@ -9,14 +9,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 
-from ka import __version__, images
+from ka import __version__, config, images
 from ka.governance import GovernanceError
 from ka.graph_change import ChangeError
 from ka.model import Scope
+from ka.security import require_access
 from ka.service import KnowledgeAcquisition, _nugget_row
 from ka.versioning import IllegalTransition, ImmutableVersionError
 from ka.vocab import AuthorityType, DecisionOutcome, NuggetStatus, ScopeType, Visibility
@@ -97,6 +98,7 @@ class DecisionIn(BaseModel):
     new_scope_type: ScopeType | None = None
     new_scope_id: str | None = None
     existing_ref: str | None = None
+    widen_visibility: bool = False
 
 
 class RevisionIn(BaseModel):
@@ -113,6 +115,7 @@ class ApplyIn(BaseModel):
     reason: str = ""
     scope_type: ScopeType | None = None
     scope_id: str | None = None
+    widen_visibility: bool = False
 
 
 class CommentIn(BaseModel):
@@ -157,6 +160,7 @@ class PromotionDecisionIn(BaseModel):
     approve: bool
     by: str
     reason: str = ""
+    widen_visibility: bool = False
 
 
 class GapIn(BaseModel):
@@ -170,7 +174,25 @@ class GapIn(BaseModel):
 
 # ------------------------------------------------------------------------------------ routers
 
-router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"])
+# [block plan-02]
+router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"], dependencies=[Depends(require_access)])
+
+
+def _upload_cap() -> int:
+    return config.get("KA_MAX_UPLOAD_MB") * 1024 * 1024
+
+
+async def _read_capped(request: Request, file: UploadFile) -> bytes:
+    """Refuse an oversize body before reading it when Content-Length says so, and after reading otherwise (413)."""
+    cap = _upload_cap()
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > cap + 4096:     # multipart framing allowance
+        raise HTTPException(413, f"upload exceeds KA_MAX_UPLOAD_MB ({config.get('KA_MAX_UPLOAD_MB')} MB)")
+    data = await file.read(cap + 1)
+    if len(data) > cap:
+        raise HTTPException(413, f"upload exceeds KA_MAX_UPLOAD_MB ({config.get('KA_MAX_UPLOAD_MB')} MB)")
+    return data
+# [/block plan-02]
 
 
 @router.get("/healthz")
@@ -241,10 +263,10 @@ def active_at(scope_type: str, scope_id: str, when: str = Query(..., description
 # ---- ingestion (§3.1)
 
 @router.post("/sources/upload")
-async def upload(file: UploadFile = File(...), owner: str = Form("user"), scope_type: str = Form(...), scope_id: str = Form(...),
+async def upload(request: Request, file: UploadFile = File(...), owner: str = Form("user"), scope_type: str = Form(...), scope_id: str = Form(...),
                  authority: str = Form(AuthorityType.PROJECT_DOCUMENTATION.value), title: str | None = Form(None),
                  extract: bool = Form(True), ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
-    data = await file.read()
+    data = await _read_capped(request, file)
     s = _scope(scope_type, scope_id)
     got = ka.ingestion.upload(filename=file.filename or "upload", data=data, owner=owner, scope=s, title=title, authority=AuthorityType(authority))
     return _ingested(ka, got, extract, owner)
@@ -335,7 +357,8 @@ def decide(ref: str, body: DecisionIn, ka: KnowledgeAcquisition = Depends(get_ka
     new_scope = Scope(scope_type=body.new_scope_type, scope_id=body.new_scope_id) if body.new_scope_type and body.new_scope_id else None
     try:
         d = ka.governance.decide(ref, body.outcome, by=body.by, reason=body.reason, comments=body.comments,
-                                 merged_statement=body.merged_statement, new_scope=new_scope, existing_ref=body.existing_ref)
+                                 merged_statement=body.merged_statement, new_scope=new_scope, existing_ref=body.existing_ref,
+                                 widen_visibility=body.widen_visibility)
     except (GovernanceError, IllegalTransition, ImmutableVersionError, KeyError) as e:
         raise HTTPException(409, str(e))
     return {"decision": d.model_dump(mode="json"), "nugget": _nugget_row(ka.repo.require_version(ref))}
@@ -345,7 +368,7 @@ def decide(ref: str, body: DecisionIn, ka: KnowledgeAcquisition = Depends(get_ka
 def apply_nugget(ref: str, body: ApplyIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     scope = Scope(scope_type=body.scope_type, scope_id=body.scope_id) if body.scope_type and body.scope_id else None
     try:
-        return ka.apply_nugget(ref, scope=scope, by=body.by, reason=body.reason)
+        return ka.apply_nugget(ref, scope=scope, by=body.by, reason=body.reason, widen_visibility=body.widen_visibility)
     except (GovernanceError, IllegalTransition, KeyError) as e:
         raise HTTPException(409, str(e))
 
@@ -421,10 +444,10 @@ def submit_correction(body: CorrectionIn, ka: KnowledgeAcquisition = Depends(get
 
 
 @router.post("/corrections/upload")
-async def submit_correction_with_file(file: UploadFile = File(...), graph_id: str | None = Form(None), element_id: str | None = Form(None),
+async def submit_correction_with_file(request: Request, file: UploadFile = File(...), graph_id: str | None = Form(None), element_id: str | None = Form(None),
                                       nugget_ref: str | None = Form(None), what_is_incorrect: str = Form(...), correct_value: str = Form(...),
                                       reason: str = Form(""), by: str = Form("user"), ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
-    data = await file.read()
+    data = await _read_capped(request, file)
     c = ka.corrections.submit(graph_id=graph_id, element_id=element_id, nugget_ref=nugget_ref, what_is_incorrect=what_is_incorrect,
                               correct_value=correct_value, reason=reason, by=by, upload=(file.filename or "evidence", data))
     return {"correction": c.model_dump(mode="json")}
@@ -545,9 +568,11 @@ def detect_promotions(scope_type: str, scope_id: str, ka: KnowledgeAcquisition =
 @router.post("/promotions/{promotion_id}/decide")
 def decide_promotion(promotion_id: str, body: PromotionDecisionIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     try:
-        p = ka.promotion.decide(promotion_id, approve=body.approve, by=body.by, reason=body.reason)
+        p = ka.promotion.decide(promotion_id, approve=body.approve, by=body.by, reason=body.reason, widen_visibility=body.widen_visibility)
     except KeyError:
         raise HTTPException(404, "promotion not found")
+    except GovernanceError as e:
+        raise HTTPException(409, str(e))
     return {"promotion": p.model_dump(mode="json")}
 
 

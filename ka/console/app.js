@@ -6,6 +6,17 @@ const pill = (s, cls = '') => `<span class="pill ${esc(s)} ${cls}">${esc(s)}</sp
 const scopePill = (k) => `<span class="pill scope">${esc(k)}</span>`;
 const when = (iso) => iso ? new Date(iso).toLocaleString() : '—';
 const who = () => localStorage.getItem('ka.user') || 'console-user';
+// [block plan-02]
+const token = () => { try { return localStorage.getItem('ka.token') || ''; } catch { return ''; } };
+const authHeaders = () => (token() ? { Authorization: 'Bearer ' + token() } : {});
+function ensureTokenField() {
+  // the token field must exist even when the API refuses us, or there is no way to enter one
+  if ($('#tok')) return;
+  $('#nav').innerHTML = `<h4>You</h4><input id="who" value="${esc(who())}"><label>Access token</label><input id="tok" type="password" value="${esc(token())}" placeholder="KA_ACCESS_TOKEN">`;
+  $('#who').addEventListener('change', (e) => { localStorage.setItem('ka.user', e.target.value); });
+  $('#tok').addEventListener('change', (e) => { try { localStorage.setItem('ka.token', e.target.value.trim()); } catch { /* ignore */ } toast('Access token saved'); render(); });
+}
+// [/block plan-02]
 
 let TOAST_T;
 function toast(msg, err = false) {
@@ -13,16 +24,17 @@ function toast(msg, err = false) {
   clearTimeout(TOAST_T); TOAST_T = setTimeout(() => (t.innerHTML = ''), err ? 7000 : 3500);
 }
 async function api(path, opts = {}) {
-  const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts,
+  const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json', ...authHeaders() }, ...opts,
     body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body });
-  if (opts.body instanceof FormData) { /* let the browser set the boundary */ }
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error('Access token required or wrong — paste it under "You" in the sidebar.');
   if (!r.ok) throw new Error(data.detail || r.statusText);
   return data;
 }
 async function form(path, fd) {
-  const r = await fetch(API + path, { method: 'POST', body: fd });
+  const r = await fetch(API + path, { method: 'POST', body: fd, headers: authHeaders() });
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401) throw new Error('Access token required or wrong — paste it under "You" in the sidebar.');
   if (!r.ok) throw new Error(data.detail || r.statusText);
   return data;
 }
@@ -76,6 +88,7 @@ window.addEventListener('unhandledrejection', (e) => fail((e.reason && e.reason.
 /* ------------------------------------------------------------------ nav: four tabs */
 async function nav() {
   const h = location.hash || '#/';
+  ensureTokenField();
   const on = (p) => (h === p || h.startsWith(p + '?') || (p === '#/dashboard' && h === '#/') ? 'active' : '');
   const detail = /^#\/(nugget|conflict|source|mission|change)\//.test(h);
   const from = detail ? tabOf(lastTab || '#/nuggets') : null;
@@ -86,8 +99,10 @@ async function nav() {
     <a href="#/browse" class="${on('#/browse') || onD('#/browse')}">3 · Browse by scope</a>
     <a href="#/dashboard" class="${on('#/dashboard') || onD('#/dashboard')}">4 · Dashboard</a>
     <a href="#/images" class="${on('#/images') || onD('#/images')}">5 · Images</a>
-    <h4>You</h4><input id="who" value="${esc(who())}" title="Your name, recorded on decisions">`;
+    <h4>You</h4><input id="who" value="${esc(who())}" title="Your name, recorded on decisions">
+    <label>Access token</label><input id="tok" type="password" value="${esc(token())}" placeholder="KA_ACCESS_TOKEN" title="Required from non-loopback addresses">`;
   $('#who').addEventListener('change', (e) => { localStorage.setItem('ka.user', e.target.value); toast('Acting as ' + e.target.value); });
+  $('#tok').addEventListener('change', (e) => { try { localStorage.setItem('ka.token', e.target.value.trim()); } catch { /* ignore */ } toast('Access token saved'); render(); });
 }
 
 /* ------------------------------------------------------------------ pages */
@@ -151,7 +166,7 @@ async function nuggetView(ref) {
   <div id="revise" class="card" hidden><h3>Propose correction → new version</h3><label>Corrected statement</label><textarea id="rv-stmt">${esc(n.statement)}</textarea><label>Reason</label><input id="rv-reason"><div class="actions"><button class="primary" data-act="revise" data-cid="${esc(n.canonical_id)}">Submit as candidate v${(d.version_history.at(-1)?.version || n.version) + 1}</button></div></div>
   <div id="evidence" class="card" hidden><h3>Add evidence</h3><label>Note</label><textarea id="ev-text"></textarea><div class="actions"><button class="primary" data-act="evidence" data-ref="${esc(n.ref)}" data-type="${n.scope_type}" data-id="${esc(n.scope_id)}">Attach</button></div></div>
   <div id="comment" class="card" hidden><h3>Add comment</h3><textarea id="cm-text"></textarea><div class="actions"><button class="primary" data-act="comment" data-ref="${esc(n.ref)}">Comment</button></div></div>
-  <div id="rescope" class="card" hidden><h3>Propose scope change</h3><div class="row"><div><label>Type</label><select id="rs-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="rs-id"></div><div><label>Reason</label><input id="rs-reason"></div><button class="primary" data-act="decide" data-ref="${esc(n.ref)}" data-outcome="CHANGE_SCOPE">Re-scope</button></div></div>
+  <div id="rescope" class="card" hidden><h3>Propose scope change</h3><div class="row"><div><label>Type</label><select id="rs-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="rs-id"></div><div><label>Reason</label><input id="rs-reason"></div><button class="primary" data-act="decide" data-ref="${esc(n.ref)}" data-outcome="CHANGE_SCOPE">Re-scope</button></div><label class="small" style="text-transform:none;letter-spacing:0"><input type="checkbox" id="rs-widen" style="width:auto"> widen visibility if the new scope needs it</label></div>
   <div id="compare" class="card" hidden><h3>Compare versions</h3><div class="row"><div><label>A</label><select id="cmp-a">${d.version_history.map((h) => `<option ${h.version === Math.max(1, n.version - 1) ? 'selected' : ''}>${h.version}</option>`).join('')}</select></div><div><label>B</label><select id="cmp-b">${d.version_history.map((h) => `<option ${h.version === n.version ? 'selected' : ''}>${h.version}</option>`).join('')}</select></div><button data-act="compare" data-cid="${esc(n.canonical_id)}">Compare</button></div><div id="cmp-out"></div></div>
   <div id="usage" class="card" hidden><h3>Graph usage</h3>${d.graph_usage.length ? `<table><tr><th>Graph</th><th>Element</th><th>Kind</th><th>Scope</th><th>Inheritance</th><th>Change</th></tr>${d.graph_usage.map((u) => `<tr><td class="mono">${esc(u.graph_id)}</td><td class="mono">${esc(u.element_id)}</td><td>${esc(u.element_kind)}</td><td>${scopePill(u.scope.scope_type + ':' + u.scope.scope_id)}</td><td>${pill(u.inheritance_state)}</td><td><a href="#/change/${u.graph_change_id}">${esc(u.graph_change_id || '')}</a></td></tr>`).join('')}</table>` : '<div class="empty">Not materialized in any graph (yet).</div>'}</div>
   <div class="grid2">
@@ -197,7 +212,7 @@ async function conflictView(ref) {
     <a href="#/nugget/${encodeURIComponent(ref)}"><button>Add Comment</button></a></div>
   <label>Reason (recorded on the decision)</label><input id="decide-reason" placeholder="Why this resolution?">
   <div id="merge" class="card" hidden><h3>Merged statement</h3><textarea id="merge-stmt">${esc(c.candidate.statement)}</textarea><div class="actions"><button class="primary" data-act="decide" data-ref="${esc(ref)}" data-outcome="MERGE" data-existing="${esc(c.existing.ref)}">Merge into ${esc(c.existing.canonical_id)} as a new version</button></div></div>
-  <div id="rescope" class="card" hidden><h3>Change scope</h3><div class="row"><div><label>Type</label><select id="rs-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="rs-id"></div><button class="primary" data-act="decide" data-ref="${esc(ref)}" data-outcome="CHANGE_SCOPE">Re-scope candidate</button></div></div>`;
+  <div id="rescope" class="card" hidden><h3>Change scope</h3><div class="row"><div><label>Type</label><select id="rs-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="rs-id"></div><button class="primary" data-act="decide" data-ref="${esc(ref)}" data-outcome="CHANGE_SCOPE">Re-scope candidate</button></div><label class="small" style="text-transform:none;letter-spacing:0"><input type="checkbox" id="rs-widen" style="width:auto"> widen visibility if the new scope needs it</label></div>`;
 }
 
 async function sourceView(id) {
@@ -278,6 +293,7 @@ async function nuggetsView(qs) {
     if (n.conflict_open) return `<a href="#/conflict/${encodeURIComponent(n.ref)}"><button class="primary">Resolve conflict</button></a>`;
     if (!pendingSet.includes(n.status)) return `<a href="#/nugget/${encodeURIComponent(n.ref)}">Details</a>`;
     return `<div class="row"><select class="apply-scope">${scopeOptions(scopes, n.scope.replace(':', '|'))}</select><button class="primary" data-act="apply" data-ref="${esc(n.ref)}">Apply</button><button data-act="decide" data-ref="${esc(n.ref)}" data-outcome="REJECT">Reject</button></div>
+            <label class="small" style="text-transform:none;letter-spacing:0"><input type="checkbox" class="widen" style="width:auto"> widen visibility if the new scope needs it</label>
             ${n.suggested_resolution ? `<div class="small muted">Suggested: ${esc(n.suggested_resolution)}</div>` : ''}`;
   };
   return `<div class="crumbs">2 · Knowledge nuggets</div><h1>Knowledge nuggets</h1>
@@ -427,7 +443,7 @@ async function act(b) {
   if (a === 'decide') {
     const body = { outcome: b.dataset.outcome, by: who(), reason: reason(), existing_ref: b.dataset.existing || null };
     if (b.dataset.outcome === 'MERGE') body.merged_statement = $('#merge-stmt').value;
-    if (b.dataset.outcome === 'CHANGE_SCOPE') { body.new_scope_type = $('#rs-type').value; body.new_scope_id = $('#rs-id').value; }
+    if (b.dataset.outcome === 'CHANGE_SCOPE') { body.new_scope_type = $('#rs-type').value; body.new_scope_id = $('#rs-id').value; body.widen_visibility = !!$('#rs-widen')?.checked; }
     const r = await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/decide`, { method: 'POST', body });
     toast(`${r.decision.outcome} → ${r.nugget.status}`);
     if (location.hash.startsWith('#/conflict/')) location.hash = `#/nugget/${encodeURIComponent(b.dataset.ref)}`; else render();
@@ -446,7 +462,8 @@ async function act(b) {
   if (a === 'mission') { const [st, sid] = $('#rm-scope').value.split('|'); const r = await api('/research/missions', { method: 'POST', body: { scope_type: st, scope_id: sid, objective: $('#rm-obj').value, questions: $('#rm-q').value.split('\n').filter(Boolean), by: who() } }); toast(`Mission ${r.mission.status}: ${r.mission.candidate_refs.length} candidates`); location.hash = `#/mission/${r.mission.mission_id}`; return; }
   if (a === 'apply') {
     const [st, sid] = b.closest('tr').querySelector('.apply-scope').value.split('|');
-    const r = await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/apply`, { method: 'POST', body: { by: who(), scope_type: st, scope_id: sid } });
+    const widen = !!b.closest('tr').querySelector('.widen')?.checked;
+    const r = await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/apply`, { method: 'POST', body: { by: who(), scope_type: st, scope_id: sid, widen_visibility: widen } });
     toast(r.applied ? `Applied ${r.nugget.ref} at ${r.nugget.scope}` : `Not applied: ${r.note}`, !r.applied);
     const out = $('#apply-result'); if (out) out.innerHTML = `<div class="card"><h3>${r.applied ? 'Applied' : 'Not applied'} — <a href="#/nugget/${encodeURIComponent(r.nugget.ref)}">${esc(r.nugget.ref)}</a> ${pill(r.nugget.status)} ${scopePill(r.nugget.scope)}</h3>${r.steps.map((s) => `<div class="small">${esc(JSON.stringify(s))}</div>`).join('')}${(r.proposals || []).map((p) => `<div class="small">Graph change <a href="#/change/${p.id}">${p.id}</a> ${pill(p.status)}${p.requires_approval ? ' ' + pill('needs approval', 'warn') : ''} → ${p.affected_element_ids.map(esc).join(', ')}</div>`).join('')}${r.note ? `<div class="quote">${esc(r.note)}</div>` : ''}</div>`;
     setTimeout(render, 600); return;

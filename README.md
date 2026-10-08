@@ -23,6 +23,9 @@ uv venv .venv && uv pip install -p .venv/bin/python -e ".[dev,extract]"
 .venv/bin/python -m ka serve                        # Knowledge Console on http://localhost:8011/console/
 ```
 
+From a browser on another machine the API needs a bearer token: set `KA_ACCESS_TOKEN` in `.env` and paste it under
+"You → Access token" in the console (`KA_ACCESS_POLICY=token`, the default; `loopback` or `open` change that).
+
 Set `ANTHROPIC_API_KEY` (see `.env.example`) to use the real extractor, research agents and conflict explanations.
 Without it the package runs on a deterministic heuristic extractor and a stub provider — the governance pipeline is identical.
 

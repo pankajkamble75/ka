@@ -7,7 +7,7 @@ from ka import config
 from ka.audit import Auditor
 from ka.conflict import similarity
 from ka.events import EventBus
-from ka.governance import CandidateInput, GovernanceService
+from ka.governance import CandidateInput, GovernanceError, GovernanceService
 from ka.model import KnowledgeNuggetVersion, PromotionProposal, Scope
 from ka.repository import Repository
 from ka.scope import ScopeRegistry
@@ -57,7 +57,7 @@ class PromotionService:
             out.append(prop)
         return out
 
-    def decide(self, promotion_id: str, *, approve: bool, by: str, reason: str = "") -> PromotionProposal:
+    def decide(self, promotion_id: str, *, approve: bool, by: str, reason: str = "", widen_visibility: bool = False) -> PromotionProposal:
         p = self.repo.promotions.require(promotion_id)
         p.decided_by, p.decided_at = by, now_iso()
         if not approve:
@@ -66,6 +66,15 @@ class PromotionService:
             self.auditor.record(who=by, what="promotion.rejected", why=reason, scope=p.target_scope, affected=[p.id])
             return p
         lead = self.repo.require_version(p.pattern_refs[0])
+        # [block plan-02]
+        # research-01 R6: promoting instance knowledge to a domain may not widen its visibility silently.
+        from ka.vocab import widens_visibility
+        needed = widens_visibility(lead.visibility, p.target_scope.scope_type)
+        if needed is not None and not widen_visibility:
+            raise GovernanceError(f"promoting {lead.ref} to {p.target_scope.key()} would widen its visibility "
+                                  f"{lead.visibility.value} → {needed.value}; pass widen_visibility=True to decide that explicitly")
+        promoted_visibility = needed if needed is not None else lead.visibility
+        # [/block plan-02]
         src, ev = [], []
         for ref in p.pattern_refs:
             v = self.repo.version(ref)
@@ -76,7 +85,7 @@ class PromotionService:
             title=lead.title, statement=lead.statement, scope=p.target_scope, source_ids=src, evidence_ids=ev,
             knowledge_type=lead.knowledge_type.value, authority_type=lead.authority_type, confidence=min(0.95, lead.confidence + 0.1),
             tags=lead.tags, graph_group=lead.graph_group, channel=AcquisitionChannel.FEEDBACK, created_by=by,
-            change_reason=f"promotion {p.id} from {len(p.instance_ids)} instances: {reason}"))
+            change_reason=f"promotion {p.id} from {len(p.instance_ids)} instances: {reason}", visibility=promoted_visibility))
         for ref in p.pattern_refs:
             from ka.model import KnowledgeRelationship
             self.repo.relationships.put(KnowledgeRelationship(from_ref=cand.ref, to_ref=ref, relationship_type=RelationshipType.MERGES,

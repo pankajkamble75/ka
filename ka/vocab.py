@@ -181,6 +181,24 @@ def narrowest_visibility(items: list[Visibility]) -> Visibility:
     return min(items, key=VISIBILITY_ORDER.index)
 
 
+# [block plan-02]
+def required_visibility(scope_type: "ScopeType") -> Visibility:
+    """§42 / research-01 R6: the narrowest visibility knowledge may carry at a scope. Knowledge an instance holds may be
+    personal; a domain's knowledge is at least DOMAIN-visible; parent-domain and structure knowledge is enterprise-wide."""
+    if scope_type == ScopeType.INSTANCE:
+        return Visibility.PERSONAL
+    if scope_type == ScopeType.DOMAIN:
+        return Visibility.DOMAIN
+    return Visibility.ENTERPRISE
+
+
+def widens_visibility(current: Visibility, scope_type: "ScopeType") -> Visibility | None:
+    """The visibility the knowledge would have to take at `scope_type`, or None when no widening is needed."""
+    needed = required_visibility(scope_type)
+    return needed if VISIBILITY_ORDER.index(current) < VISIBILITY_ORDER.index(needed) else None
+# [/block plan-02]
+
+
 class DecisionOutcome(str, Enum):
     """§33 actions, plus the plain approve/reject a reviewer takes on a pending candidate."""
     APPROVE = "APPROVE"
