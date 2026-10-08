@@ -21,10 +21,10 @@ from ka.events import EventBus
 from ka.graph_adapter import LINEAGE_KEY, GraphAdapter, GraphValidationError, PublishRefused
 from ka.graph_impact import KIND_FOR_KNOWLEDGE, GraphImpactService, ImpactReport
 from ka.lineage import LineageService
-from ka.model import ElementChange, GraphChangeExecution, GraphChangeProposal, KnowledgeNuggetVersion, Subject
+from ka.model import ElementChange, GraphChangeExecution, GraphChangeProposal, KnowledgeNuggetVersion, Scope, Subject
 from ka.repository import Repository
 from ka.timeutil import now_iso
-from ka.vocab import BindingStatus, GraphElementKind, InheritanceState, NuggetStatus, ProposalStatus
+from ka.vocab import BindingStatus, GraphElementKind, InheritanceState, NuggetStatus, ProposalStatus, ScopeType
 
 
 class ChangeError(RuntimeError):
@@ -375,6 +375,55 @@ class GraphChangeService:
         self.auditor.record(who=by, what="graph.change.applied", approval=p.id, before=p.before_state, after=p.proposed_after_state,
                             affected=[p.id, ex.id] + p.affected_element_ids + ([p.eos_proposal_id] if p.eos_proposal_id else []))
         return ex
+
+    # [block plan-12] research-02 R4 (Q2): explicit per-instance repin by a named person, through the adapter → store
+    def repin_status(self, proposal_id: str) -> list[dict[str, Any]]:
+        p = self.repo.proposals.require(proposal_id)
+        if p.status != ProposalStatus.APPLIED or not p.affected_graph_ids:
+            return []
+        domain = self.adapter.scope_for_graph(p.affected_graph_ids[0])
+        target = p.new_version or self.adapter.base_version(domain) or "current"
+        pins = self.adapter.pinned_versions(domain)
+        done = {r["instance_id"]: r for r in p.impact_summary.get("repinned", [])}
+        rows = []
+        for iid in sorted(set(pins) | set(p.pinned_instances)):
+            pinned = pins.get(iid)
+            rows.append({"instance_id": iid, "pinned": pinned, "target": target, "current": pinned is not None and str(pinned) == str(target),
+                         "repinned": done.get(iid)})
+        return rows
+
+    def repin(self, proposal_id: str, instance_id: str, *, by: str, preview: bool = False, agent_ids: set[str] | None = None):
+        p = self.repo.proposals.require(proposal_id)
+        if p.status != ProposalStatus.APPLIED or not p.new_version and self.adapter.needs_named_actor():
+            raise ChangeError(f"proposal {p.id} is {p.status.value}; only an APPLIED proposal with a new version can be repinned")
+        if not by or by.startswith("ka.") or by in (agent_ids or set()):
+            raise ChangeError("repin is a person's decision (Q2): `by` must name a person, not a policy or a research agent")
+        domain = self.adapter.scope_for_graph(p.affected_graph_ids[0])
+        target = str(p.new_version or self.adapter.base_version(domain) or "current")
+        pins = self.adapter.pinned_versions(domain)
+        if instance_id not in pins and instance_id not in p.pinned_instances:
+            raise ChangeError(f"instance {instance_id!r} does not pin {domain.scope_id}")
+        inst = Scope(scope_type=ScopeType.INSTANCE, scope_id=instance_id)
+        result = self.adapter.repin(inst, domain, target, actor=by, apply=not preview)
+        if preview or not result.applied:
+            return result
+        if result.from_version == result.to_version and result.note:
+            return result                                                  # already current: nothing moved, nothing to record
+        req = [i for i in p.impact_summary.get("repin_required", []) if i != instance_id]
+        p.impact_summary["repin_required"] = req
+        rec = {"instance_id": instance_id, "from": result.from_version, "to": result.to_version, "by": by, "at": now_iso()}
+        p.impact_summary["repinned"] = [r for r in p.impact_summary.get("repinned", []) if r["instance_id"] != instance_id] + [rec]
+        self.repo.proposals.put(p)
+        self.bus.emit("graph.instance.repinned", proposal_id=p.id, instance_id=instance_id, to_version=result.to_version or "")
+        self.auditor.record(who=by, what="graph.instance.repinned", why=f"{domain.scope_id} {result.from_version} → {result.to_version}", scope=inst,
+                            before={"pinned": result.from_version}, after={"pinned": result.to_version}, approval=p.id, affected=[p.id, instance_id])
+        return result
+
+    def awaiting_repin(self) -> list[dict[str, Any]]:
+        """One row per (APPLIED proposal, instance still on the old version) — the Dashboard's queue."""
+        return [{"proposal_id": p.id, "instance_id": iid, "new_version": p.new_version, "knowledge_change_ids": p.knowledge_change_ids}
+                for p in self.repo.proposals.where(lambda p: p.status == ProposalStatus.APPLIED) for iid in p.impact_summary.get("repin_required", [])]
+    # [/block plan-12]
 
     # [block plan-10] research-02 R2 (Q4): retiring a version removes the graph elements that depend on it ALONE
     def propose_retirement(self, v: KnowledgeNuggetVersion, *, by: str = "ka.graph_change") -> GraphChangeProposal | None:

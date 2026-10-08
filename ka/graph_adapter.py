@@ -60,6 +60,9 @@ class GraphAdapter(Protocol):
     def resolve_element_id(self, scope: Scope, local_id: str) -> str: ...
     def edge_target_kind(self, edge: str) -> str | None: ...
     def needs_named_actor(self) -> bool: ...
+    # plan-12 (Q2): pins are read and moved only through these two
+    def pinned_versions(self, domain_scope: Scope) -> dict[str, str | None]: ...
+    def repin(self, instance_scope: Scope, domain_scope: Scope, new_version: str, *, actor: str, apply: bool) -> "RepinResult": ...
 
 
 class GraphValidationError(RuntimeError):
@@ -82,6 +85,20 @@ class PublishResult(BaseModel):
     new_version: str | None = None
     pinned_instances: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+# [block plan-12] research-02 R4 (Q2, decided 2026-10-08): repin is explicit, per instance, by a named person — through the store
+class RepinResult(BaseModel):
+    instance_id: str
+    substructure_id: str
+    from_version: str | None = None
+    to_version: str | None = None
+    applied: bool = False
+    blocking_edges: list[str] = Field(default_factory=list)
+    added_nodes: list[str] = Field(default_factory=list)
+    removed_nodes: list[str] = Field(default_factory=list)
+    note: str | None = None
+# [/block plan-12]
 
 
 # ====================================================================== in-memory reference adapter
@@ -322,6 +339,15 @@ class InMemoryGraphAdapter:
     def needs_named_actor(self):
         return False
 
+    # plan-12 (Q2): the reference adapter has no pins — inheritance is propagated downward at apply (§26), so every descendant
+    # is already current; the methods exist so the console and the service behave the same against both adapters.
+    def pinned_versions(self, domain_scope):
+        return {s.scope_id: self.base_version(domain_scope) or "current" for s in self.find_descendants(domain_scope) if s.scope_type == ScopeType.INSTANCE}
+
+    def repin(self, instance_scope, domain_scope, new_version, *, actor, apply):
+        return RepinResult(instance_id=instance_scope.scope_id, substructure_id=self.graph_id_for(domain_scope), from_version=new_version,
+                           to_version=new_version, applied=bool(apply), note="already current — the reference adapter propagates downward at apply")
+
 
 def _compare(parent: GraphElement, child: GraphElement) -> InheritanceState:
     ignore = {"realizes", LINEAGE_KEY}
@@ -478,6 +504,24 @@ class EnterpriseOSGraphAdapter:
 
     def needs_named_actor(self):
         return True
+
+    # plan-12 (Q2): pins live in the store; KA reads them with `pinned_by` and moves ONE with `repin(..., apply=)`, never a manifest write
+    def pinned_versions(self, domain_scope):
+        return dict(self.store.pinned_by(self.graph_id_for(domain_scope)))
+
+    def repin(self, instance_scope, domain_scope, new_version, *, actor, apply):
+        from knowledge_worker.graph_store.errors import RepinBlocked, NotPinned  # type: ignore
+        sid, iid = self.graph_id_for(domain_scope), self.graph_id_for(instance_scope)
+        try:
+            diff = self.store.repin(iid, sid, str(new_version), apply=apply)
+        except RepinBlocked as e:
+            return RepinResult(instance_id=iid, substructure_id=sid, to_version=str(new_version), applied=False,
+                               blocking_edges=list(getattr(e, "edges", None) or getattr(e, "blocking_edges", None) or []), note=str(e))
+        except NotPinned as e:
+            raise PublishRefused("not_pinned", str(e))
+        return RepinResult(instance_id=iid, substructure_id=sid, from_version=diff.from_version, to_version=diff.to_version, applied=bool(diff.applied),
+                           blocking_edges=list(diff.blocking_edges), added_nodes=list(diff.added_nodes), removed_nodes=list(diff.removed_nodes),
+                           note=None if diff.from_version != diff.to_version else "already on that version")
 
     def base_version(self, scope):
         if scope.scope_type == ScopeType.DOMAIN:

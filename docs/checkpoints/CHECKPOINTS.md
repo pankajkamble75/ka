@@ -2,6 +2,36 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 01:05 UTC — plan-12: repin after a domain write — explicit, per instance, by a named person (research-02 R4, Q2)
+
+**What changed**
+
+- *Adapters (PROTECTED, additive)* `ka/graph_adapter.py`: `RepinResult`; `GraphAdapter.pinned_versions(domain)` and
+  `repin(instance, domain, new_version, actor, apply)`. EOS adapter: `store.pinned_by` / `store.repin(..., apply=)`, `RepinBlocked` → an
+  unapplied result with the blocking edges, `NotPinned` → refused. Reference adapter: pins are implicit (downward propagation at
+  apply), so every descendant reports current and a repin is a recorded no-op.
+- *Service (PROTECTED, additive)* `ka/graph_change.py`: `repin_status(proposal_id)`, `repin(proposal_id, instance_id, by, preview,
+  agent_ids)` — only an APPLIED proposal; `by` may not be a `ka.*` policy id or a research agent; preview writes nothing; a move
+  updates `impact_summary.repin_required` / `repinned`, audits `graph.instance.repinned` with before/after versions and emits the event;
+  `awaiting_repin()` rows for the Dashboard. `apply`, `publish`, `emit_ops` untouched.
+- `ka/events.py` name; `ka/service.py` needs-attention `instances_awaiting_repin`; `ka/api.py` `GET /graph-changes/{id}/repins`,
+  `POST /graph-changes/{id}/repin`; `ka/console/app.js` "Instances pinned to this domain" table with Preview/Repin and the Dashboard list.
+- Tests: `test_plan12_repin.py` (reference adapter + routes, 10 cases) and `test_plan12_eos_repin.py` (EOS interpreter: preview/apply,
+  PT4 status → named repin → store state + audit, blocked repin). `e2e/plan12_repin_flow.py`. Architecture §5 Q2 → ✅ built; ledger;
+  `docs/protected.md` graph_change row re-verified.
+
+**Why** — the author's Q2 decision: approved knowledge must be able to reach instances without any pin moving unseen.
+
+**Verification** — protected protocol: characterization 4bcf9d9 first (pins reported, nothing moves) in both interpreters; covering
+suites UNMODIFIED. In-process 231 passed; EOS interpreter 11 passed (plan-12 + plan-05); ruff F clean. Verify recount 8/8 D, 7/7 P,
+5/5 N; blocks 6/6 files. Live flow 7/7 PASS on the reference adapter (a policy id refused with 409); screenshot verified. Product tests
+(research-02): PT1–PT4 PASS; PT5–PT7 awaiting plans 13–15.
+
+**Follow-ups / risks** — the live server runs the reference adapter, so the console shows "current" rows; the EOS store half is proved
+at the seam under the EOS interpreter. No "repin all": each instance is one decision by design.
+
+**Decisions and questions** — BUILT: Q2. RAISED: none. Plan `plan-12`; research-02 R4 → UPLOADED.
+
 ## 2026-10-08 23:55 UTC — plan-11 complete: fenced prompts and the heuristic-only binding cap, verified (research-02 R3, Q10)
 
 **What changed** (on top of d79ce37, the work-in-progress commit)

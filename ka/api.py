@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from ka import __version__, config, images
 from ka.governance import GovernanceError
+from ka.graph_adapter import PublishRefused
 from ka.graph_change import ChangeError
 from ka.model import Scope
 from ka.security import require_access
@@ -559,6 +560,32 @@ def proposal(proposal_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> di
     if p is None:
         raise HTTPException(404, "proposal not found")
     return {"proposal": p.model_dump(mode="json"), "executions": [e.model_dump(mode="json") for e in ka.repo.executions.where(lambda e: e.proposal_id == p.id)]}
+
+
+# [block plan-12] research-02 R4 (Q2): repin status and the per-instance repin, by a named person
+class RepinIn(BaseModel):
+    instance_id: str
+    by: str
+    preview: bool = False
+
+
+@router.get("/graph-changes/{proposal_id}/repins")
+def repin_status(proposal_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.proposals.get(proposal_id) is None:
+        raise HTTPException(404, "proposal not found")
+    return {"repins": ka.graph_change.repin_status(proposal_id), "awaiting": ka.graph_change.awaiting_repin()}
+
+
+@router.post("/graph-changes/{proposal_id}/repin")
+def repin(proposal_id: str, body: RepinIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.proposals.get(proposal_id) is None:
+        raise HTTPException(404, "proposal not found")
+    try:
+        r = ka.graph_change.repin(proposal_id, body.instance_id, by=body.by, preview=body.preview, agent_ids=ka.governance.research_agent_ids)
+    except (ChangeError, PublishRefused) as e:
+        raise HTTPException(409, str(e))
+    return {"result": r.model_dump(mode="json"), "repins": ka.graph_change.repin_status(proposal_id)}
+# [/block plan-12]
 
 
 @router.post("/graph-changes/{proposal_id}/{action}")

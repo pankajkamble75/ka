@@ -84,4 +84,56 @@ def test_P1_characterization_a_ka_promotion_leaves_every_pin_on_the_old_version(
     assert p.status == ProposalStatus.APPLIED and p.new_version == "2"
     assert store.pinned_by("ka-dom") == {"ka-inst-a": "1", "ka-inst-b": "1"}
     assert sorted(p.pinned_instances) == ["ka-inst-a", "ka-inst-b"] and sorted(p.impact_summary["repin_required"]) == ["ka-inst-a", "ka-inst-b"]
-    assert not hasattr(ka.graph_change, "repin")
+    # (commit 4bcf9d9 also pinned "no repin method"; that is what this plan adds)
+
+
+def test_P3_preview_writes_nothing_and_apply_moves_exactly_one_pin(eos):
+    ka, store, D = eos
+    v, p = _promoted(ka, D)
+    pv = ka.graph_change.repin(p.id, "ka-inst-a", by="Pankaj Kamble", preview=True)
+    assert pv.applied is False and pv.from_version == "1" and pv.to_version == "2" and not pv.blocking_edges
+    assert store.pinned_by("ka-dom") == {"ka-inst-a": "1", "ka-inst-b": "1"}
+    r = ka.graph_change.repin(p.id, "ka-inst-a", by="Pankaj Kamble")
+    assert r.applied and store.pinned_by("ka-dom") == {"ka-inst-a": "2", "ka-inst-b": "1"}
+    _, g = store.get_instance("ka-inst-a")
+    assert g.node("ka-dom/p.merchant_underwriting").props.get("process_type") == "decision"
+    _, gb = store.get_instance("ka-inst-b")
+    assert gb.node("ka-dom/p.merchant_underwriting").props.get("process_type") is None
+
+
+def test_P7_PT4_status_named_repin_store_state_and_audit(eos):
+    ka, store, D = eos
+    v, p = _promoted(ka, D)
+    rows = {r["instance_id"]: r for r in ka.graph_change.repin_status(p.id)}
+    assert rows["ka-inst-a"] == {"instance_id": "ka-inst-a", "pinned": "1", "target": "2", "current": False, "repinned": None}
+    ka.graph_change.repin(p.id, "ka-inst-b", by="Pankaj Kamble")
+    rows = {r["instance_id"]: r for r in ka.graph_change.repin_status(p.id)}
+    assert rows["ka-inst-b"]["current"] and rows["ka-inst-b"]["repinned"]["by"] == "Pankaj Kamble" and not rows["ka-inst-a"]["current"]
+    p2 = ka.repo.proposals.require(p.id)
+    assert p2.impact_summary["repin_required"] == ["ka-inst-a"]
+    a = [x for x in ka.repo.audit() if x.what == "graph.instance.repinned"]
+    assert len(a) == 1 and a[0].who == "Pankaj Kamble" and a[0].before == {"pinned": "1"} and a[0].after == {"pinned": "2"}
+    assert [r["instance_id"] for r in ka.needs_attention()["instances_awaiting_repin"]] == ["ka-inst-a"]
+
+
+def test_N4_a_blocked_repin_leaves_the_pin_and_records_no_move(eos):
+    ka, store, D = eos
+    v, p = _promoted(ka, D)
+    # make the new version drop a node the instance still points at from its own edge: add an instance-local edge to the child,
+    # then a second promotion that removes the child → repin is blocked
+    from knowledge_worker.graph_store import proposals as P
+    from knowledge_worker.graph_model.model import Edge, Node
+    pr = P.propose_instance_change("ka-inst-a", ops=[{"op": "add_node", "node": Node(id="local.clerk", kind="actor", name="Local clerk", description="", props={}).model_dump()},
+                                                     {"op": "add_edge", "edge": Edge(id="performed_by:ka-dom~p.merchant_underwriting.collect_application->local.clerk", kind="performed_by",
+                                                                                     source="ka-dom/p.merchant_underwriting.collect_application", target="local.clerk", props={}).model_dump()}],
+                                   actor="Pankaj Kamble", reason="local edge", store=store)
+    P.approve(pr.id, actor="Pankaj Kamble", store=store)                     # an instance change is awaiting_approval from birth
+    P.apply(pr.id, store=store)
+    pr2 = P.propose_promotion("ka-dom", "2", ops=[{"op": "remove_edge", "id": "contains:p.merchant_underwriting->p.merchant_underwriting.collect_application"},
+                                                  {"op": "remove_node", "id": "p.merchant_underwriting.collect_application"}],
+                              actor="Pankaj Kamble", reason="drop child", store=store)
+    P.request_approval(pr2.id, store=store); P.approve(pr2.id, actor="Pankaj Kamble", store=store); P.apply(pr2.id, store=store)
+    p.new_version = "3"; p.impact_summary["repin_required"] = ["ka-inst-a", "ka-inst-b"]; ka.repo.proposals.put(p)
+    r = ka.graph_change.repin(p.id, "ka-inst-a", by="Pankaj Kamble")
+    assert r.applied is False and r.blocking_edges and store.pinned_by("ka-dom")["ka-inst-a"] == "1"
+    assert not any(x.what == "graph.instance.repinned" for x in ka.repo.audit())

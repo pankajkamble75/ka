@@ -252,6 +252,9 @@ class KnowledgeAcquisition:
                                    for p in self.graph_change.failed()],
             "promotions": [p.model_dump(mode="json") for p in self.repo.promotions.where(lambda p: p.status == "PROPOSED")],
             "acquisition_requests": [r.model_dump(mode="json") for r in self.runtime_guard.open_requests()],
+            # [block plan-12] research-02 R4 (Q2): instances still on the old version after a promotion — one named repin each
+            "instances_awaiting_repin": self.graph_change.awaiting_repin(),
+            # [/block plan-12]
             "revoked_sources_with_active_knowledge": self.connectors.revoked_with_active_knowledge(),   # plan-08
             "revoked_source_reviews": [_nugget_row(n) | {"source_revoked": n.analysis.get("source_revoked"), "remaining_sources": n.analysis.get("remaining_sources")}
                                        for n in pending if n.analysis.get("source_revoked")],   # plan-10

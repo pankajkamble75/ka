@@ -126,6 +126,7 @@ function proposalRows(ps) {
 
 async function changeView(id) {
   const { proposal: p, executions } = await api(`/graph-changes/${id}`);
+  const repins = p.status === 'APPLIED' ? (await api(`/graph-changes/${id}/repins`)).repins : [];
   const s = p.impact_summary || {};
   return `<div class="crumbs"><a href="#/dashboard">Dashboard</a> / graph change ${p.id}</div><h1>${p.id} ${pill(p.status)}</h1><p class="sub">${esc(p.reason)}</p>
   <div class="actions">${p.status === 'READY' ? `<button class="primary" data-act="prop" data-id="${p.id}" data-do="approve">Approve</button>` : ''}
@@ -141,11 +142,18 @@ async function changeView(id) {
     <dt>Content key</dt><dd class="mono small">${esc((p.idempotency_key || '').slice(0, 16))}…</dd>
     <dt>EOS proposal</dt><dd>${p.eos_proposal_id ? `<span class="mono">${esc(p.eos_proposal_id)}</span> ${pill(p.eos_status || '')}` : '<span class="muted">not published yet</span>'}</dd>
     <dt>Base version</dt><dd>${esc(p.eos_base_version || '—')}${p.new_version ? ` → new version <b>${esc(p.new_version)}</b>` : ''}</dd>
-    ${p.pinned_instances.length ? `<dt>Pinned instances</dt><dd>${p.pinned_instances.map(esc).join(', ')} <span class="pill warn">repin required (Q2)</span></dd>` : ''}
+    ${p.pinned_instances.length ? `<dt>Pinned instances</dt><dd>${p.pinned_instances.map(esc).join(', ')} ${(p.impact_summary.repin_required || []).length ? '<span class="pill warn">repin required (Q2)</span>' : '<span class="pill ok">all repinned</span>'}</dd>` : ''}
     ${(p.impact_summary.publish_notes || []).length ? `<dt>Notes</dt><dd class="small muted">${p.impact_summary.publish_notes.map(esc).join('<br>')}</dd>` : ''}
     ${p.impact_summary.note ? `<dt>Status note</dt><dd class="small muted">${esc(p.impact_summary.note)}</dd>` : ''}
     <dt>Ops</dt><dd><pre class="small">${esc(JSON.stringify(p.ops, null, 1))}</pre></dd></dl></div>` : ''}
   <!-- [/block plan-05] -->
+  <!-- [block plan-12] per-instance repin (Q2): a named person moves each pin; never automatic -->
+  ${repins.length ? `<div class="card"><h3>Instances pinned to this domain</h3><p class="small muted">A promotion creates a new substructure version and leaves every instance on the old one. Repin is one decision per instance, by a named person, through the store's own repin — never automatic (Q2).</p>
+    <table><tr><th>Instance</th><th>Pinned</th><th>Target</th><th>State</th><th></th></tr>${repins.map((r) => `<tr><td>${scopePill('INSTANCE:' + r.instance_id)}</td><td class="mono">${esc(r.pinned ?? '—')}</td><td class="mono">${esc(r.target ?? '—')}</td>
+      <td>${r.current ? pill('current', 'ok') : pill('behind', 'warn')}${r.repinned ? `<div class="small muted">repinned by ${esc(r.repinned.by)} · ${when(r.repinned.at)}</div>` : ''}</td>
+      <td>${r.current ? '' : `<button data-act="repin" data-id="${p.id}" data-inst="${esc(r.instance_id)}" data-preview="1">Preview</button> <button class="primary" data-act="repin" data-id="${p.id}" data-inst="${esc(r.instance_id)}">Repin</button>`}</td></tr>`).join('')}</table>
+    <div id="repin-result"></div></div>` : ''}
+  <!-- [/block plan-12] -->
   <h2>Element changes</h2>${p.changes.map((c) => `<div class="card"><b>${esc(c.operation)}</b> ${esc(c.element_kind)} <span class="mono">${esc(c.graph_id)} / ${esc(c.element_id)}</span>
     <div class="diff"><div class="before"><b>Before</b><pre class="small">${esc(JSON.stringify(c.before, null, 1))}</pre></div><div class="after"><b>After</b><pre class="small">${esc(JSON.stringify(c.after, null, 1))}</pre></div></div></div>`).join('')}
   <h2>Validation</h2><table><tr><th>Element</th><th>OK</th><th>Detail</th></tr>${p.validation_results.map((r) => `<tr><td class="mono">${esc(r.element_id)}</td><td>${pill(r.ok ? 'ok' : 'FAILED')}</td><td>${esc(r.detail)}</td></tr>`).join('')}</table>
@@ -524,6 +532,7 @@ async function dashboard() {
   ${a.pending_governance.length ? `<h3>Pending governance</h3>${nuggetRows(a.pending_governance, (x) => decideBtns(x.ref))}` : ''}
   ${(a.graph_impact.length || a.failed_propagation.length) ? `<h3>Graph change proposals waiting</h3>${proposalRows([...a.graph_impact, ...a.failed_propagation])}` : ''}
   ${a.promotions.length ? `<h3>Promotion proposals</h3><table><tr><th>Statement</th><th>Target</th><th>Instances</th><th></th></tr>${a.promotions.map((p) => `<tr><td>${esc(p.statement)}</td><td>${scopePill(p.target_scope.scope_type + ':' + p.target_scope.scope_id)}</td><td>${p.instance_ids.join(', ')}</td><td class="actions"><button class="primary" data-act="promote" data-id="${p.id}" data-approve="1">Promote</button><button data-act="promote" data-id="${p.id}" data-approve="0">Reject</button></td></tr>`).join('')}</table>` : ''}
+  ${(a.instances_awaiting_repin || []).length ? `<h3>Instances awaiting a named repin (Q2)</h3><table><tr><th>Instance</th><th>Graph change</th><th>New version</th></tr>${a.instances_awaiting_repin.map((r) => `<tr><td>${scopePill('INSTANCE:' + r.instance_id)}</td><td><a href="#/change/${r.proposal_id}">${esc(r.proposal_id)}</a></td><td class="mono">${esc(r.new_version ?? '—')}</td></tr>`).join('')}</table>` : ''}
   ${(a.revoked_source_reviews || []).length ? revokedReviewsTable(a.revoked_source_reviews) : ''}
   ${(a.revoked_sources_with_active_knowledge || []).length ? `<h3>Sources revoked at their connector, with active knowledge</h3><table><tr><th>Source</th><th>Revoked</th><th>Active nuggets</th></tr>${a.revoked_sources_with_active_knowledge.map((r) => `<tr><td><a href="#/source/${r.source_id}">${esc(r.title)}</a></td><td class="small">${when(r.revoked_at)}</td><td class="small">${r.active_nuggets.map((x) => `<a href="#/nugget/${encodeURIComponent(x)}">${esc(x)}</a>`).join(', ')}<div class="muted">${esc(r.note)}</div></td></tr>`).join('')}</table>` : ''}
   ${a.acquisition_requests.length ? `<h3>Graph gaps reported by the runtime</h3>${gapTable(a.acquisition_requests)}` : ''}
@@ -635,6 +644,12 @@ async function act(b) {
     const r = await api('/connectors', { method: 'POST', body: { kind: 'local_folder', name: $('#cn-name').value, config: { root: $('#cn-root').value, ...(include.length ? { include } : {}) }, owner: who(), scope_type: st, scope_id: sid, authority: $('#cn-auth').value, visibility: $('#cn-vis').value } });
     const sr = await api(`/connectors/${r.connection.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' });
     toast(`Connected · synced: ${sr.report.new} new, ${sr.report.candidates} candidates`); render(); return;
+  }
+  if (a === 'repin') {
+    const r = await api(`/graph-changes/${b.dataset.id}/repin`, { method: 'POST', body: { instance_id: b.dataset.inst, by: who(), preview: !!b.dataset.preview } });
+    const x = r.result;
+    if (b.dataset.preview) { $('#repin-result').innerHTML = `<div class="quote small">Preview ${esc(x.instance_id)}: ${esc(x.from_version ?? '?')} → ${esc(x.to_version ?? '?')} · +${(x.added_nodes || []).length} nodes · −${(x.removed_nodes || []).length} nodes${x.blocking_edges && x.blocking_edges.length ? ` · BLOCKED by ${x.blocking_edges.map(esc).join(', ')}` : ''}${x.note ? ` · ${esc(x.note)}` : ''}</div>`; return; }
+    toast(x.applied ? `Repinned ${x.instance_id} → ${x.to_version}` : `Not repinned: ${x.note || 'blocked'}`); render(); return;
   }
   if (a === 'cancel-gap') { const reason = prompt('Reason for cancelling this gap request?') || ''; await api(`/runtime/requests/${b.dataset.id}/cancel?by=${encodeURIComponent(who())}&reason=${encodeURIComponent(reason)}`, { method: 'POST' }); toast('Gap request cancelled'); render(); return; }
   if (a === 'sync-conn') { const sr = await api(`/connectors/${b.dataset.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Synced: ${sr.report.new} new · ${sr.report.modified} modified · ${sr.report.moved} moved · ${sr.report.deleted} deleted · ${sr.report.permission_changed} permissions · ${sr.report.candidates} candidates`); render(); return; }

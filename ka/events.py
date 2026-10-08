@@ -25,6 +25,9 @@ EVENT_NAMES = {
     # [block plan-08]
     "source.synced", "source.revoked", "source.permission_changed",
     # [/block plan-08]
+    # [block plan-12]
+    "graph.instance.repinned",
+    # [/block plan-12]
 }
 
 Handler = Callable[[dict[str, Any]], None]

@@ -150,11 +150,14 @@ runs it after the statement pass, so both share source, scope and the one govern
 **Evidence in the Enterprise console (Q9 — ✅ DECIDED 2026-10-08: not yet).** The Live Console frontend stays pinned (EOS Q418); the
 evidence behind a published node is read through KA's lineage API and the Knowledge Console. Revisit once real published graphs exist.
 
-**Repinning after a domain write (Q2 — ⏳ DECIDED 2026-10-08, not built).** KA never repins an instance automatically. After a
+**Repinning after a domain write (Q2 — ✅ built by plan-12, 2026-10-09).** KA never repins an instance automatically. After a
 promotion is applied, the graph-change page lists every instance still pinned to the previous substructure version (the
 `pinned_instances` the adapter already reports) with a Repin action; a named person repins each one, KA calls the store's own
 `repin`, and the audit records who moved which instance to which version. Until repinned, the instance's inheritance state
-shows it behind the domain. Ledger: `docs/questions/knowledge-acquisition.md` Q2.
+shows it behind the domain. Lives in `ka/graph_adapter.py` (`RepinResult`, `pinned_versions`, `repin` on both adapters — the EOS one
+calls `store.repin(..., apply=)` and maps `RepinBlocked` to an unapplied result), `ka/graph_change.py::repin` / `repin_status` /
+`awaiting_repin` (a `by` that is a policy id or a research agent is refused), routes `GET/POST /graph-changes/{id}/repin(s)`, the
+change page's "Instances pinned to this domain" table and the Dashboard count. Ledger: `docs/questions/knowledge-acquisition.md` Q2.
 
 ## 6. Research (§3.2, §16–§18) — `ka/research.py`
 
