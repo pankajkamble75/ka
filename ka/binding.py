@@ -17,7 +17,7 @@ from ka.conflict import similarity
 from ka.grammar import GrammarMismatch, GrammarRegistry
 from ka.model import GrammarBinding, KnowledgeNuggetVersion
 from ka.repository import Repository
-from ka.vocab import PREDICATES, BindingStatus, NuggetStatus
+from ka.vocab import PREDICATES, AuthorityType, BindingStatus, NuggetStatus
 
 # predicate → (edge or None, slot or None); typed_as → props.process_type; prop-fallback predicates carry no edge.
 PREDICATE_TABLE: dict[str, tuple[str | None, str | None]] = {
@@ -38,29 +38,43 @@ PREDICATE_TABLE: dict[str, tuple[str | None, str | None]] = {
 assert set(PREDICATE_TABLE) == set(PREDICATES)
 
 
+HEURISTIC_ONLY = {AuthorityType.INTERNET_RESEARCH, AuthorityType.LLM_GENERATED}   # plan-11 (Q10)
+
+
 class Binder:
     def __init__(self, registry: GrammarRegistry, repo: Repository):
         self.registry, self.repo = registry, repo
 
+    # [block plan-11] research-02 R3 (Q10): heuristic-only sources never bind without review
     def bind(self, v: KnowledgeNuggetVersion, *, method: str = "inferred") -> GrammarBinding:
+        """One binding record per call. A typed assertion whose source is heuristic-only (INTERNET_RESEARCH, LLM_GENERATED)
+        is capped at `proposed` until a reviewer approves the version — the approval re-bind passes method="approved"."""
+        b = self._compute(v, method=method)
+        if b.binding_status == BindingStatus.BOUND and v.authority_type in HEURISTIC_ONLY and method != "approved":
+            b.binding_status = BindingStatus.PROPOSED
+            b.reasons.append(f"heuristic-only source (Q10): {v.authority_type.value}; binds on a reviewer's approval")
+        return self.repo.bindings.put(b)
+    # [/block plan-11]
+
+    def _compute(self, v: KnowledgeNuggetVersion, *, method: str = "inferred") -> GrammarBinding:
         reg = self.registry
         vers = reg.versions()
         b = GrammarBinding(nugget_ref=v.ref, grammar_version=vers["grammar_version"], type_table_version=vers["type_table_version"],
                            digest=(vers["grammar_digest"] or "")[:12] + "/" + (vers["type_table_digest"] or "")[:12], method=method)
         if v.predicate is None and v.subject is None:
             b.binding_status, b.reasons = BindingStatus.NOT_APPLICABLE, ["no assertion on this version"]
-            return self.repo.bindings.put(b)
+            return b
         if not reg.loaded:
             b.binding_status, b.reasons = BindingStatus.UNRESOLVED, ["no grammar loaded (set KA_GRAMMAR_DIR or KA_ENTERPRISE_OS_ROOT)"]
-            return self.repo.bindings.put(b)
+            return b
         if reg.is_stale():
             b.binding_status, b.reasons = BindingStatus.STALE, [reg.stale_reason() or "stale"]
-            return self.repo.bindings.put(b)
+            return b
 
         kinds = reg.node_kinds()
         if v.subject is not None and v.subject.kind not in kinds:
             b.binding_status, b.reasons = BindingStatus.UNRESOLVED, [f"subject kind {v.subject.kind!r} is not an EOS node kind ({', '.join(kinds)})"]
-            return self.repo.bindings.put(b)
+            return b
 
         pred = v.predicate or "description"
         if pred == "typed_as":
@@ -80,25 +94,25 @@ class Binder:
                     b.binding_status, b.confidence = BindingStatus.UNRESOLVED, 0.0
                     b.reasons = [f"{wanted!r} is not one of the {len(names)} types in {vers['type_table_version']}"]
                 b.alternatives = ranked[:3]
-            return self.repo.bindings.put(b)
+            return b
 
         edge, slot = PREDICATE_TABLE[pred]
         if edge is None:
             b.binding_status, b.slot = BindingStatus.NOT_APPLICABLE, slot
             b.reasons = [f"{pred!r} compiles to a property, not an edge" + (f" (slot {slot})" if slot else "")]
-            return self.repo.bindings.put(b)
+            return b
         spec = reg.edge_spec(edge)
         if spec is None:
             b.binding_status, b.reasons = BindingStatus.UNRESOLVED, [f"edge {edge!r} is not in {vers['grammar_version']}"]
             b.alternatives = [e["name"] for e in reg.edge_pairs() if e["group"] == "process"][:3]
-            return self.repo.bindings.put(b)
+            return b
         b.edge, b.slot = edge, reg.slot_for_edge(edge) or slot
         b.binding_status, b.confidence = BindingStatus.BOUND, 1.0
         b.reasons = [f"{pred!r} → edge {edge!r} ({', '.join(spec.get('from', []))} → {', '.join(spec.get('to', []))}), slot {b.slot!r}"]
         if v.object is not None and v.object.kind and spec.get("to") and v.object.kind not in spec["to"]:
             b.binding_status, b.confidence = BindingStatus.PROPOSED, 0.6
             b.reasons.append(f"object kind {v.object.kind!r} is not an allowed target ({', '.join(spec['to'])})")
-        return self.repo.bindings.put(b)
+        return b
 
     def rebind_all(self) -> int:
         """After a grammar release: one new binding record per ACTIVE / PENDING version. Refuses on a stale registry."""

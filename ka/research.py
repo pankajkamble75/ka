@@ -74,7 +74,12 @@ class ResearchAgent(Protocol):
     def research(self, ctx: AgentContext) -> list[Finding]: ...
 
 
+# [block plan-11] research-02 R3 (Q10): fetched page text is fenced and declared untrusted
+from ka.prompting import UNTRUSTED_NOTICE, fence   # noqa: E402
+# [/block plan-11]
+
 _LLM_RESEARCH_PROMPT = """You are the {role} for an enterprise knowledge system. Scope: {scope}.
+""" + UNTRUSTED_NOTICE + """
 Objective: {objective}
 Research questions:
 {questions}
@@ -224,7 +229,7 @@ class InternetResearchAgent:
             fetched.append(url)
             if not got.extraction.text:
                 continue
-            items = _ask(ctx, "Internet Research Agent", f"SOURCE {url}:\n{got.extraction.text[:12000]}")
+            items = _ask(ctx, "Internet Research Agent", f"SOURCE {url}:\n{fence(got.extraction.text[:12000], 'page')}")
             out += _findings_from(ctx, items, got.source.id, got.version.id, AuthorityType.INTERNET_RESEARCH, locator=url)
         if ctx.run.discovery:
             ctx.run.discovery["fetched"] = fetched

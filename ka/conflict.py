@@ -74,13 +74,17 @@ class Analysis:
         return bool(self.conflicts)
 
 
-_EXPLAIN_PROMPT = """Two knowledge statements in an enterprise knowledge base appear to conflict.
+# [block plan-11] research-02 R3 (Q10): statements came from documents — fenced and declared untrusted
+from ka.prompting import UNTRUSTED_NOTICE, fence   # noqa: E402
+# [/block plan-11]
+
+_EXPLAIN_PROMPT = """Two knowledge statements in an enterprise knowledge base appear to conflict. """ + UNTRUSTED_NOTICE + """
 
 EXISTING (scope {es}, authority {ea}, effective {ef}):
-  "{e}"
+{e}
 
 NEW CANDIDATE (scope {cs}, authority {ca}, effective {cf}):
-  "{c}"
+{c}
 
 Return a JSON object with keys:
   why_conflict: one or two sentences on why they appear to conflict,
@@ -167,8 +171,8 @@ class ConflictDetector:
 
     def _explain(self, c: KnowledgeNuggetVersion, e: KnowledgeNuggetVersion, f: Finding) -> None:
         got = complete_json(self.provider, _EXPLAIN_PROMPT.format(
-            es=e.scope.key(), ea=e.authority_type.value, ef=e.effective_from or "n/a", e=e.statement,
-            cs=c.scope.key(), ca=c.authority_type.value, cf=c.effective_from or "n/a", c=c.statement), default=None)
+            es=e.scope.key(), ea=e.authority_type.value, ef=e.effective_from or "n/a", e=fence(e.statement, "existing"),
+            cs=c.scope.key(), ca=c.authority_type.value, cf=c.effective_from or "n/a", c=fence(c.statement, "candidate")), default=None)
         if isinstance(got, dict):
             f.llm = got
             if isinstance(got.get("both_valid"), bool):

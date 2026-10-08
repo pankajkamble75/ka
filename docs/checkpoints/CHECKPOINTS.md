@@ -2,6 +2,30 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 23:20 UTC — plan-11 work in progress: fenced prompts and the heuristic-only binding cap (research-02 R3, Q10) — committed at the author's request, NOT verified
+
+**What changed**
+
+- `ka/prompting.py` (new): `UNTRUSTED_NOTICE` and `fence(text, label)` (a closing tag inside the text is broken with a zero-width space).
+- The four document-reading prompts carry the notice and fence the content: `ka/extraction.py` (pass one), `ka/process_extraction.py`
+  (pass two), `ka/research.py` (fetched page text, `<page>`), `ka/conflict.py` (both statements of the explain prompt).
+- `ka/binding.py`: `HEURISTIC_ONLY = {INTERNET_RESEARCH, LLM_GENERATED}`; `Binder.bind` computes then caps a BOUND typed assertion from such
+  a source at `proposed` with the reason "heuristic-only source (Q10) …" unless `method="approved"`. `ka/service.py`: a
+  `knowledge.approved` subscriber registered BEFORE the graph-proposal subscriber re-binds only capped bindings with `method="approved"`.
+- `ka/console/app.js`: "heuristic-only source · binds on approval" pill on the Process assertion card.
+- `docs/implementation-plans/plan-11.md`; tracker R3 → PLANNED.
+
+**Why** — the author's Q10 decision (2026-10-08). The author asked to commit and push mid-build.
+
+**Verification** — in-process suite 210 passed (the touched suites plan-03/04/06/07 pass unmodified); ruff F clean. **plan-11's own
+test file (11 cases), live flow, architecture state and verify/upload have NOT been done** — the tracker row stays PLANNED, not
+IMPLEMENTED. Deliverables present: D1–D5 of 6; D6 (flow, docs) missing; 0 of 11 cases written.
+
+**Follow-ups / risks** — finish plan-11: `ka/tests/test_plan11_injection.py`, `e2e/plan11_injection_flow.py`, architecture §3 → ✅,
+verify, upload. Then plans 12–15.
+
+**Decisions and questions** — BUILT (partially, unverified): Q10. RAISED: none. Plan `plan-11`; research-02 R3 still PLANNED.
+
 ## 2026-10-08 22:40 UTC — plan-10: duplicates resolve as Keep Existing + evidence; revocation becomes a re-review (research-02 R1, R2; Q11, Q4)
 
 **What changed**

@@ -324,12 +324,15 @@ function extractionReport(d) {
 // [/block plan-04]
 
 // [block plan-03] process assertion + grammar binding (research-01 R2, R8)
+// [block plan-11] research-02 R3 (Q10): a binding capped because its source is heuristic-only says so
+const heuristicPill = (b) => (b && (b.reasons || []).some((r) => r.startsWith('heuristic-only source')) ? ' ' + pill('heuristic-only source · binds on approval', 'warn') : '');
+// [/block plan-11]
 const bindPill = (b) => b ? pill(b.binding_status, { bound: 'ok', proposed: 'warn', unresolved: 'halt', stale: 'halt', not_applicable: '' }[b.binding_status] || '') : pill('unbound');
 function assertionCard(d) {
   const a = d.assertion || {}, b = d.binding, g = d.grammar || {};
   if (!a.subject && !a.predicate) return `<div class="card small muted">No process assertion on this version — it is a statement only. Grammar ${esc(g.grammar_version || 'not loaded')}${g.stale ? ' · <span class="pill halt">stale</span>' : ''}.</div>`;
   const obj = a.object ? (a.object.canonical_key ? `<a href="#/subject/${encodeURIComponent(a.object.canonical_key)}">${esc(a.object.value || a.object.canonical_key)}</a> <span class="muted small">${esc(a.object.kind || '')}</span>` : esc(a.object.value || '')) : '—';
-  return `<div class="card"><h3>Process assertion ${bindPill(b)}</h3>
+  return `<div class="card"><h3>Process assertion ${bindPill(b)}${heuristicPill(b)}</h3>
     <dl class="kv"><dt>Subject</dt><dd>${a.subject ? `<a href="#/subject/${encodeURIComponent(a.subject.canonical_key)}">${esc(a.subject.name || a.subject.canonical_key)}</a> <span class="pill">${esc(a.subject.kind)}</span> <span class="mono small muted">${esc(a.subject.canonical_key)}</span>` : '—'}</dd>
     <dt>Predicate</dt><dd class="mono">${esc(a.predicate || '—')}</dd><dt>Object</dt><dd>${obj}</dd>
     ${b ? `<dt>Binds to</dt><dd>${b.process_type ? `props.process_type = <b>${esc(b.process_type)}</b>` : b.edge ? `edge <b>${esc(b.edge)}</b>${b.slot ? ` · slot <b>${esc(b.slot)}</b>` : ''}` : b.slot ? `slot <b>${esc(b.slot)}</b> (property)` : 'a property'} <span class="muted small">· ${esc(b.method)} · confidence ${b.confidence}</span></dd>

@@ -75,6 +75,9 @@ class KnowledgeAcquisition:
         # [/block plan-08]
         self.runtime_guard = RuntimeGuard(self.repo, self.bus, self.research)
         self._restore_registry()
+        # [block plan-11] research-02 R3 (Q10): approval is the reviewer's decision — re-bind first, so the proposal sees it
+        self.bus.subscribe("knowledge.approved", self._rebind_on_approval)
+        # [/block plan-11]
         if auto_propose_graph_changes:
             self.bus.subscribe("knowledge.approved", self._on_approved)
         # [block plan-10] research-02 R2: a rejected re-review retires its prior version's graph elements through a proposal;
@@ -92,6 +95,13 @@ class KnowledgeAcquisition:
         if config.get("KA_ENTERPRISE_OS_ROOT") and EnterpriseOSGraphAdapter.available():
             return EnterpriseOSGraphAdapter()
         return InMemoryGraphAdapter(path=self.repo.root / "graph_shadow.json")
+
+    def _rebind_on_approval(self, ev: dict[str, Any]) -> None:      # plan-11
+        """Only a binding capped as heuristic-only is re-bound on approval; an uncapped binding is left as it is (no duplicate record)."""
+        v = self.repo.version(ev["ref"])
+        latest = self.repo.binding_for(ev["ref"]) if v is not None else None
+        if v is not None and latest is not None and any(r.startswith("heuristic-only source") for r in latest.reasons):
+            self.binder.bind(v, method="approved")
 
     def _on_approved(self, ev: dict[str, Any]) -> None:
         v = self.repo.version(ev["ref"])
