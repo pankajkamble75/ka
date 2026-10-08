@@ -6,8 +6,15 @@ import os
 
 import pytest
 
-os.environ.setdefault("KA_LLM_PROVIDER", "stub")
+# The suite must never read the server's real `.env` (ka.config loads it with override=False, so the process env wins):
+# stub model, no search provider, no keys, Internet gate OFF — a test that wants otherwise scopes it explicitly.
+os.environ["KA_LLM_PROVIDER"] = "stub"
 os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["KA_SEARCH_PROVIDER"] = "none"
+os.environ["KA_SEARCH_API_KEY"] = ""
+os.environ["KA_SEARCH_FIXTURE"] = ""
+os.environ["KA_RESEARCH_INTERNET"] = "0"
+os.environ["KA_ACCESS_POLICY"] = "open"
 # plan-03: the fixture grammar pair (real shape, trimmed) so bindings resolve without the enterprise-os checkout
 FIXTURE_GRAMMAR = str(__import__("pathlib").Path(__file__).resolve().parent / "fixtures" / "grammar")
 os.environ.setdefault("KA_GRAMMAR_DIR", FIXTURE_GRAMMAR)

@@ -77,8 +77,8 @@ class AnthropicProvider:
         delay = 1.0
         for attempt in range(5):
             try:
-                kwargs: dict[str, Any] = dict(model=model, max_tokens=max_tokens, temperature=temperature,
-                                              messages=[{"role": "user", "content": prompt}])
+                # anthropic SDK ≥ 1.12 dropped the top-level `temperature` argument; KA's calls are deterministic-enough without it
+                kwargs: dict[str, Any] = dict(model=model, max_tokens=max_tokens, messages=[{"role": "user", "content": prompt}])
                 if system:
                     kwargs["system"] = system
                 resp = self._client.messages.create(**kwargs)

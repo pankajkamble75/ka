@@ -2,6 +2,26 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 05:05 UTC — Anthropic provider fix and test isolation from the server's `.env`
+
+**What changed**
+
+- `ka/llm/provider.py`: the Anthropic call no longer passes `temperature` — anthropic SDK 1.12 removed that top-level argument, and every
+  live model call failed with `Messages.create() got an unexpected keyword argument 'temperature'` the moment the author's key was in
+  place. A one-token real call with the configured model (`claude-sonnet-4-6`) now succeeds.
+- `ka/tests/conftest.py`: the suite pins `KA_LLM_PROVIDER=stub`, empty `ANTHROPIC_API_KEY` / `KA_SEARCH_API_KEY`, `KA_SEARCH_PROVIDER=none`,
+  `KA_RESEARCH_INTERNET=0`, `KA_ACCESS_POLICY=open` in the process environment BEFORE `ka.config` loads `.env` (override=False, so the
+  process wins). Before this, the author's `.env` (Brave key, gate on, Anthropic key) leaked into two tests and the suite made real network
+  calls (46 s, 2 red).
+- Server operations, not in git: `.env` (gitignored) now holds `KA_SEARCH_API_KEY`, `KA_SEARCH_PROVIDER=brave`, `KA_RESEARCH_INTERNET=1`
+  and `ANTHROPIC_API_KEY`; the server is started without the stub override, so the Dashboard reports provider `anthropic`, search `brave`,
+  gate on.
+
+**Verification** — in-process suite 258 passed, 2 skipped in 8.6 s (back to no network); ruff F clean. A real one-token Anthropic call
+succeeded. The first real mission with the model is recorded in the follow-up note once it completes.
+
+**Decisions and questions** — none raised. Operational: the author supplied the Anthropic key (2026-10-09) and asked for the Internet gate on.
+
 ## 2026-10-09 04:10 UTC — Q12 answered: Brave key supplied; the live search provider is on
 
 **What changed** — docs only in git. The author added the Brave key to the server's `.env` (gitignored; never committed) under a
