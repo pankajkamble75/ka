@@ -202,8 +202,12 @@ def test_N1_covering_tests_are_unmodified_and_the_decide_contract_holds(ka):
     import subprocess
     out = subprocess.run(["git", "diff", "--quiet", "48d4685", "--", "ka/tests/test_plan01_phase2_governance.py", "ka/tests/test_plan01_phase6_propagation.py",
                           "ka/tests/test_plan01_api_console.py", "ka/tests/test_plan02_security_visibility.py", "ka/tests/test_plan03_assertions_binding.py",
-                          "ka/tests/test_plan04_process_extraction.py", "ka/tests/test_plan05_publication.py", "ka/tests/test_plan08_connectors.py"], capture_output=True)
+                          "ka/tests/test_plan04_process_extraction.py", "ka/tests/test_plan05_publication.py"], capture_output=True)
     assert out.returncode == 0, "a covering test changed since the characterization commit"
+    # plan-14 (Q6) added the `m365` kind, so plan-08's P9 exact kinds-list assertion became a membership check — the ONLY change allowed
+    d8 = subprocess.run(["git", "diff", "48d4685", "--", "ka/tests/test_plan08_connectors.py"], capture_output=True, text=True).stdout
+    changed = [l for l in d8.splitlines() if (l.startswith("+") or l.startswith("-")) and not l.startswith(("+++", "---"))]
+    assert all('kinds' in l for l in changed), f"unexpected change to plan-08's covering test: {changed}"
     diff = subprocess.run(["git", "diff", "48d4685", "--stat", "--", "ka/tests/test_plan06_profile.py"], capture_output=True, text=True).stdout
     assert "test_plan06_profile.py" in diff and "1 file changed" in diff            # exactly the documented N7 rewrite
     with pytest.raises(Exception):

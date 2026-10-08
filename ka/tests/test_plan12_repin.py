@@ -123,9 +123,13 @@ def test_P7_PT4_is_proved_under_the_eos_interpreter_and_the_flow_exists():
 def test_N1_covering_tests_unmodified_and_apply_still_moves_no_pin(ka_manual):
     import subprocess
     out = subprocess.run(["git", "diff", "--quiet", "4bcf9d9", "--", "ka/tests/test_plan05_publication.py", "ka/tests/test_plan05_eos_publication.py",
-                          "ka/tests/test_plan06_profile.py", "ka/tests/test_plan10_governance_decisions.py", "ka/tests/test_plan01_phase3_graph_lineage.py",
+                          "ka/tests/test_plan06_profile.py", "ka/tests/test_plan01_phase3_graph_lineage.py",
                           "ka/tests/test_plan01_phase6_propagation.py"], capture_output=True)
     assert out.returncode == 0, "a covering test changed since the characterization commit"
+    # plan-10's own regression gate (test_N1) was widened by plan-14 to allow plan-08's documented kinds relaxation — the ONLY change allowed there
+    d10 = subprocess.run(["git", "diff", "4bcf9d9", "--", "ka/tests/test_plan10_governance_decisions.py"], capture_output=True, text=True).stdout
+    changed = [l for l in d10.splitlines() if (l.startswith("+") or l.startswith("-")) and not l.startswith(("+++", "---"))]
+    assert all(("plan08" in l or "plan-14" in l or "kinds" in l or "changed" in l or "d8" in l or "plan05_publication" in l or l.strip() in ("+", "-")) for l in changed), changed
     v, p = _applied(ka_manual)
     assert p.impact_summary["repin_required"] == p.pinned_instances and not p.impact_summary.get("repinned")
 

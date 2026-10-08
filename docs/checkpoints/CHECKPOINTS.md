@@ -23,8 +23,10 @@ Dated notes written by `upload` before each push. Newest first.
 
 **Why** — the author's Q6 decision. The registration is Q13 and the author's.
 
-**Verification** — in-process 254 passed, 2 skipped (the two live product tests gated on the author's credentials); ruff F clean; no
-protected code and `SyncService` untouched (diff confirmed). Verify recount 7/7 D, 7/7 P, 5/5 N; blocks 4/4 files. Live flow 6/6 PASS;
+**Verification** — CORRECTED in the follow-up commit: the run before e41815c was 253 passed, 1 FAILED, 2 skipped — the failure was
+plan-10's regression gate `test_N1`, which byte-compares plan-08's test file and saw the documented kinds relaxation; the pipe hid pytest's
+exit code from the commit chain. The gate now allows exactly that one change; after the fix: 254 passed, 2 skipped (the two live product
+tests gated on the author's credentials); ruff F clean; no protected code and `SyncService` untouched (diff confirmed). Verify recount 7/7 D, 7/7 P, 5/5 N; blocks 4/4 files. Live flow 6/6 PASS;
 screenshot verified. Product tests (research-02): PT1–PT4 PASS; PT5, PT6 fixture-driven PASS, live NOT RUN (Q12, Q13); PT7 awaiting plan-15.
 
 **Follow-ups / risks** — the permission mapping is a heuristic over Graph permission shapes; the sweep interval trades Graph calls
