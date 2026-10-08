@@ -9,7 +9,7 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
-| research-01 | R9 — DiscoveryAgent ahead of Internet agent; search provider decision; robots/allowlist budget (MAJOR) | plan-07 | OPEN | — | From research-01; Decision parked as Q5 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
+| research-01 | R9 — DiscoveryAgent ahead of Internet agent; search provider decision; robots/allowlist budget (MAJOR) | plan-07 | PLANNED | — | From research-01; Decision parked as Q5 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R10 — ka/connectors/ with Connector protocol; local folder first; providers decision (MAJOR) | plan-08 | OPEN | — | From research-01; Decision parked as Q6 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R11 — Decide: EOS routes found_new/grow_existing through KA gap request; grow GapIn (MAJOR) | plan-09 | OPEN | — | From research-01; Decision parked as Q7 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | OPEN | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
