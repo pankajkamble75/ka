@@ -371,6 +371,12 @@ async function addView() {
   </div><div id="add-result"></div><div id="co-result"></div>${await connectionsList()}`;
 }
 
+// [block plan-09] research-01 R11 (KA half): the gap request lifecycle in the console — principal, intent, status, Cancel
+function gapTable(rows) {
+  return `<table><tr><th>Scope</th><th>Question</th><th>Gap</th><th>Principal · intent</th><th>Status</th><th></th></tr>${rows.map((r) => `<tr><td>${scopePill(r.scope.scope_type + ':' + r.scope.scope_id)}</td><td>${esc(r.question)}${r.correlation_id ? `<div class="mono muted small">${esc(r.correlation_id)}</div>` : ''}</td><td>${esc(r.gap_description)}${(r.missing_semantics || []).length ? `<div class="muted small">missing: ${r.missing_semantics.map(esc).join(', ')}</div>` : ''}</td><td class="small">${esc(r.principal || r.requested_by)} · <span class="pill">${esc(r.intent || 'answer')}</span>${r.deduplicated_count ? `<div class="muted">raised ${r.deduplicated_count + 1}×</div>` : ''}</td><td>${pill(r.status, r.status === 'FULFILLED' ? 'ok' : r.status === 'CANCELLED' ? '' : 'warn')}${r.mission_id ? `<div class="small"><a href="#/mission/${r.mission_id}">${esc(r.mission_id)}</a></div>` : ''}</td><td>${['OPEN', 'IN_RESEARCH'].includes(r.status) ? `<button data-act="cancel-gap" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`).join('')}</table>`;
+}
+// [/block plan-09]
+
 // [block plan-08] managed connectors (research-01 R10): connect a folder, sync it, revoke it; providers beyond the folder are Q6
 function connectCard(scopeSel, authSel) {
   return `<div class="card"><h3>Connect a folder</h3><p class="small muted">A managed connection: the engine enumerates the folder, syncs new, changed, moved and deleted files as source versions (history kept), and re-resolves what changed. Cloud and enterprise providers are decision Q6.</p>
@@ -501,7 +507,7 @@ async function dashboard() {
   ${(a.graph_impact.length || a.failed_propagation.length) ? `<h3>Graph change proposals waiting</h3>${proposalRows([...a.graph_impact, ...a.failed_propagation])}` : ''}
   ${a.promotions.length ? `<h3>Promotion proposals</h3><table><tr><th>Statement</th><th>Target</th><th>Instances</th><th></th></tr>${a.promotions.map((p) => `<tr><td>${esc(p.statement)}</td><td>${scopePill(p.target_scope.scope_type + ':' + p.target_scope.scope_id)}</td><td>${p.instance_ids.join(', ')}</td><td class="actions"><button class="primary" data-act="promote" data-id="${p.id}" data-approve="1">Promote</button><button data-act="promote" data-id="${p.id}" data-approve="0">Reject</button></td></tr>`).join('')}</table>` : ''}
   ${(a.revoked_sources_with_active_knowledge || []).length ? `<h3>Sources revoked at their connector, with active knowledge</h3><table><tr><th>Source</th><th>Revoked</th><th>Active nuggets</th></tr>${a.revoked_sources_with_active_knowledge.map((r) => `<tr><td><a href="#/source/${r.source_id}">${esc(r.title)}</a></td><td class="small">${when(r.revoked_at)}</td><td class="small">${r.active_nuggets.map((x) => `<a href="#/nugget/${encodeURIComponent(x)}">${esc(x)}</a>`).join(', ')}<div class="muted">${esc(r.note)}</div></td></tr>`).join('')}</table>` : ''}
-  ${a.acquisition_requests.length ? `<h3>Graph gaps reported by the runtime</h3><table><tr><th>Scope</th><th>Question</th><th>Gap</th></tr>${a.acquisition_requests.map((r) => `<tr><td>${scopePill(r.scope.scope_type + ':' + r.scope.scope_id)}</td><td>${esc(r.question)}</td><td>${esc(r.gap_description)}</td></tr>`).join('')}</table>` : ''}
+  ${a.acquisition_requests.length ? `<h3>Graph gaps reported by the runtime</h3>${gapTable(a.acquisition_requests)}` : ''}
   ${!Object.values(q).some((v) => v) ? '<div class="empty">All queues are empty.</div>' : ''}
   <div class="actions"><button data-act="detect-promotions">Detect repeated instance patterns</button></div>
   <h2>Recent activity</h2>${auditTable(d.recent_audit.slice().reverse())}
@@ -611,6 +617,7 @@ async function act(b) {
     const sr = await api(`/connectors/${r.connection.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' });
     toast(`Connected · synced: ${sr.report.new} new, ${sr.report.candidates} candidates`); render(); return;
   }
+  if (a === 'cancel-gap') { const reason = prompt('Reason for cancelling this gap request?') || ''; await api(`/runtime/requests/${b.dataset.id}/cancel?by=${encodeURIComponent(who())}&reason=${encodeURIComponent(reason)}`, { method: 'POST' }); toast('Gap request cancelled'); render(); return; }
   if (a === 'sync-conn') { const sr = await api(`/connectors/${b.dataset.id}/sync?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Synced: ${sr.report.new} new · ${sr.report.modified} modified · ${sr.report.moved} moved · ${sr.report.deleted} deleted · ${sr.report.permission_changed} permissions · ${sr.report.candidates} candidates`); render(); return; }
   if (a === 'revoke-conn') { if (!confirm('Revoke this connection? Synced sources stay; nothing new is pulled.')) return; await api(`/connectors/${b.dataset.id}/revoke?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast('Connection revoked'); render(); return; }
   if (a === 'run-mission') { const r = await api(`/research/missions/${b.dataset.id}/run`, { method: 'POST' }); toast(`Run ${r.run.status}`); render(); return; }

@@ -7,7 +7,7 @@ from /console. Nothing here is a question-answering endpoint (§43).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -203,6 +203,12 @@ class GapIn(BaseModel):
     gap_description: str
     requested_by: str = "runtime"
     open_mission: bool = False
+    # [block plan-09] research-01 R11 (KA half)
+    principal: str | None = None
+    intent: Literal["found_new", "grow_existing", "answer", "other"] = "answer"
+    missing_semantics: list[str] = []
+    correlation_id: str | None = None
+    # [/block plan-09]
 
 
 # ------------------------------------------------------------------------------------ routers
@@ -738,8 +744,34 @@ def search(q: str = "", filter: str = "All Knowledge", scope_type: str | None = 
 @router.post("/runtime/graph-gap")
 def graph_gap(body: GapIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     out = ka.runtime_guard.graph_gap_detected(scope=Scope(scope_type=body.scope_type, scope_id=body.scope_id), question=body.question,
-                                              gap_description=body.gap_description, requested_by=body.requested_by, open_mission=body.open_mission)
-    return {"signal": out.signal, "request_id": out.request_id, "mission_id": out.mission_id}
+                                              gap_description=body.gap_description, requested_by=body.requested_by, open_mission=body.open_mission,
+                                              principal=body.principal, intent=body.intent, missing_semantics=body.missing_semantics,
+                                              correlation_id=body.correlation_id)
+    return {"signal": out.signal, "request_id": out.request_id, "mission_id": out.mission_id, "deduplicated": out.deduplicated}
+
+
+# plan-09 — the request lifecycle (research-01 R11 KA half; the EOS caller is Q7)
+@router.get("/runtime/requests")
+def list_requests(status: str | None = None, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return {"requests": [r.model_dump(mode="json") for r in ka.runtime_guard.requests(status)]}
+
+
+@router.get("/runtime/requests/{request_id}")
+def get_request(request_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    r = ka.repo.requests.get(request_id)
+    if r is None:
+        raise HTTPException(404, "request not found")
+    return {"request": r.model_dump(mode="json")}
+
+
+@router.post("/runtime/requests/{request_id}/cancel")
+def cancel_request(request_id: str, by: str = "user", reason: str = "", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.requests.get(request_id) is None:
+        raise HTTPException(404, "request not found")
+    try:
+        return {"request": ka.runtime_guard.cancel(request_id, by=by, reason=reason).model_dump(mode="json")}
+    except ValueError as e:
+        raise HTTPException(409, str(e))
 
 
 # ---- grammar, bindings, subjects (research-01 R2, R8 — plan-03)
@@ -876,8 +908,10 @@ def audit(object_id: str | None = None, limit: int = 200, ka: KnowledgeAcquisiti
 
 
 @router.get("/events")
-def events(limit: int = 200, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
-    return {"events": ka.repo.events()[-limit:]}
+def events(limit: int = Query(200, ge=0), after: int | None = None, tail: bool = False, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    # plan-09 (R15): an outbox read — `after=<seq>` resumes exactly; `tail=1` keeps the old "last N" view for the console
+    evs = ka.repo.events(after=after, limit=limit, tail=tail)
+    return {"events": evs, "next_after": evs[-1]["seq"] if evs else (after if after is not None else 0), "version": ka.repo.EVENTS_VERSION}
 
 
 @router.get("/vocab")

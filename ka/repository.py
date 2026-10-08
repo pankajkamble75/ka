@@ -231,11 +231,36 @@ class Repository:
     def audit(self) -> list[AuditRecord]:
         return [AuditRecord.model_validate(r) for r in read_jsonl(self.audit_log)]
 
-    def append_event(self, rec: dict) -> None:
-        append_jsonl(self.event_log, rec)
+    # [block plan-09] research-01 R15: events.jsonl is the outbox — every record carries a monotonic `seq` and a schema
+    # `version`; records written before this plan are served with their 1-based line number so `after=` is total.
+    EVENTS_VERSION = "ka-events/1"
 
-    def events(self) -> list[dict]:
-        return list(read_jsonl(self.event_log))
+    def _last_seq(self) -> int:
+        if getattr(self, "_seq", None) is None:
+            n = 0
+            for i, r in enumerate(read_jsonl(self.event_log), start=1):
+                n = max(n, int(r.get("seq") or i))
+            self._seq = n
+        return self._seq
+
+    def append_event(self, rec: dict) -> None:
+        seq = self._last_seq() + 1
+        rec = {**rec, "seq": seq, "version": self.EVENTS_VERSION}
+        append_jsonl(self.event_log, rec)
+        self._seq = seq
+
+    def events(self, after: int | None = None, limit: int | None = None, tail: bool = False) -> list[dict]:
+        out = []
+        for i, r in enumerate(read_jsonl(self.event_log), start=1):
+            if "seq" not in r:
+                r = {**r, "seq": i, "version": "ka-events/0"}
+            if after is not None and r["seq"] <= after:
+                continue
+            out.append(r)
+        if limit is not None:
+            out = out[-limit:] if tail else out[:limit]
+        return out
+    # [/block plan-09]
 
     # ---- scope helpers --------------------------------------------------------------------------
 

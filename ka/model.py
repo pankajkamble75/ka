@@ -450,7 +450,19 @@ class KnowledgeAcquisitionRequest(BaseModel):
     requested_by: str = "runtime"
     created_at: str = Field(default_factory=now_iso)
     mission_id: str | None = None
-    status: str = "OPEN"
+    status: str = "OPEN"                            # OPEN | IN_RESEARCH | FULFILLED | CANCELLED
+    # [block plan-09] research-01 R11 (KA half): the richer contract — who asked, with what grammar intent, what is missing,
+    # and a correlation id; dedupe while open; a lifecycle with cancel and fulfilment. Whether EOS calls it is Q7.
+    principal: str = "runtime"
+    intent: str = "answer"                          # found_new | grow_existing | answer | other
+    missing_semantics: list[str] = Field(default_factory=list)
+    correlation_id: str | None = None
+    dedupe_key: str = ""
+    updated_at: str = Field(default_factory=now_iso)
+    fulfilled_by: list[str] = Field(default_factory=list)
+    cancelled_reason: str | None = None
+    deduplicated_count: int = 0
+    # [/block plan-09]
 
 
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)

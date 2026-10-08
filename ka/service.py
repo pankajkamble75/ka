@@ -77,6 +77,9 @@ class KnowledgeAcquisition:
         self._restore_registry()
         if auto_propose_graph_changes:
             self.bus.subscribe("knowledge.approved", self._on_approved)
+        # [block plan-09] research-01 R11: an approved candidate from a gap's mission fulfils the request
+        self.bus.subscribe("knowledge.approved", lambda ev: self.runtime_guard.fulfil_from_approval(ev["ref"]))
+        # [/block plan-09]
 
     # ---- wiring --------------------------------------------------------------------------------------
 

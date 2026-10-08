@@ -46,6 +46,10 @@ source, location updated; deleted → `Source.revoked_at`, versions and derived 
 permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. Cloud and
 enterprise providers are decision Q6.
 
+**Store size (plan-09, R16 benchmark half).** `tools/bench_store.py` fills a fresh repository and times cold load, status and
+scope queries, search, put and get; the measured 10k and 100k rows are in `docs/research/benchmarks/store-bench-2026-10-08.md`.
+The numbers are evidence for a later decision; this plan changes nothing about the store.
+
 ## 3. Scope and inheritance (§7–§9, §24) — `ka/scope.py`
 
 `ScopeRegistry` is configuration: `STRUCTURE ⊃ PARENT_DOMAIN ⊃ DOMAIN ⊃ INSTANCE`. enterprise-os has no Parent Domain in
@@ -171,6 +175,20 @@ No new tab while Q8 is parked.
 
 `ka.events.EventBus` — the §38 names, payloads are ids (a value longer than 200 chars is refused), every event appended to `events.jsonl`.
 `ka.audit.Auditor.record` on every state change → `audit.jsonl`; `GET /audit?object_id=` reconstructs any object's history.
+
+**Events as an outbox (plan-09, R15).** `events.jsonl` is the durable, ordered log KA already had; `Repository.append_event` now
+stamps every record with a monotonic `seq` and `version: "ka-events/1"` (records from before plan-09 are served with their
+1-based line number and `ka-events/0`). `GET /events?after=<seq>&limit=` returns records ascending with `next_after`, so any
+consumer (EOS included) reads at-least-once by remembering `seq`; `tail=1` keeps the "last N" view. A broker is a later
+decision, taken on a measured need.
+
+**The gap request lifecycle (plan-09, R11 KA half).** `KnowledgeAcquisitionRequest` carries `principal`, `intent`
+(`found_new | grow_existing | answer | other`), `missing_semantics`, `correlation_id` and a `dedupe_key`; the same gap raised
+while a request is OPEN or IN_RESEARCH returns that request (`GapOutcome.deduplicated`). `open_mission=True` puts it
+IN_RESEARCH; approving a candidate from that mission marks it FULFILLED (`ka/service.py` subscriber → `RuntimeGuard.fulfil_from_approval`);
+`cancel` works from the live states only. Routes `GET /runtime/requests[?status=]`, `GET /runtime/requests/{id}`,
+`POST /runtime/requests/{id}/cancel`; the Dashboard's needs-attention table shows principal · intent, status and Cancel.
+The door (`retrieve_for_answer`) is unchanged. **Whether EOS calls this contract is Q7.**
 
 ## 10. Security (§42)
 

@@ -2,6 +2,52 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 20:20 UTC — plan-09: the gap request contract (KA half), events as an outbox, the store benchmark (research-01 R11, R15, R16)
+
+**What changed**
+
+- *Gap requests (R11, KA half; PROTECTED)* `ka/model.py`: `KnowledgeAcquisitionRequest` gains `principal`, `intent`, `missing_semantics`,
+  `correlation_id`, `dedupe_key`, `updated_at`, `fulfilled_by`, `cancelled_reason`, `deduplicated_count`; status lifecycle OPEN →
+  IN_RESEARCH → FULFILLED | CANCELLED. `ka/runtime_guard.py`: `graph_gap_detected` validates the intent, dedupes against live
+  requests (same scope + normalised question, or the correlation id) and returns `GapOutcome.deduplicated`; `open_mission` →
+  IN_RESEARCH; new `get`, `requests`, `cancel`, `fulfil`, `fulfil_from_approval`; `open_requests` counts both live states;
+  `retrieve_for_answer` untouched. `ka/service.py`: a `knowledge.approved` subscriber fulfils the request whose mission produced the
+  approved ref. `ka/api.py`: `GapIn` fields; `GET /runtime/requests[?status]`, `GET /runtime/requests/{id}`, `POST …/cancel` (409 when
+  terminal). `ka/console/app.js`: needs-attention gap table with principal · intent, status, mission link, Cancel.
+- *Outbox (R15)* `ka/repository.py`: `append_event` stamps `seq` + `version: ka-events/1` (counter resumed from the file);
+  `events(after=, limit=, tail=)` serves pre-plan records with their line number; `GET /events?after=&limit=&tail=` returns
+  `next_after` and `version`.
+- *Benchmark (R16 half)* `tools/bench_store.py`; results and reading in `docs/research/benchmarks/store-bench-2026-10-08.md`
+  (10k: cold load 0.50 s, search 279 ms; 100k: 8.47 s, 3682 ms, 126 MB).
+- *Docs/tests*: architecture §2 (store size), §9 (outbox, request lifecycle); `docs/protected.md` runtime-guard row re-verified;
+  `plan-09.md`; `ka/tests/test_plan09_gap_requests.py` (15 cases); `e2e/plan09_gap_requests_flow.py`.
+
+**Why**
+
+research-01 §6 and §8: the KA side of the gap contract is cheap and makes scenario A10 possible whichever way Q7 goes; the event
+log was already durable and ordered and only lacked a cursor; and nobody should argue about a store migration without the numbers.
+
+**Verification**
+
+- Protected protocol for `ka/runtime_guard.py`: characterization committed first (67df074, green against the unchanged file); the
+  covering test `test_plan01_phase4_corrections.py::test_N1` passes UNMODIFIED (diff empty); Verified date bumped in `docs/protected.md`;
+  P1's identical-question case was the behaviour this plan changes — rewritten to distinct questions with the reason in its docstring.
+- `pytest ka/tests` (in-process) → 196 passed; EOS path → 7 passed; ruff F clean (style rules E501 etc. are pre-existing noise, 117 on
+  the committed tree). Verify recount: 9/9 deliverables, 9/9 positive, 6/6 negative; blocks 7/7 files found, none undeclared.
+- Live: `e2e/plan09_gap_requests_flow.py` 7/7 PASS (gap twice → one request; dashboard shows principal/intent/status and "raised 2×";
+  Cancel; `GET /events?after=` resumes exactly); screenshots verified.
+- Product tests (research-01, 8 defined): PT1–PT8 PASS (none names R11/R15/R16).
+
+**Follow-ups / risks**
+
+- Search at 100k is linear (3.7 s); an index or migration is a decision for the author with these numbers in hand.
+- Nothing in EOS calls the gap contract yet (Q7).
+
+**Decisions and questions**
+
+- Plan `plan-09`; research points R11 (KA half), R15, R16 (benchmark half) → UPLOADED. R11's EOS half, R13, R14 remain parked (Q7, Q8, Q9).
+- BUILT: `knowledge-acquisition.md` §9 paragraphs (outbox; request lifecycle), §2 store-size note. RAISED: none new.
+
 ## 2026-10-08 19:25 UTC — plan-08: managed connectors — the contract, a local-folder connector, incremental sync that keeps history (research-01 R10)
 
 **What changed**
