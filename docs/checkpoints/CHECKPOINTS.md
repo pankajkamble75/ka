@@ -2,6 +2,48 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 18:40 UTC — plan-07: discovery before fetching — provider seam, allow-list and robots budget, provenance on every page (research-01 R9)
+
+**What changed**
+
+- *Discovery* `ka/discovery.py` (new): `SearchResult`, `SearchProvider` protocol, `NullSearchProvider`, `FixtureSearchProvider` (JSON
+  file; exact query then token overlap), `select_provider` (unknown value fails closed to `none`), `canonical_url` (fragments and
+  tracking parameters dropped, host lowercased), `RobotsCache` (per host, through plan-02's `safe_fetch` resolved at call time;
+  unreachable = allowed, recorded), `DiscoveryAgent` (queries from objective + questions; dedupe → allow-list → URL guard → robots →
+  overlap ranking → per-mission budget; every skip with its reason; gate off = no network at all, selections recorded as skipped).
+- *Research* `ka/research.py`: `AgentContext.discovered`; discovery first in the coordinator; the Internet agent fetches the selection
+  (plus explicit URLs) with provenance metadata. `ka/ingestion.py::link(metadata=)` stamps `retrieved_at`. `ka/model.py`:
+  `ResearchRun.discovery`. `ka/config.py`: six settings. `ka/service.py`: provider + gate on the dashboard (one line).
+- *API/console* `ka/api.py`: `GET /research/providers`. `ka/console/app.js`: discovery table on the mission page; Dashboard line.
+- *Docs/tests*: architecture §6 paragraph; `.env.example`; `plan-07.md`; `ka/tests/fixtures/search_fixture.json`;
+  `ka/tests/test_plan07_discovery.py` (15 cases, network patched); `e2e/plan07_discovery_flow.py` + `e2e/search_fixture_live.json`.
+
+**Why**
+
+research-01 R9: a general research question produced only model recollections; URLs had to be named up front. Discovery turns the
+question into search, selects responsibly (allow-list, robots, budget, URL safety) and hands fetching to the guarded agent, so an
+internet-sourced candidate carries a canonical URL, publisher, retrieval time and the query that found it — and a model answer never
+poses as one (authority `LLM_GENERATED` vs `INTERNET_RESEARCH`). The provider itself stays the author's decision (Q5).
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 165 passed; EOS path (unchanged areas) → 7 passed; ruff F clean. Verify recount: 9/9 deliverables,
+  9/9 positive, 7/7 negative; blocks 7/7, plus one unmarked one-line field in `ka/service.py` (finding).
+- No protected code touched (diff confirmed).
+- Live: server with the fixture provider and the gate OFF; `e2e/plan07_discovery_flow.py` 5/5 PASS; screenshot verified (mission page
+  with the discovery table: provider, queries, publisher, skips).
+- Product tests (research-01): **PT7 PASS** (this plan, with the fixture provider and patched fetches); PT1–PT6 PASS; PT8 FAIL (plan-08).
+
+**Follow-ups / risks**
+
+- PT7 is green with the fixture provider; against a real provider it waits on Q5 and a key.
+- Robots are honoured only when the gate is on (a gate-off run makes no network calls by design).
+
+**Decisions and questions**
+
+- Plan `plan-07`; research point R9 → UPLOADED.
+- BUILT: `knowledge-acquisition.md` §6 "Discovery" paragraph. RAISED: none new; Q5 remains parked.
+
 ## 2026-10-08 17:50 UTC — plan-06: the process profile — composed, evidence-linked, with coverage and the unknowns (research-01 R12)
 
 **What changed**

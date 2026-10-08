@@ -245,7 +245,7 @@ async function missionView(id) {
   ${m.research_questions.length ? `<div class="card"><h3>Research questions</h3><ul>${m.research_questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></div>` : ''}
   <div class="actions"><button class="primary" data-act="run-mission" data-id="${m.mission_id}">Run again</button></div>
   <h2>Candidate nuggets <span class="muted">${d.candidates.length}</span></h2>${nuggetRows(d.candidates, (n) => ['PENDING_REVIEW', 'CONFLICT'].includes(n.status) ? decideBtns(n.ref) : '')}
-  <h2>Research runs</h2>${d.runs.map((r) => `<div class="card small"><b>${r.run_id}</b> ${pill(r.status)} · agent ${esc(r.agent_id)} · model ${esc(r.model || '—')} · ${when(r.started_at)} → ${when(r.completed_at)}<br>${r.sources_examined.length} sources examined · ${r.evidence_created.length} evidence · ${r.candidate_nuggets_created.length} candidates · tokens ${esc(JSON.stringify(r.token_usage))} · cost $${r.cost}${r.notes ? `<div class="muted">${esc(r.notes)}</div>` : ''}${r.errors.length ? `<div class="quote">${esc(r.errors.join('\n'))}</div>` : ''}</div>`).join('') || '<div class="empty">Not run yet.</div>'}
+  <h2>Research runs</h2>${d.runs.map((r) => `<div class="card small"><b>${r.run_id}</b> ${pill(r.status)} · agent ${esc(r.agent_id)} · model ${esc(r.model || '—')} · ${when(r.started_at)} → ${when(r.completed_at)}<br>${r.sources_examined.length} sources examined · ${r.evidence_created.length} evidence · ${r.candidate_nuggets_created.length} candidates · tokens ${esc(JSON.stringify(r.token_usage))} · cost $${r.cost}${r.notes ? `<div class="muted">${esc(r.notes)}</div>` : ''}${r.errors.length ? `<div class="quote">${esc(r.errors.join('\n'))}</div>` : ''}${discoveryTable(r.discovery)}</div>`).join('') || '<div class="empty">Not run yet.</div>'}
   <h2>Sources discovered</h2>${d.sources_discovered.length ? `<table><tr><th>Source</th><th>Type</th><th>Authority</th></tr>${d.sources_discovered.map((s) => `<tr><td><a href="#/source/${s.id}">${esc(s.title)}</a></td><td>${esc(s.source_type)}</td><td class="small">${esc(s.authority_type)}</td></tr>`).join('')}</table>` : '<div class="empty">None recorded.</div>'}`;
 }
 
@@ -265,6 +265,18 @@ async function addView() {
 
 
 const scopeOptions = (scopes, selected = '') => scopes.map((s) => `<option value="${s.scope_type}|${esc(s.scope_id)}" ${`${s.scope_type}|${s.scope_id}` === selected ? 'selected' : ''}>${esc(s.name)} · ${s.scope_type.toLowerCase().replace('_', ' ')}</option>`).join('');
+
+// [block plan-07] discovery table on the mission page (research-01 R9)
+function discoveryTable(d) {
+  if (!d || !d.provider) return '';
+  const sel = d.selected || [], skipped = d.skipped || [], fetched = new Set(d.fetched || []);
+  return `<div style="margin-top:10px"><b>Discovery</b> · provider <span class="pill">${esc(d.provider)}</span> · ${(d.queries || []).length} queries · ${d.results} results · budget ${d.budget} · robots ${d.robots ? 'on' : 'off'}${(d.allowed_domains || []).length ? ` · domains ${d.allowed_domains.map(esc).join(', ')}` : ''}
+    ${(d.notes || []).length ? `<div class="muted">${d.notes.map(esc).join(' · ')}</div>` : ''}
+    ${(d.queries || []).length ? `<div class="muted">Queries: ${d.queries.map((q) => `“${esc(q)}”`).join(', ')}</div>` : ''}
+    ${sel.length ? `<table><tr><th>#</th><th>Selected</th><th>Publisher</th><th>Published</th><th>Status</th></tr>${sel.map((r) => `<tr><td>${r.rank}</td><td><a href="${esc(r.url)}" target="_blank">${esc(r.title || r.url)}</a><div class="muted">${esc(r.url)}</div></td><td>${esc(r.publisher || '—')}</td><td>${esc(r.published_at || 'unknown')}</td><td>${fetched.has(r.url) ? pill('fetched', 'ok') : pill('not fetched', 'warn')}</td></tr>`).join('')}</table>` : '<div class="muted">nothing selected</div>'}
+    ${skipped.length ? `<details><summary>${skipped.length} skipped</summary><table><tr><th>URL</th><th>Reason</th></tr>${skipped.map((x) => `<tr><td class="mono">${esc(x.url)}</td><td>${esc(x.reason)}</td></tr>`).join('')}</table></details>` : ''}</div>`;
+}
+// [/block plan-07]
 
 // [block plan-06] the process profile (research-01 R12)
 const fieldLine = (f) => `<li><a href="#/nugget/${encodeURIComponent(f.ref)}">${esc(f.value || f.statement)}</a>${f.object_key ? ` <a class="small muted" href="#/subject/${encodeURIComponent(f.object_key)}">${esc(f.object_kind || '')}</a>` : ''}
@@ -452,6 +464,7 @@ async function dashboard() {
     <div class="small">${d.grammar.loaded ? `${esc(d.grammar.grammar_version)} · ${esc(d.grammar.type_table_version)} · ${d.grammar.types.length} process types · ${d.grammar.edges.length} edge pairs · ${d.grammar.slots.length} slots · ${d.grammar.bindings} bindings on ${d.grammar.subjects} subjects<div class="mono muted">${esc(d.grammar.source_dir)}</div>` : 'Set KA_GRAMMAR_DIR (or KA_ENTERPRISE_OS_ROOT) to bind assertions to EOS process types and edges. Until then every binding is unresolved.'}
     ${d.grammar.stale ? `<div class="quote">${esc(d.grammar.stale_reason)}</div>` : ''}</div>
     <div class="actions"><button data-act="grammar-refresh">Refresh grammar</button>${d.grammar.stale ? `<button class="danger" data-act="grammar-refresh" data-force="1">Accept changed files (force)</button>` : ''}<button data-act="rebind-all">Rebind all</button></div></div>
+  <div class="card small"><b>Research discovery</b> · search provider <span class="pill">${esc((d.research && d.research.search_provider) || 'none')}</span> · internet gate ${d.research && d.research.internet_gate ? pill('on', 'ok') : pill('off', 'warn')} · the provider itself is decision Q5</div>
   <h2>Scopes</h2><table><tr><th>Scope</th><th>Type</th><th class="num">Active</th><th class="num">Pending</th></tr>${d.scopes.map((s) => `<tr><td><a href="#/browse?scope=${s.scope_type}|${encodeURIComponent(s.scope_id)}">${esc(s.name)}</a></td><td>${scopePill(s.scope_type)}</td><td class="num">${s.active}</td><td class="num">${s.pending}</td></tr>`).join('')}</table>
   <div class="card" style="margin-top:12px"><h3>Register a scope</h3><div class="row"><div><label>Type</label><select id="sc-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option selected>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="sc-id" placeholder="merchant-acquiring"></div><div><label>Name</label><input id="sc-name" placeholder="Merchant Acquiring"></div><div><label>Parent (key)</label><input id="sc-parent" placeholder="PARENT_DOMAIN:payment-processing"></div><button class="primary" data-act="register-scope">Register</button></div></div>
   <div class="grid2">

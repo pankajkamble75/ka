@@ -331,6 +331,9 @@ class ResearchRun(BaseModel):
     status: RunStatus = RunStatus.STARTED
     errors: list[str] = Field(default_factory=list)
     notes: str = ""
+    # [block plan-07] research-01 R9: what discovery searched, selected, fetched and skipped (with reasons)
+    discovery: dict[str, Any] = Field(default_factory=dict)
+    # [/block plan-07]
 
     @property
     def id(self) -> str:

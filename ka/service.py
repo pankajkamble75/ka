@@ -179,7 +179,9 @@ class KnowledgeAcquisition:
                         "active_by_scope_type": by_scope_type, "by_channel": by_channel, "active_by_authority": by_authority},
             "graph": {"proposals_by_status": proposals, "dependencies": len(self.repo.dependencies.where(lambda d: d.active)),
                       "elements_with_lineage": len({(d.graph_id, d.element_id) for d in self.repo.dependencies.where(lambda d: d.active)})},
-            "research": {"missions_by_status": missions, "runs": len(self.repo.runs), "cost_usd": round(sum(r.cost for r in self.repo.runs), 4)},
+            "research": {"missions_by_status": missions, "runs": len(self.repo.runs), "cost_usd": round(sum(r.cost for r in self.repo.runs), 4),
+                         "search_provider": __import__("ka.discovery", fromlist=["select_provider"]).select_provider()[0].name,   # plan-07
+                         "internet_gate": bool(config.get("KA_RESEARCH_INTERNET"))},
             "corrections": {"total": len(self.repo.corrections), "pending": len(self.corrections.pending())},
             "queues": {k: len(v) for k, v in att.items()},
             "attention": att,

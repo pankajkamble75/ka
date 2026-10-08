@@ -53,8 +53,12 @@ class IngestionService:
 
     def link(self, *, url: str, owner: str, scope: Scope | None = None, title: str | None = None,
              authority: AuthorityType = AuthorityType.EXTERNAL_REFERENCE, visibility: Visibility = Visibility.ENTERPRISE,
-             fetch: bool = True, prefetched: bytes | None = None, timeout: float = 20.0) -> Ingested:
+             fetch: bool = True, prefetched: bytes | None = None, timeout: float = 20.0, metadata: dict | None = None) -> Ingested:
         st = SourceType.GITHUB if "github.com" in url else SourceType.URL
+        # [block plan-07] provenance from discovery (canonical_url, publisher, published_at, query, discovered_rank) + retrieved_at
+        from ka.timeutil import now_iso as _now
+        metadata = {**(metadata or {}), "retrieved_at": _now()}
+        # [/block plan-07]
         data = prefetched
         note = None
         # [block plan-02]
@@ -82,7 +86,7 @@ class IngestionService:
             data = b""
             note = "not fetched"
         got = self._ingest(title=title or url, data=data, source_type=st, owner=owner, scope=scope, authority=authority,
-                           visibility=visibility, location=url)
+                           visibility=visibility, location=url, metadata=metadata)
         if note:
             got.version.extraction_status = ExtractionStatus.FAILED if ("failed" in note or "blocked" in note) else ExtractionStatus.PENDING
             got.version.extraction_note = note

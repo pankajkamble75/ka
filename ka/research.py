@@ -65,6 +65,7 @@ class AgentContext:
     ingestion: IngestionService
     provider: LLMProvider | None
     usage: LLMUsage = field(default_factory=LLMUsage)
+    discovered: list = field(default_factory=list)       # plan-07: SearchResults the discovery agent selected
 
 
 class ResearchAgent(Protocol):
@@ -193,35 +194,42 @@ class StandardsRegulatoryAgent:
 
 
 class InternetResearchAgent:
-    """Fetches URLs the mission names in preferred_source_types / research_questions when KA_RESEARCH_INTERNET is on."""
+    """Fetches the URLs discovery selected (plan-07) plus any the mission names explicitly, when KA_RESEARCH_INTERNET is on."""
     agent_id = "agent.internet_research"
 
     def research(self, ctx: AgentContext) -> list[Finding]:
         if not config.get("KA_RESEARCH_INTERNET"):
             ctx.run.notes += "internet research disabled (KA_RESEARCH_INTERNET=0); "
             return []
-        urls = [u for u in ctx.mission.preferred_source_types + ctx.mission.research_questions if u.startswith("http")]
+        # [block plan-07]
+        explicit = [u for u in ctx.mission.preferred_source_types + ctx.mission.research_questions if u.startswith("http")]
+        targets: list[tuple[str, dict]] = [(r.url, {"canonical_url": r.url, "publisher": r.publisher, "published_at": r.published_at,
+                                                     "query": r.query, "discovered_rank": r.rank, "title": r.title}) for r in ctx.discovered]
+        targets += [(u, {"canonical_url": u, "publisher": None, "published_at": None, "query": None, "discovered_rank": None}) for u in explicit[:5]]
         out: list[Finding] = []
-        for url in urls[:5]:
-            # [block plan-02]
+        fetched: list[str] = []
+        for url, meta in targets:
             ok, why = is_safe_url(url)
             if not ok:
                 ctx.run.errors.append(f"{url}: blocked: {why}")
                 continue
-            # [/block plan-02]
             try:
-                got = ctx.ingestion.link(url=url, owner=ctx.mission.created_by,
+                got = ctx.ingestion.link(url=url, owner=ctx.mission.created_by, title=meta.get("title") or None,
                                          scope=Scope(scope_type=ctx.mission.scope_type, scope_id=ctx.mission.scope_id),
-                                         authority=AuthorityType.INTERNET_RESEARCH, visibility=ctx.mission.permitted_visibility)
+                                         authority=AuthorityType.INTERNET_RESEARCH, visibility=ctx.mission.permitted_visibility, metadata=meta)
             except httpx.HTTPError as e:  # pragma: no cover
                 ctx.run.errors.append(f"{url}: {e}")
                 continue
             ctx.run.sources_examined.append(got.source.id)
+            fetched.append(url)
             if not got.extraction.text:
                 continue
             items = _ask(ctx, "Internet Research Agent", f"SOURCE {url}:\n{got.extraction.text[:12000]}")
             out += _findings_from(ctx, items, got.source.id, got.version.id, AuthorityType.INTERNET_RESEARCH, locator=url)
+        if ctx.run.discovery:
+            ctx.run.discovery["fetched"] = fetched
         return out
+        # [/block plan-07]
 
 
 class LLMKnowledgeAgent:
@@ -292,8 +300,9 @@ class ResearchOrchestrator:
                  agents: list[ResearchAgent] | None = None):
         self.repo, self.bus, self.auditor, self.ingestion = repo, bus, auditor, ingestion
         self.governance, self.registry, self.provider = governance, registry, provider
+        from ka.discovery import DiscoveryAgent
         self.agents: list[ResearchAgent] = agents if agents is not None else [
-            EnterpriseContentAgent(registry), DomainResearchAgent(), StandardsRegulatoryAgent(), InternetResearchAgent(), LLMKnowledgeAgent()]
+            DiscoveryAgent(), EnterpriseContentAgent(registry), DomainResearchAgent(), StandardsRegulatoryAgent(), InternetResearchAgent(), LLMKnowledgeAgent()]
         self.synthesis = SynthesisAgent(repo, governance, registry)
         governance.research_agent_ids |= {a.agent_id for a in self.agents} | {self.synthesis.agent_id}
         governance.on_more_research = self._more_research

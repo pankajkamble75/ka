@@ -623,6 +623,18 @@ def mission(mission_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict
     return {"mission": m.model_dump(mode="json"), "runs": runs, "candidates": cands, "sources_discovered": sources}
 
 
+# [block plan-07] discovery provider status (research-01 R9; the provider itself is Q5)
+@router.get("/research/providers")
+def research_providers(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.discovery import select_provider
+    provider, note = select_provider()
+    return {"search_provider": provider.name, "note": note, "fixture": config.get("KA_SEARCH_FIXTURE") or None,
+            "internet_gate": bool(config.get("KA_RESEARCH_INTERNET")), "respect_robots": bool(config.get("KA_RESPECT_ROBOTS")),
+            "allowed_domains": [d.strip() for d in (config.get("KA_ALLOWED_DOMAINS") or "").split(",") if d.strip()],
+            "budget": config.get("KA_DISCOVERY_BUDGET"), "results_per_query": config.get("KA_DISCOVERY_RESULTS"), "decision": "Q5"}
+# [/block plan-07]
+
+
 # ---- promotion (§25)
 
 @router.post("/promotions/detect/{scope_type}/{scope_id}")

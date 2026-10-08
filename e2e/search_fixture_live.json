@@ -1,0 +1,10 @@
+{
+  "Visa dispute processing rules": [
+    {"url": "https://www.example.com/visa/disputes?utm_source=flow", "title": "Visa dispute processing rules", "snippet": "Visa dispute processing rules and response windows", "publisher": "Example Rules Co", "published_at": "2026-03-01"},
+    {"url": "https://www.example.com/visa/disputes", "title": "duplicate", "snippet": "duplicate", "publisher": "Example Rules Co"},
+    {"url": "https://www.example.org/unrelated", "title": "Cooking", "snippet": "soup", "publisher": "Other"}
+  ],
+  "What is the dispute response window?": [
+    {"url": "https://www.example.net/windows", "title": "Dispute response window", "snippet": "the dispute response window is 30 days", "publisher": "Example Net"}
+  ]
+}

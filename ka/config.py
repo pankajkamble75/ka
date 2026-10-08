@@ -76,6 +76,14 @@ declare("KA_OCR", bool, False, "ka.extraction", "OCR text-less PDFs and images (
 declare("KA_EOS_AUTO_ACTOR", str, "", "ka.graph_change",
         "A person's name under which KA's auto-approved low-impact proposals are published to EOS. Empty: they wait for a person.")
 # [/block plan-05]
+# [block plan-07]
+declare("KA_SEARCH_PROVIDER", str, "none", "ka.discovery", "none | fixture. The real provider is Q5; unknown values fail closed to none.")
+declare("KA_SEARCH_FIXTURE", str, "", "ka.discovery", "Path to a JSON file {query: [results]} for the fixture provider.")
+declare("KA_ALLOWED_DOMAINS", str, "", "ka.discovery", "Comma-separated hosts discovery may select (suffix match). Empty: any public host.")
+declare("KA_DISCOVERY_BUDGET", int, 5, "ka.discovery", "Fetches per mission from discovered results.")
+declare("KA_DISCOVERY_RESULTS", int, 10, "ka.discovery", "Results asked per query.")
+declare("KA_RESPECT_ROBOTS", bool, True, "ka.discovery", "Honour robots.txt for user-agent enterprise-os-ka.")
+# [/block plan-07]
 
 _overrides: dict[str, Any] = {}
 

@@ -128,6 +128,14 @@ runs it after the statement pass, so both share source, scope and the one govern
 `GovernanceService.research_agent_ids` makes `decide(by=<agent>)` fail (§17). `knowledge_for_domain` is the §18 Domain Builder entry:
 reuse ACTIVE knowledge on the scope chain, open a mission only for the gap.
 
+**Discovery (plan-07, R9).** `ka/discovery.py::DiscoveryAgent` runs first in the coordinator: the objective and questions become
+queries for a `SearchProvider` (a seam — `none` or `fixture` until Q5 names a real one); results are canonicalised (fragments and
+tracking parameters dropped), deduplicated, filtered by `KA_ALLOWED_DOMAINS`, `is_safe_url` and `robots.txt` (fetched through
+`safe_fetch`, cached per run; unreachable = allowed, recorded), ranked by overlap with the objective and cut at `KA_DISCOVERY_BUDGET`;
+every skip carries its reason in `ResearchRun.discovery`. The Internet agent fetches the selection only when `KA_RESEARCH_INTERNET`
+is on and stamps `canonical_url / publisher / published_at (never guessed) / retrieved_at / query` on the `Source`. Fetched pages
+are `INTERNET_RESEARCH`; model answers stay `LLM_GENERATED`, so a model answer is never presented as an internet source.
+
 ## 7. Corrections and promotion (§23–§25) — `ka/corrections.py`, `ka/promotion.py`
 
 `CorrectionService.submit` resolves lineage from the registry *and* from the element's `props.knowledge_lineage`, records the form as a
