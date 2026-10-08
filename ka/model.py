@@ -13,6 +13,7 @@ from ka.timeutil import now_iso
 from ka.vocab import (
     AcquisitionChannel,
     AuthorityType,
+    BindingStatus,
     CorrectionStatus,
     DecisionOutcome,
     ExtractionStatus,
@@ -99,6 +100,52 @@ class Evidence(BaseModel):
     visibility: Visibility = Visibility.ENTERPRISE
 
 
+# ---------------------------------------------------------------- process assertions (research-01 R2)
+
+# [block plan-03]
+class Subject(BaseModel):
+    """What a nugget is about, in EOS terms. Identity = (kind, canonical_key); scope is not part of it."""
+    kind: str                                        # an EOS node kind: process, entity, actor, rule, event, state, …
+    canonical_key: str
+    name: str = ""
+    aliases: list[str] = Field(default_factory=list)
+
+
+class ObjectRef(BaseModel):
+    """The object of an assertion: another subject (kind + key) or a literal value (a type name, a description)."""
+    kind: str | None = None
+    canonical_key: str | None = None
+    value: str | None = None
+
+
+class GrammarBinding(BaseModel):
+    """One binding of one nugget version under one grammar release. Recomputed per release; never edits the version."""
+    id: str = Field(default_factory=lambda: new_id("binding"))
+    nugget_ref: str
+    grammar_version: str | None = None
+    type_table_version: str | None = None
+    digest: str = ""
+    process_type: str | None = None
+    edge: str | None = None
+    slot: str | None = None
+    binding_status: BindingStatus = BindingStatus.UNRESOLVED
+    method: str = "inferred"                         # evidenced | inferred
+    confidence: float = 0.0
+    alternatives: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+    bound_at: str = Field(default_factory=now_iso)
+
+
+class SubjectRecord(BaseModel):
+    canonical_key: str
+    kind: str
+    name: str
+    aliases: list[str] = Field(default_factory=list)
+    created_at: str = Field(default_factory=now_iso)
+    first_ref: str | None = None
+# [/block plan-03]
+
+
 # ---------------------------------------------------------------- knowledge nugget (§5, §6)
 
 
@@ -127,6 +174,10 @@ class KnowledgeNuggetVersion(BaseModel):
     structure_id: str | None = None
 
     knowledge_type: KnowledgeType = KnowledgeType.FACT
+    # research-01 R2 (plan-03): the assertion, semantic and immutable with the version; binding lives in its own record
+    subject: Subject | None = None
+    predicate: str | None = None
+    object: ObjectRef | None = None
     status: NuggetStatus = NuggetStatus.CANDIDATE
     authority_type: AuthorityType = AuthorityType.USER_KNOWLEDGE
     authority_rank: int = 0

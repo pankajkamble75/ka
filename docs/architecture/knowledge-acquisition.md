@@ -25,7 +25,8 @@ Sources ─► ka.ingestion ─► ka.extraction ─► ka.governance ─► ACT
 |---|---|
 | `Source`, `SourceVersion` | Raw content. Same location + owner re-ingested with a new checksum → new `SourceVersion` (`content_version` +1). Bytes under `ka_storage/blobs/`. |
 | `Evidence` | A located excerpt (`locator` = "Section 4.2", "p.3", "¶7", URL) of one source version. Carries `visibility`. |
-| `KnowledgeNuggetVersion` | The §6 schema verbatim plus `authority_rank`, `visibility`, `graph_group`, `inherited_from`, `analysis`. `ref` = `KN-983:v3`. |
+| `KnowledgeNuggetVersion` | The §6 schema verbatim plus `authority_rank`, `visibility`, `graph_group`, `inherited_from`, `analysis`; plan-03 adds `subject`, `predicate`, `object` (§5a). `ref` = `KN-983:v3`. |
+| `GrammarBinding`, `SubjectRecord` | plan-03 (§5a): one binding per version per grammar release; one subject per (kind, canonical key). |
 | `KnowledgeRelationship` | §10 types, with `explanation` so a reviewer sees why. |
 | `GovernanceDecision` | §33 outcomes plus APPROVE / REJECT / AUTO_RESOLVED_BY_AUTHORITY. `automatic=True` for §13 auto-resolution. |
 | `KnowledgeCorrection` | §23 form fields + `resolved_lineage`, `suggested_scope`, `scope_rationale`, `candidate_ref`. |
@@ -85,6 +86,23 @@ adds `why_conflict / both_valid / suggested_resolution` to the finding.
    (`auto_approve_low_impact`) may approve + apply.
 5. `apply` — adapter writes, then `LineageService.register` for every element (retiring the old version's dependency) → Invariants 4/5.
 6. `rollback(execution_id)` — inverse of the applied changes, old lineage restored.
+
+## 5a. Process assertions and grammar binding (research-01 R2, R8 — plan-03)
+
+A nugget version may carry an **assertion**: `subject` (an EOS node kind + canonical key + name + aliases), a `predicate`
+from the closed list in `ka/vocab.py::PREDICATES`, and an `object` (another subject or a literal). These three are semantic
+and join `SEMANTIC_FIELDS`, so they are immutable with the version. A **GrammarBinding** (`ka/binding.py`) says what the
+assertion would be on the EOS graph — `props.process_type` for `typed_as`, an edge + slot for relation predicates, a
+property for `description` and the like — with status `bound | proposed | unresolved | not_applicable | stale`. Bindings
+are records in their own collection keyed by nugget ref and grammar versions, so a grammar release recomputes them
+(`Binder.rebind_all`) without touching any governed version.
+
+The grammar is EOS's (`ka/grammar.py::GrammarRegistry`): `grammar.json` and `process_types.json` read from
+`KA_GRAMMAR_DIR` (default `<KA_ENTERPRISE_OS_ROOT>/knowledge_worker/graph_model`), snapshotted by version string **and**
+sha256. Files that change under the same version string make the registry stale: new bindings are `stale`, `rebind_all`
+refuses, and only `refresh(force=True)` accepts them. No grammar loaded → every binding `unresolved`, never a guess.
+Subjects resolve through `ka/identity.py::SubjectRegistry` (exact key → alias → similarity within kind); element ids
+derived from canonical keys land in plan-05.
 
 ## 6. Research (§3.2, §16–§18) — `ka/research.py`
 

@@ -8,6 +8,9 @@ import pytest
 
 os.environ.setdefault("KA_LLM_PROVIDER", "stub")
 os.environ["ANTHROPIC_API_KEY"] = ""
+# plan-03: the fixture grammar pair (real shape, trimmed) so bindings resolve without the enterprise-os checkout
+FIXTURE_GRAMMAR = str(__import__("pathlib").Path(__file__).resolve().parent / "fixtures" / "grammar")
+os.environ.setdefault("KA_GRAMMAR_DIR", FIXTURE_GRAMMAR)
 
 from ka.llm import StubLLMProvider  # noqa: E402
 from ka.model import Scope  # noqa: E402

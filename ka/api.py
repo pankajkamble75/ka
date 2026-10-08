@@ -70,6 +70,37 @@ class PasteIn(BaseModel):
     extract: bool = True
 
 
+# [block plan-03]
+class AssertionIn(BaseModel):
+    """A person stating what a note asserts, in EOS terms (research-01 R2)."""
+    subject_kind: str | None = None          # process | entity | actor | rule | event | state | …
+    subject_name: str | None = None
+    predicate: str | None = None             # one of ka.vocab.PREDICATES
+    object_value: str | None = None          # a type name for typed_as, or a literal
+    object_kind: str | None = None           # when the object is another subject
+    object_name: str | None = None
+
+    def to_fields(self) -> dict[str, Any]:
+        from ka.identity import canonical_key
+        from ka.model import ObjectRef, Subject
+        out: dict[str, Any] = {}
+        if self.subject_name:
+            out["subject"] = Subject(kind=self.subject_kind or "process", canonical_key=canonical_key(self.subject_name), name=self.subject_name)
+        if self.predicate:
+            out["predicate"] = self.predicate
+        if self.object_value or self.object_name:
+            out["object"] = ObjectRef(kind=self.object_kind, canonical_key=canonical_key(self.object_name) if self.object_name else None,
+                                      value=self.object_value or self.object_name)
+        if out:
+            out["binding_method"] = "evidenced"
+        return out
+
+
+class GrammarRefreshIn(BaseModel):
+    force: bool = False
+# [/block plan-03]
+
+
 class NoteIn(BaseModel):
     text: str
     title: str = "Note"
@@ -77,6 +108,7 @@ class NoteIn(BaseModel):
     scope_type: ScopeType
     scope_id: str
     extract: bool = True
+    assertion: AssertionIn | None = None
 
 
 class LinkIn(BaseModel):
@@ -108,6 +140,7 @@ class RevisionIn(BaseModel):
     title: str | None = None
     scope_type: ScopeType | None = None
     scope_id: str | None = None
+    assertion: AssertionIn | None = None
 
 
 class ApplyIn(BaseModel):
@@ -281,7 +314,21 @@ def paste(body: PasteIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str
 
 @router.post("/sources/note")
 def note(body: NoteIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
-    got = ka.ingestion.write_note(text=body.text, owner=body.owner, scope=Scope(scope_type=body.scope_type, scope_id=body.scope_id), title=body.title)
+    scope = Scope(scope_type=body.scope_type, scope_id=body.scope_id)
+    got = ka.ingestion.write_note(text=body.text, owner=body.owner, scope=scope, title=body.title)
+    if body.assertion and body.assertion.to_fields():
+        from ka.governance import CandidateInput
+        from ka.model import Evidence
+        ev = ka.repo.evidence.put(Evidence(source_id=got.source.id, source_version_id=got.version.id, locator="note", excerpt=body.text[:600], created_by=body.owner))
+        try:
+            cand = ka.governance.ingest_candidate(CandidateInput(
+                title=body.title if body.title != "Note" else body.text[:80], statement=body.text.strip(), scope=scope,
+                source_ids=[got.source.id], evidence_ids=[ev.id], created_by=body.owner, **body.assertion.to_fields()))
+        except GovernanceError as e:
+            raise HTTPException(400, str(e))
+        return {"source": got.source.model_dump(mode="json"), "source_version": got.version.model_dump(mode="json", exclude={"text"}),
+                "extraction_status": got.extraction.status.value, "extraction_note": None, "is_new_version": got.is_new_version,
+                "candidates": [_nugget_row(cand)]}
     return _ingested(ka, got, body.extract, body.owner)
 
 
@@ -382,7 +429,8 @@ def engine_dashboard(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, An
 def propose_revision(canonical_id: str, body: RevisionIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     scope = Scope(scope_type=body.scope_type, scope_id=body.scope_id) if body.scope_type and body.scope_id else None
     try:
-        v = ka.governance.propose_revision(canonical_id, statement=body.statement, by=body.by, reason=body.reason, title=body.title, scope=scope)
+        v = ka.governance.propose_revision(canonical_id, statement=body.statement, by=body.by, reason=body.reason, title=body.title, scope=scope,
+                                           **(body.assertion.to_fields() if body.assertion else {}))
     except GovernanceError as e:
         raise HTTPException(400, str(e))
     return {"candidate": _nugget_row(v)}
@@ -596,6 +644,65 @@ def graph_gap(body: GapIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[s
     out = ka.runtime_guard.graph_gap_detected(scope=Scope(scope_type=body.scope_type, scope_id=body.scope_id), question=body.question,
                                               gap_description=body.gap_description, requested_by=body.requested_by, open_mission=body.open_mission)
     return {"signal": out.signal, "request_id": out.request_id, "mission_id": out.mission_id}
+
+
+# ---- grammar, bindings, subjects (research-01 R2, R8 — plan-03)
+
+@router.get("/grammar")
+def grammar(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return ka.grammar.descriptor()
+
+
+@router.post("/grammar/refresh")
+def grammar_refresh(body: GrammarRefreshIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.grammar import GrammarMismatch
+    try:
+        snap = ka.grammar.refresh(force=body.force)
+    except GrammarMismatch as e:
+        raise HTTPException(409, str(e))
+    return {"snapshot": snap.__dict__ if snap else None, "descriptor": ka.grammar.descriptor()}
+
+
+@router.post("/grammar/rebind-all")
+def rebind_all(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.grammar import GrammarMismatch
+    try:
+        return {"rebound": ka.binder.rebind_all(), **ka.grammar.versions()}
+    except GrammarMismatch as e:
+        raise HTTPException(409, str(e))
+
+
+@router.get("/nugget/{ref}/binding")
+def nugget_binding(ref: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.version(ref) is None:
+        raise HTTPException(404, "nugget version not found")
+    b = ka.repo.binding_for(ref)
+    return {"ref": ref, "binding": b.model_dump(mode="json") if b else None, "history": [x.model_dump(mode="json") for x in ka.repo.bindings_of(ref)]}
+
+
+@router.post("/nugget/{ref}/rebind")
+def nugget_rebind(ref: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    v = ka.repo.version(ref)
+    if v is None:
+        raise HTTPException(404, "nugget version not found")
+    return {"binding": ka.binder.bind(v).model_dump(mode="json")}
+
+
+@router.get("/subjects")
+def subjects(kind: str | None = None, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    recs = ka.repo.subjects.all()
+    if kind:
+        recs = [r for r in recs if r.kind == kind]
+    return {"subjects": [r.model_dump(mode="json") | {"nuggets": len(ka.repo.nuggets_by_subject(r.canonical_key))} for r in sorted(recs, key=lambda r: r.name.lower())]}
+
+
+@router.get("/subjects/{key}")
+def subject(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    rec = ka.repo.subjects.get(key)
+    if rec is None:
+        raise HTTPException(404, "subject not found")
+    ns = ka.repo.nuggets_by_subject(key)
+    return {"subject": rec.model_dump(mode="json"), "nuggets": [_nugget_row(n) | {"binding": (b.model_dump(mode="json") if (b := ka.repo.binding_for(n.ref)) else None)} for n in ns]}
 
 
 # ---- images for conversations (not knowledge; see ka/images.py)

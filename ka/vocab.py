@@ -245,6 +245,21 @@ class CorrectionStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
+# [block plan-03]
+PREDICATES = ("description", "typed_as", "decomposes_into", "consumes", "produces", "acts_on", "performed_by", "governed_by",
+              "emits", "transitions_to", "precondition", "postcondition", "related_to")
+
+
+class BindingStatus(str, Enum):
+    """research-01 R2 — what a nugget's assertion is, against the loaded EOS grammar."""
+    BOUND = "bound"
+    PROPOSED = "proposed"
+    UNRESOLVED = "unresolved"
+    NOT_APPLICABLE = "not_applicable"
+    STALE = "stale"
+# [/block plan-03]
+
+
 class GraphElementKind(str, Enum):
     """§15 / §21 — what a nugget can materialize as."""
     NODE = "node"

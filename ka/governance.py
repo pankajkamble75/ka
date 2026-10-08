@@ -17,7 +17,7 @@ from ka.audit import Auditor
 from ka.conflict import Analysis, ConflictDetector
 from ka.events import EventBus
 from ka.extraction import CandidateExtractor, CandidateStatement, TextExtraction, normalize
-from ka.model import Evidence, GovernanceDecision, KnowledgeNuggetVersion, KnowledgeRelationship, Scope, Source, SourceVersion
+from ka.model import Evidence, GovernanceDecision, KnowledgeNuggetVersion, KnowledgeRelationship, ObjectRef, Scope, Source, SourceVersion, Subject
 from ka.repository import Repository
 from ka.scope import ScopeDecisionEngine, ScopeRegistry
 from ka.timeutil import now_iso
@@ -29,6 +29,7 @@ from ka.vocab import (
     NuggetStatus,
     RelationshipType,
     ScopeType,
+    PREDICATES,
     Visibility,
     narrowest_visibility,
     widens_visibility,
@@ -61,14 +62,20 @@ class CandidateInput:
     canonical_id: str | None = None        # set to revise an existing nugget (→ next version)
     change_reason: str | None = None
     visibility: Visibility | None = None
+    # plan-03 (research-01 R2): the assertion, optional; stored on the version and bound at birth (block in ingest_candidate)
+    subject: Subject | None = None
+    predicate: str | None = None
+    object: ObjectRef | None = None
+    binding_method: str = "inferred"       # evidenced when a person or the extractor stated it
 
 
 class GovernanceService:
     def __init__(self, repo: Repository, bus: EventBus, auditor: Auditor, registry: ScopeRegistry,
                  versioning: VersioningService, detector: ConflictDetector, extractor: CandidateExtractor,
-                 authority_policy: config.AuthorityPolicy | None = None):
+                 authority_policy: config.AuthorityPolicy | None = None, binder=None, subjects=None):
         self.repo, self.bus, self.auditor, self.registry = repo, bus, auditor, registry
         self.versioning, self.detector, self.extractor = versioning, detector, extractor
+        self.binder, self.subjects = binder, subjects          # plan-03: ka.binding.Binder, ka.identity.SubjectRegistry
         self.scope_engine = ScopeDecisionEngine(registry)
         self.authority = authority_policy or config.AuthorityPolicy()
         self.on_more_research: Callable[[KnowledgeNuggetVersion, str], str] | None = None   # set by ResearchOrchestrator
@@ -109,6 +116,24 @@ class GovernanceService:
     # ---------------------------------------------------------------- Candidate → Analyzed (§11 steps 2–8)
 
     def ingest_candidate(self, inp: CandidateInput, *, analyze: bool = True) -> KnowledgeNuggetVersion:
+        # [block plan-03]
+        # research-01 R2: an assertion is validated and resolved to a canonical subject BEFORE the version exists,
+        # because subject/predicate/object are semantic and immutable once the version is governed.
+        if inp.predicate is not None and inp.predicate not in PREDICATES:
+            raise GovernanceError(f"unknown predicate {inp.predicate!r}; one of {', '.join(PREDICATES)}")
+        subject = inp.subject
+        if subject is not None:
+            kinds = self.binder.registry.node_kinds() if (self.binder and self.binder.registry.loaded) else None
+            if kinds and subject.kind not in kinds:
+                raise GovernanceError(f"subject kind {subject.kind!r} is not an EOS node kind ({', '.join(kinds)})")
+            if self.subjects is not None:
+                rec, _ = self.subjects.resolve(subject.kind, subject.name or subject.canonical_key, tuple(subject.aliases))
+                subject = Subject(kind=rec.kind, canonical_key=rec.canonical_key, name=rec.name, aliases=list(rec.aliases))
+        obj = inp.object
+        if obj is not None and obj.kind and obj.canonical_key is None and obj.value and self.subjects is not None:
+            rec, _ = self.subjects.resolve(obj.kind, obj.value)
+            obj = ObjectRef(kind=rec.kind, canonical_key=rec.canonical_key, value=obj.value)
+        # [/block plan-03]
         sources = [s for s in (self.repo.sources.get(i) for i in inp.source_ids) if s]
         vis = inp.visibility or narrowest_visibility([s.visibility for s in sources]) if sources else (inp.visibility or Visibility.ENTERPRISE)
         if inp.canonical_id:
@@ -123,7 +148,10 @@ class GovernanceService:
                                                  channel=inp.channel, created_by=inp.created_by, change_reason=inp.change_reason,
                                                  effective_from=inp.effective_from, visibility=vis,
                                                  research_run_refs=[inp.research_run_id] if inp.research_run_id else [],
-                                                 correction_refs=[inp.correction_id] if inp.correction_id else [])
+                                                 correction_refs=[inp.correction_id] if inp.correction_id else [],
+                                                 subject=subject if subject is not None else prior.subject,
+                                                 predicate=inp.predicate if inp.predicate is not None else prior.predicate,
+                                                 object=obj if obj is not None else prior.object)
         else:
             v = KnowledgeNuggetVersion(
                 canonical_id=self.repo.next_canonical_id(), title=inp.title, statement=inp.statement,
@@ -134,10 +162,13 @@ class GovernanceService:
                 channel=inp.channel, created_by=inp.created_by, effective_from=inp.effective_from, visibility=vis,
                 research_run_refs=[inp.research_run_id] if inp.research_run_id else [],
                 correction_refs=[inp.correction_id] if inp.correction_id else [], change_reason=inp.change_reason,
+                subject=subject, predicate=inp.predicate, object=obj,
             )
         v.authority_rank = self.authority.rank(v.authority_type, v.scope_type, v.scope_id)
         self.registry.fill_hierarchy_fields(v)
         self.repo.nuggets.put(v)
+        if self.binder is not None and (v.subject is not None or v.predicate is not None):
+            self.binder.bind(v, method=inp.binding_method)          # plan-03: a binding record from birth
         self.bus.emit("knowledge.candidate.created", ref=v.ref, canonical_id=v.canonical_id, scope=v.scope.key())
         self.auditor.record(who=inp.created_by, what="knowledge.candidate.created", why=inp.change_reason or inp.channel.value,
                             source=inp.source_ids[0] if inp.source_ids else None, scope=v.scope, affected=[v.ref, v.canonical_id])
@@ -349,7 +380,8 @@ class GovernanceService:
 
     def propose_revision(self, canonical_id: str, *, statement: str, by: str, reason: str, source_ids: list[str] | None = None,
                          evidence_ids: list[str] | None = None, authority: AuthorityType | None = None, scope: Scope | None = None,
-                         title: str | None = None) -> KnowledgeNuggetVersion:
+                         title: str | None = None, subject: Subject | None = None, predicate: str | None = None,
+                         object: ObjectRef | None = None, binding_method: str = "evidenced") -> KnowledgeNuggetVersion:
         prior = self.repo.latest_version(canonical_id)
         if prior is None:
             raise GovernanceError(f"unknown nugget {canonical_id}")
@@ -359,7 +391,8 @@ class GovernanceService:
             evidence_ids=evidence_ids if evidence_ids is not None else prior.evidence_refs,
             knowledge_type=prior.knowledge_type.value, authority_type=authority or prior.authority_type,
             confidence=prior.confidence, tags=prior.tags, graph_group=prior.graph_group, channel=AcquisitionChannel.FEEDBACK,
-            created_by=by, canonical_id=canonical_id, change_reason=reason))
+            created_by=by, canonical_id=canonical_id, change_reason=reason,
+            subject=subject, predicate=predicate, object=object, binding_method=binding_method))   # plan-03: pass-through (prior's kept when None)
 
     def add_comment(self, ref: str, by: str, text: str) -> KnowledgeNuggetVersion:
         v = self.repo.require_version(ref)

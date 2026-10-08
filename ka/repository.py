@@ -16,6 +16,7 @@ from ka.model import (
     AuditRecord,
     Evidence,
     GovernanceDecision,
+    GrammarBinding,
     GraphChangeExecution,
     GraphChangeProposal,
     GraphDependency,
@@ -29,6 +30,7 @@ from ka.model import (
     Scope,
     Source,
     SourceVersion,
+    SubjectRecord,
 )
 from ka.vocab import NuggetStatus, ScopeType
 
@@ -102,6 +104,10 @@ class Repository:
         self.executions = Collection(r, "executions", GraphChangeExecution)
         self.promotions = Collection(r, "promotions", PromotionProposal)
         self.requests = Collection(r, "requests", KnowledgeAcquisitionRequest)
+        # [block plan-03]
+        self.bindings = Collection(r, "bindings", GrammarBinding)
+        self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")
+        # [/block plan-03]
         self.audit_log = r / "audit.jsonl"
         self.event_log = r / "events.jsonl"
 
@@ -200,6 +206,18 @@ class Repository:
 
     def sources_for(self, version: KnowledgeNuggetVersion) -> list[Source]:
         return [s for s in (self.sources.get(i) for i in version.source_refs) if s]
+
+    # ---- assertions and bindings (research-01 R2) -----------------------------------------------
+
+    def bindings_of(self, ref: str) -> list[GrammarBinding]:
+        return sorted(self.bindings.where(lambda b: b.nugget_ref == ref), key=lambda b: b.bound_at)
+
+    def binding_for(self, ref: str) -> GrammarBinding | None:
+        bs = self.bindings_of(ref)
+        return bs[-1] if bs else None
+
+    def nuggets_by_subject(self, canonical_key: str) -> list[KnowledgeNuggetVersion]:
+        return self.nuggets.where(lambda n: n.subject is not None and n.subject.canonical_key == canonical_key)
 
     # ---- logs -----------------------------------------------------------------------------------
 

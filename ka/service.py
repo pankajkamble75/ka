@@ -13,7 +13,10 @@ from ka.conflict import ConflictDetector
 from ka.corrections import CorrectionService
 from ka.events import EventBus
 from ka.extraction import CandidateExtractor
+from ka.binding import Binder
 from ka.governance import GovernanceService
+from ka.grammar import GrammarRegistry
+from ka.identity import SubjectRegistry
 from ka.graph_adapter import EnterpriseOSGraphAdapter, GraphAdapter, InMemoryGraphAdapter
 from ka.graph_change import GraphChangeService
 from ka.graph_impact import GraphImpactService
@@ -44,8 +47,14 @@ class KnowledgeAcquisition:
         self.versioning = VersioningService(self.repo)
         self.lineage = LineageService(self.repo)
         self.ingestion = IngestionService(self.repo, self.bus, self.auditor)
+        # [block plan-03]
+        self.grammar = GrammarRegistry.from_config(self.repo.root)
+        self.subjects = SubjectRegistry(self.repo)
+        self.binder = Binder(self.grammar, self.repo)
+        # [/block plan-03]
         self.governance = GovernanceService(self.repo, self.bus, self.auditor, self.registry, self.versioning,
-                                            ConflictDetector(self.provider), CandidateExtractor(self.provider))
+                                            ConflictDetector(self.provider), CandidateExtractor(self.provider),
+                                            binder=self.binder, subjects=self.subjects)
         self.impact = GraphImpactService(self.repo, self.adapter, self.lineage, self.registry)
         self.graph_change = GraphChangeService(self.repo, self.bus, self.auditor, self.adapter, self.impact, self.lineage)
         self.graph_change.auto_approve_low_impact = auto_approve_low_impact
@@ -175,6 +184,7 @@ class KnowledgeAcquisition:
             "recent_events": self.repo.events()[-25:][::-1],
             "recent_audit": [a.model_dump(mode="json") for a in self.repo.audit()[-25:][::-1]],
             "provider": getattr(self.provider, "name", "?"), "adapter": type(self.adapter).__name__, "storage": str(self.repo.root),
+            "grammar": self.grammar.descriptor() | {"bindings": len(self.repo.bindings), "subjects": len(self.repo.subjects)},
         }
 
     # ---- "Why?" (§15, §47) ----------------------------------------------------------------------------
@@ -274,6 +284,13 @@ class KnowledgeAcquisition:
                               for p in self.repo.proposals.where(lambda p: v.ref in p.knowledge_change_ids)],
             "inherited_value": inherited_value, "used_by_descendants": used_by_descendants,
             "audit": [a.model_dump(mode="json") for a in self.auditor.for_object(v.ref)],
+            # plan-03 (block is the wiring in __init__)
+            "assertion": {"subject": v.subject.model_dump() if v.subject else None, "predicate": v.predicate,
+                          "object": v.object.model_dump() if v.object else None},
+            "binding": (b.model_dump(mode="json") if (b := self.repo.binding_for(v.ref)) else None),
+            "bindings_history": [b.model_dump(mode="json") for b in self.repo.bindings_of(v.ref)],
+            "subject_record": (r.model_dump(mode="json") if v.subject and (r := self.repo.subjects.get(v.subject.canonical_key)) else None),
+            "grammar": self.grammar.versions() | {"stale": self.grammar.is_stale(), "loaded": self.grammar.loaded},
         }
 
 
@@ -282,4 +299,5 @@ def _nugget_row(n) -> dict[str, Any]:
             "status": n.status.value, "scope": n.scope.key(), "authority": n.authority_type.value, "confidence": n.confidence,
             "knowledge_type": n.knowledge_type.value, "channel": n.channel.value, "graph_group": n.graph_group,
             "created_at": n.created_at, "approved_at": n.approved_at, "conflict_open": bool(n.analysis.get("conflict_open")),
+            "subject": n.subject.canonical_key if n.subject else None, "predicate": n.predicate,
             "suggested_resolution": next((f.get("suggested_resolution") for f in n.analysis.get("findings", []) if f["relationship"] == "CONTRADICTS"), None)}

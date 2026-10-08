@@ -20,6 +20,7 @@ PREFIXES = {
     "audit": "AUD",
     "promotion": "PRO",
     "request": "KAR",
+    "binding": "GB",
 }
 
 

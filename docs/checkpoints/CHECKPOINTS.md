@@ -2,6 +2,58 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 15:20 UTC — plan-03: process assertions on nuggets and the EOS grammar registry (research-01 R2, R8 KA half)
+
+**What changed**
+
+- *Grammar* `ka/grammar.py` (new): `GrammarRegistry` reads EOS `grammar.json` + `process_types.json` from `KA_GRAMMAR_DIR`
+  (default `<KA_ENTERPRISE_OS_ROOT>/knowledge_worker/graph_model`), snapshots version strings and sha256 digests to
+  `ka_storage/grammar_snapshot.json`, flags a same-version digest change as stale, `refresh(force=True)` accepts it; descriptor and
+  lookups (`type_grammar`, `slot_for_edge`, `edge_spec`). `KA_GRAMMAR_DIR` declared in `ka/config.py`.
+- *Model* `ka/model.py`: `Subject`, `ObjectRef`, `GrammarBinding`, `SubjectRecord`; `KnowledgeNuggetVersion.subject/predicate/object`.
+  `ka/vocab.py`: `PREDICATES` (13), `BindingStatus`. `ka/repository.py`: `bindings`, `subjects` collections and queries.
+  `ka/versioning.py`: `SEMANTIC_FIELDS` now includes the three assertion fields (immutable with the version).
+- *Identity* `ka/identity.py` (new): `canonical_key`, `SubjectRegistry.resolve` (exact key → alias → token containment / similarity
+  within kind → new). *Binder* `ka/binding.py` (new): `PREDICATE_TABLE` (predicate → EOS edge + slot), `Binder.bind` with statuses
+  bound / proposed / unresolved / not_applicable / stale, `rebind_all` (refuses on a stale registry).
+- *Governance (protected)* `ka/governance.py`: `CandidateInput.subject/predicate/object/binding_method`; `ingest_candidate` validates
+  the predicate and subject kind, resolves subjects, stores the assertion and binds at birth; `propose_revision` passes assertions through.
+- *Service/API/console*: `ka/service.py` wires registry, subject registry, binder; detail carries assertion, binding, history, grammar.
+  `ka/api.py`: `GET /grammar`, `POST /grammar/refresh`, `POST /grammar/rebind-all`, `GET /nugget/{ref}/binding`, `POST /nugget/{ref}/rebind`,
+  `GET /subjects`, `GET /subjects/{key}`; `AssertionIn` on `POST /sources/note` and `propose-revision`. `ka/console/app.js`: assertion
+  card with binding pill and Rebind, subject page `#/subject/<key>`, subject column on Knowledge nuggets, EOS grammar card on the Dashboard.
+- *Docs/tests*: architecture §5a and object rows; `docs/protected.md` Verified bump; `docs/implementation-plans/plan-03.md`;
+  `ka/tests/fixtures/grammar/` (real shape, trimmed); `ka/tests/test_plan03_assertions_binding.py` (20 cases; characterization `dd06520`);
+  `e2e/plan03_binding_flow.py`; conftest points tests at the fixture grammar.
+
+**Why**
+
+research-01 §2: KA's nuggets said nothing EOS could place on its typed graph, and KA had no notion of the grammar EOS governs. This
+plan gives every nugget an optional assertion in EOS terms and a binding that is a *lookup against EOS's own files*, recomputable per
+grammar release without touching governed versions, and fails closed when the files drift. It is the model plan-04 (extraction) fills
+and plan-05 (publication) compiles.
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 104 passed; ruff F clean. Verify recount: 12/12 deliverables, 12/12 positive, 9/9 negative; code blocks
+  12 declared / 12 found / 0 undeclared.
+- Protected: characterization `dd06520` before the change; covering suites byte-identical; Verified date bumped.
+- Live on :8011 with `KA_ENTERPRISE_OS_ROOT` set: grammar loaded (`grammar/v2`, `process-types/v2`, 10 types, not stale);
+  `e2e/plan03_binding_flow.py` 6/6 PASS, screenshots verified.
+- Product tests (research-01): PT5, PT6 PASS (plan-02); PT1–PT4, PT7, PT8 FAIL awaiting plans 04–08.
+
+**Follow-ups / risks**
+
+- Subject resolution uses token containment and similarity; a wrong merge of two distinct processes is possible on short names — the
+  subject page shows aliases so a reviewer can see it. Splitting a wrongly merged subject is not built.
+- The registry reads files from the checkout; the EOS endpoint with a digest (Q7) would replace the file read, not the registry.
+
+**Decisions and questions**
+
+- Plan `plan-03`; research points R2 (fields, bindings, canonical keys — id derivation deferred to plan-05) and R8 (KA half) → UPLOADED.
+- BUILT: `knowledge-acquisition.md` §5a "Process assertions and grammar binding" (new section, with paths).
+- RAISED: none new. Q7 (EOS grammar endpoint) and Q8 (console shape) remain parked.
+
 ## 2026-10-08 14:55 UTC — plan-02: access containment, upload/URL safety, visibility protection (research-01 R4 step 1, R5, R6)
 
 **What changed**

@@ -12,8 +12,11 @@ from ka.timeutil import now_iso
 from ka.vocab import STATUS_TRANSITIONS, NuggetStatus
 
 # Adding evidence/sources to a governed version is allowed (§31 "Add Evidence"); it does not change meaning.
+# [block plan-03]
+# research-01 R2: the assertion (subject / predicate / object) is meaning, so it is immutable with the version.
 SEMANTIC_FIELDS = ("title", "statement", "normalized_meaning", "scope_type", "scope_id", "knowledge_type",
-                   "authority_type", "effective_from")
+                   "authority_type", "effective_from", "subject", "predicate", "object")
+# [/block plan-03]
 
 
 class ImmutableVersionError(RuntimeError):

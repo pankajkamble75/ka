@@ -66,6 +66,9 @@ declare("KA_ACCESS_TOKEN", str, "", "ka.security", "Bearer token non-loopback pe
 declare("KA_MAX_UPLOAD_MB", int, 25, "ka.api", "Largest upload body accepted by /sources/upload and /corrections/upload.")
 declare("KA_URL_ALLOWLIST", str, "", "ka.security", "Comma-separated intranet hostnames link()/research may fetch even if private.")
 # [/block plan-02]
+# [block plan-03]
+declare("KA_GRAMMAR_DIR", str, "", "ka.grammar", "Directory holding EOS grammar.json and process_types.json. Default: <KA_ENTERPRISE_OS_ROOT>/knowledge_worker/graph_model.")
+# [/block plan-03]
 
 _overrides: dict[str, Any] = {}
 

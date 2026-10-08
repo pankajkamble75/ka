@@ -47,6 +47,7 @@ const routes = [
   [/^#\/nuggets(?:\?(.*))?$/, nuggetsView],
   [/^#\/browse(?:\?(.*))?$/, browseView],
   [/^#\/images(?:\?(.*))?$/, imagesView],
+  [/^#\/subject\/([^/]+)$/, subjectView],
   [/^#\/nugget\/([^/]+)$/, nuggetView],
   [/^#\/conflict\/([^/]+)$/, conflictView],
   [/^#\/source\/([^/]+)$/, sourceView],
@@ -90,7 +91,7 @@ async function nav() {
   const h = location.hash || '#/';
   ensureTokenField();
   const on = (p) => (h === p || h.startsWith(p + '?') || (p === '#/dashboard' && h === '#/') ? 'active' : '');
-  const detail = /^#\/(nugget|conflict|source|mission|change)\//.test(h);
+  const detail = /^#\/(nugget|conflict|source|mission|change|subject)\//.test(h);
   const from = detail ? tabOf(lastTab || '#/nuggets') : null;
   const onD = (p) => (from === p ? 'active' : '');
   $('#nav').innerHTML = `
@@ -156,6 +157,7 @@ async function nuggetView(ref) {
   <h1>${esc(n.title)}</h1><div class="sub">${pill(n.status)} ${scopePill(n.scope_type + ':' + n.scope_id)} <span class="pill">v${n.version}</span> <span class="pill">${esc(n.knowledge_type)}</span> <span class="pill">${esc(n.authority_type)} · rank ${n.authority_rank}</span> <span class="pill">confidence ${n.confidence}</span>${n.analysis.conflict_open ? ' ' + pill('conflict', 'halt') : ''}</div>
   <div class="card"><h3>Current statement</h3><p style="font-size:var(--fs-15)">${esc(n.statement)}</p><div class="small muted">Normalized: <span class="mono">${esc(n.normalized_meaning)}</span></div>
   ${d.inherited_value ? `<div class="quote">Inherited value — ${esc(d.inherited_value.scope)} → ${esc(d.inherited_value.statement)} (<a href="#/nugget/${encodeURIComponent(d.inherited_value.ref)}">${esc(d.inherited_value.ref)}</a>)</div>` : ''}</div>
+  ${assertionCard(d)}
   <div class="actions">
     ${canDecide ? decideBtns(n.ref) : ''}${n.analysis.conflict_open ? `<a href="#/conflict/${encodeURIComponent(n.ref)}"><button class="primary">Resolve conflict</button></a>` : ''}
     <button data-act="show" data-target="revise">Propose Correction</button><button data-act="show" data-target="evidence">Add Evidence</button><button data-act="show" data-target="comment">Add Comment</button>
@@ -253,6 +255,31 @@ async function addView() {
 
 const scopeOptions = (scopes, selected = '') => scopes.map((s) => `<option value="${s.scope_type}|${esc(s.scope_id)}" ${`${s.scope_type}|${s.scope_id}` === selected ? 'selected' : ''}>${esc(s.name)} · ${s.scope_type.toLowerCase().replace('_', ' ')}</option>`).join('');
 
+// [block plan-03] process assertion + grammar binding (research-01 R2, R8)
+const bindPill = (b) => b ? pill(b.binding_status, { bound: 'ok', proposed: 'warn', unresolved: 'halt', stale: 'halt', not_applicable: '' }[b.binding_status] || '') : pill('unbound');
+function assertionCard(d) {
+  const a = d.assertion || {}, b = d.binding, g = d.grammar || {};
+  if (!a.subject && !a.predicate) return `<div class="card small muted">No process assertion on this version — it is a statement only. Grammar ${esc(g.grammar_version || 'not loaded')}${g.stale ? ' · <span class="pill halt">stale</span>' : ''}.</div>`;
+  const obj = a.object ? (a.object.canonical_key ? `<a href="#/subject/${encodeURIComponent(a.object.canonical_key)}">${esc(a.object.value || a.object.canonical_key)}</a> <span class="muted small">${esc(a.object.kind || '')}</span>` : esc(a.object.value || '')) : '—';
+  return `<div class="card"><h3>Process assertion ${bindPill(b)}</h3>
+    <dl class="kv"><dt>Subject</dt><dd>${a.subject ? `<a href="#/subject/${encodeURIComponent(a.subject.canonical_key)}">${esc(a.subject.name || a.subject.canonical_key)}</a> <span class="pill">${esc(a.subject.kind)}</span> <span class="mono small muted">${esc(a.subject.canonical_key)}</span>` : '—'}</dd>
+    <dt>Predicate</dt><dd class="mono">${esc(a.predicate || '—')}</dd><dt>Object</dt><dd>${obj}</dd>
+    ${b ? `<dt>Binds to</dt><dd>${b.process_type ? `props.process_type = <b>${esc(b.process_type)}</b>` : b.edge ? `edge <b>${esc(b.edge)}</b>${b.slot ? ` · slot <b>${esc(b.slot)}</b>` : ''}` : b.slot ? `slot <b>${esc(b.slot)}</b> (property)` : 'a property'} <span class="muted small">· ${esc(b.method)} · confidence ${b.confidence}</span></dd>
+    <dt>Grammar</dt><dd class="small">${esc(b.grammar_version || 'none')} · ${esc(b.type_table_version || 'none')} <span class="mono muted">${esc(b.digest)}</span> · bound ${when(b.bound_at)}</dd>
+    <dt>Why</dt><dd class="small muted">${(b.reasons || []).map(esc).join('<br>')}${b.alternatives && b.alternatives.length ? `<br>Alternatives: ${b.alternatives.map(esc).join(', ')}` : ''}</dd>` : ''}</dl>
+    <div class="actions"><button data-act="rebind" data-ref="${esc(d.ref)}">Rebind under current grammar</button>${(d.bindings_history || []).length > 1 ? `<span class="small muted">${d.bindings_history.length} bindings on record</span>` : ''}</div></div>`;
+}
+async function subjectView(key) {
+  key = decodeURIComponent(key);
+  const d = await api(`/subjects/${encodeURIComponent(key)}`);
+  const s = d.subject;
+  return `<div class="crumbs"><a href="#/nuggets">Knowledge nuggets</a> / subject</div><h1>${esc(s.name)} <span class="pill">${esc(s.kind)}</span></h1>
+  <div class="sub mono">${esc(s.canonical_key)}${s.aliases.length ? ` · also: ${s.aliases.map(esc).join(', ')}` : ''}</div>
+  <h2>Assertions about this subject <span class="muted">${d.nuggets.length}</span></h2>
+  ${d.nuggets.length ? `<table><tr><th>Nugget</th><th>Predicate</th><th>Statement</th><th>Scope</th><th>Status</th><th>Binding</th></tr>${d.nuggets.map((n) => `<tr><td><a href="#/nugget/${encodeURIComponent(n.ref)}">${esc(n.ref)}</a></td><td class="mono">${esc(n.predicate || '—')}</td><td>${esc(n.statement)}</td><td>${scopePill(n.scope)}</td><td>${pill(n.status)}</td><td>${bindPill(n.binding)}${n.binding && (n.binding.process_type || n.binding.edge) ? ` <span class="small muted">${esc(n.binding.process_type || n.binding.edge)}</span>` : ''}</td></tr>`).join('')}</table>` : '<div class="empty">None yet.</div>'}`;
+}
+// [/block plan-03]
+
 /* TAB 1 — Add knowledge: Upload / Paste / Write / Link, plus Research and Correct (the other two channels). */
 async function addView() {
   const { scopes } = await api('/scopes');
@@ -296,11 +323,12 @@ async function nuggetsView(qs) {
             <label class="small" style="text-transform:none;letter-spacing:0"><input type="checkbox" class="widen" style="width:auto"> widen visibility if the new scope needs it</label>
             ${n.suggested_resolution ? `<div class="small muted">Suggested: ${esc(n.suggested_resolution)}</div>` : ''}`;
   };
+  const subjCell = (n) => n.subject ? `<a href="#/subject/${encodeURIComponent(n.subject)}" class="mono small">${esc(n.subject)}</a>${n.predicate ? `<div class="small muted">${esc(n.predicate)}</div>` : ''}` : '<span class="muted small">—</span>';
   return `<div class="crumbs">2 · Knowledge nuggets</div><h1>Knowledge nuggets</h1>
   <p class="sub">Candidates extracted from your content. <b>Apply</b> approves a nugget at the chosen scope — domain, instance or parent domain — makes it the active governed version, and compiles it into that scope's graph through a Graph Change Proposal. Nothing is applied without this step.</p>
   <div class="tabs">${tab('pending', 'Pending')}${tab('conflicts', 'Conflicts')}${tab('active', 'Active')}${tab('history', 'History')}${tab('all', 'All')}</div>
-  ${rows.length ? `<table><tr><th>Nugget</th><th>Statement</th><th>Current scope</th><th>Status</th><th>Authority</th><th style="min-width:340px">Apply to</th></tr>${rows.map((n) =>
-    `<tr><td><a href="#/nugget/${encodeURIComponent(n.ref)}">${esc(n.ref)}</a><div class="small muted">${esc(n.title)}</div></td><td>${esc(n.statement)}<div class="small muted">${esc(n.knowledge_type)} · ${esc(n.channel.toLowerCase())}</div></td>
+  ${rows.length ? `<table><tr><th>Nugget</th><th>Statement</th><th>Subject</th><th>Current scope</th><th>Status</th><th>Authority</th><th style="min-width:340px">Apply to</th></tr>${rows.map((n) =>
+    `<tr><td><a href="#/nugget/${encodeURIComponent(n.ref)}">${esc(n.ref)}</a><div class="small muted">${esc(n.title)}</div></td><td>${esc(n.statement)}<div class="small muted">${esc(n.knowledge_type)} · ${esc(n.channel.toLowerCase())}</div></td><td>${subjCell(n)}</td>
      <td>${scopePill(n.scope)}</td><td>${pill(n.status)}${n.conflict_open ? ' ' + pill('conflict', 'halt') : ''}</td><td class="small">${esc(n.authority)}</td><td>${applyCell(n)}</td></tr>`).join('')}</table>` : '<div class="empty">Nothing here. <a href="#/add">Add knowledge</a> to create candidates.</div>'}
   <div id="apply-result"></div>`;
 }
@@ -360,6 +388,10 @@ async function dashboard() {
     <div class="tile ${d.corrections.pending ? 'warn' : ''}"><div class="k">Corrections pending</div><div class="v">${d.corrections.pending}</div></div>
     <div class="tile ${q.promotions ? 'warn' : ''}"><div class="k">Promotion proposals</div><div class="v">${q.promotions}</div></div>
   </div>
+  <div class="card"><h3>EOS grammar ${d.grammar.loaded ? (d.grammar.stale ? pill('stale', 'halt') : pill('loaded', 'ok')) : pill('not loaded', 'warn')}</h3>
+    <div class="small">${d.grammar.loaded ? `${esc(d.grammar.grammar_version)} · ${esc(d.grammar.type_table_version)} · ${d.grammar.types.length} process types · ${d.grammar.edges.length} edge pairs · ${d.grammar.slots.length} slots · ${d.grammar.bindings} bindings on ${d.grammar.subjects} subjects<div class="mono muted">${esc(d.grammar.source_dir)}</div>` : 'Set KA_GRAMMAR_DIR (or KA_ENTERPRISE_OS_ROOT) to bind assertions to EOS process types and edges. Until then every binding is unresolved.'}
+    ${d.grammar.stale ? `<div class="quote">${esc(d.grammar.stale_reason)}</div>` : ''}</div>
+    <div class="actions"><button data-act="grammar-refresh">Refresh grammar</button>${d.grammar.stale ? `<button class="danger" data-act="grammar-refresh" data-force="1">Accept changed files (force)</button>` : ''}<button data-act="rebind-all">Rebind all</button></div></div>
   <h2>Scopes</h2><table><tr><th>Scope</th><th>Type</th><th class="num">Active</th><th class="num">Pending</th></tr>${d.scopes.map((s) => `<tr><td><a href="#/browse?scope=${s.scope_type}|${encodeURIComponent(s.scope_id)}">${esc(s.name)}</a></td><td>${scopePill(s.scope_type)}</td><td class="num">${s.active}</td><td class="num">${s.pending}</td></tr>`).join('')}</table>
   <div class="card" style="margin-top:12px"><h3>Register a scope</h3><div class="row"><div><label>Type</label><select id="sc-type"><option>STRUCTURE</option><option>PARENT_DOMAIN</option><option selected>DOMAIN</option><option>INSTANCE</option></select></div><div><label>Id</label><input id="sc-id" placeholder="merchant-acquiring"></div><div><label>Name</label><input id="sc-name" placeholder="Merchant Acquiring"></div><div><label>Parent (key)</label><input id="sc-parent" placeholder="PARENT_DOMAIN:payment-processing"></div><button class="primary" data-act="register-scope">Register</button></div></div>
   <div class="grid2">
@@ -470,6 +502,9 @@ async function act(b) {
   }
   if (a === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(`Copied: ${b.dataset.text}`); } catch { prompt('Copy:', b.dataset.text); } return; }
   if (a === 'img-delete') { if (!confirm(`Delete image #${b.dataset.n}? Its number will not be reused.`)) return; await api(`/images/${b.dataset.n}/delete`, { method: 'POST' }); toast(`Deleted image #${b.dataset.n}`); render(); return; }
+  if (a === 'rebind') { const r = await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/rebind`, { method: 'POST' }); toast(`Binding: ${r.binding.binding_status}`); render(); return; }
+  if (a === 'grammar-refresh') { const r = await api('/grammar/refresh', { method: 'POST', body: { force: b.dataset.force === '1' } }); toast(`Grammar ${r.descriptor.grammar_version} · ${r.descriptor.type_table_version}`); render(); return; }
+  if (a === 'rebind-all') { const r = await api('/grammar/rebind-all', { method: 'POST' }); toast(`Rebound ${r.rebound} nugget(s)`); render(); return; }
   if (a === 'browse') { location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&q=${encodeURIComponent($('#br-q').value)}`; return; }
   if (a === 'browse-type') { const p = new URLSearchParams(location.hash.split('?')[1] || ''); location.hash = `#/browse?scope=${encodeURIComponent($('#br-scope').value)}&q=${encodeURIComponent($('#br-q').value)}&type=${b.dataset.t}`; return; }
   if (a === 'detect-promotions') { const { scopes } = await api('/scopes'); let n = 0; for (const s of scopes.filter((s) => s.scope_type !== 'INSTANCE')) { n += (await api(`/promotions/detect/${s.scope_type}/${encodeURIComponent(s.scope_id)}`, { method: 'POST' })).proposals.length; } toast(`${n} promotion proposal(s)`); render(); return; }
