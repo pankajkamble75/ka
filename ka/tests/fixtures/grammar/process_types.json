@@ -1,0 +1,848 @@
+{
+ "version": "process-types/v2",
+ "slots": [
+  "goal",
+  "trigger",
+  "input",
+  "entity",
+  "current_state",
+  "actor",
+  "action",
+  "rule",
+  "constraint",
+  "decision",
+  "output",
+  "target_state",
+  "event",
+  "data",
+  "feedback"
+ ],
+ "intents": [
+  "describe",
+  "how",
+  "why",
+  "decide",
+  "calculate",
+  "history",
+  "next"
+ ],
+ "slot_edges": {
+  "goal": {
+   "paths": [
+    [
+     {
+      "edge": "has_goal",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "goal"
+   ],
+   "prop_fallback": true
+  },
+  "trigger": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  },
+  "input": {
+   "paths": [
+    [
+     {
+      "edge": "consumes",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": null,
+   "prop_fallback": false
+  },
+  "entity": {
+   "paths": [
+    [
+     {
+      "edge": "acts_on",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "entity"
+   ],
+   "prop_fallback": false
+  },
+  "current_state": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  },
+  "actor": {
+   "paths": [
+    [
+     {
+      "edge": "performed_by",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "actor"
+   ],
+   "prop_fallback": true
+  },
+  "action": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  },
+  "rule": {
+   "paths": [
+    [
+     {
+      "edge": "governed_by",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "rule"
+   ],
+   "prop_fallback": true
+  },
+  "constraint": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  },
+  "decision": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  },
+  "output": {
+   "paths": [
+    [
+     {
+      "edge": "produces",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": null,
+   "prop_fallback": false
+  },
+  "target_state": {
+   "paths": [
+    [
+     {
+      "edge": "emits",
+      "direction": "out"
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "state"
+   ],
+   "prop_fallback": false
+  },
+  "event": {
+   "paths": [
+    [
+     {
+      "edge": "emits",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "event"
+   ],
+   "prop_fallback": false
+  },
+  "data": {
+   "paths": [
+    [
+     {
+      "edge": "consumes",
+      "direction": "out"
+     }
+    ],
+    [
+     {
+      "edge": "produces",
+      "direction": "out"
+     }
+    ]
+   ],
+   "target_kinds": [
+    "attribute"
+   ],
+   "prop_fallback": false
+  },
+  "feedback": {
+   "paths": [],
+   "target_kinds": null,
+   "prop_fallback": true
+  }
+ },
+ "types": {
+  "decision": {
+   "purpose": "Select an outcome or action from alternatives based on evidence, rules, constraints, judgment, or models.",
+   "grammar": {
+    "goal": "recommended",
+    "trigger": "recommended",
+    "input": "required",
+    "entity": "recommended",
+    "current_state": "optional",
+    "actor": "optional",
+    "action": "optional",
+    "rule": "required",
+    "constraint": "recommended",
+    "decision": "recommended",
+    "output": "required",
+    "target_state": "recommended",
+    "event": "required",
+    "data": "optional",
+    "feedback": "recommended"
+   },
+   "traversal": {
+    "describe": [
+     {
+      "edge": "has_goal",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "how": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 3
+     },
+     {
+      "edge": "performed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "why": [
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "in",
+      "max_depth": 2
+     },
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "decide": [
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "calculate": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "in",
+      "max_depth": 2
+     },
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "history": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "affects",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "next": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "in",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "contains",
+      "direction": "in",
+      "max_depth": 1
+     }
+    ]
+   },
+   "index_emphasis": [
+    "goal",
+    "input",
+    "rule",
+    "constraint",
+    "decision",
+    "output",
+    "entity",
+    "event"
+   ]
+  },
+  "interaction": {
+   "purpose": "Exchange information, requests, responses, commitments, or signals between actors/entities.",
+   "grammar": {
+    "goal": "optional",
+    "trigger": "recommended",
+    "input": "required",
+    "entity": "recommended",
+    "current_state": "optional",
+    "actor": "required",
+    "action": "optional",
+    "rule": "optional",
+    "constraint": "optional",
+    "decision": "optional",
+    "output": "required",
+    "target_state": "recommended",
+    "event": "recommended",
+    "data": "optional",
+    "feedback": "optional"
+   },
+   "traversal": {
+    "describe": [
+     {
+      "edge": "performed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "how": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 3
+     },
+     {
+      "edge": "performed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "why": [
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "in",
+      "max_depth": 2
+     },
+     {
+      "edge": "contains",
+      "direction": "in",
+      "max_depth": 1
+     }
+    ],
+    "decide": [
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "calculate": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "in",
+      "max_depth": 2
+     },
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "history": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "affects",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "next": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "in",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "contains",
+      "direction": "in",
+      "max_depth": 1
+     }
+    ]
+   },
+   "index_emphasis": [
+    "actor",
+    "input",
+    "output",
+    "entity",
+    "event"
+   ]
+  },
+  "control": {
+   "purpose": "Observe a system or entity, compare its state with desired conditions, and intervene when necessary.",
+   "grammar": {
+    "goal": "recommended",
+    "trigger": "optional",
+    "input": "required",
+    "entity": "required",
+    "current_state": "recommended",
+    "actor": "optional",
+    "action": "recommended",
+    "rule": "required",
+    "constraint": "optional",
+    "decision": "recommended",
+    "output": "optional",
+    "target_state": "recommended",
+    "event": "recommended",
+    "data": "recommended",
+    "feedback": "recommended"
+   },
+   "traversal": {
+    "describe": [
+     {
+      "edge": "has_goal",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "performed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "how": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 3
+     },
+     {
+      "edge": "performed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "why": [
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "decide": [
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "acts_on",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "calculate": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "produces",
+      "direction": "in",
+      "max_depth": 2
+     },
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "history": [
+     {
+      "edge": "contains",
+      "direction": "out",
+      "max_depth": 2
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "transitions_to",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "affects",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "governed_by",
+      "direction": "out",
+      "max_depth": 1
+     }
+    ],
+    "next": [
+     {
+      "edge": "produces",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "consumes",
+      "direction": "in",
+      "max_depth": 1
+     },
+     {
+      "edge": "emits",
+      "direction": "out",
+      "max_depth": 1
+     },
+     {
+      "edge": "contains",
+      "direction": "in",
+      "max_depth": 1
+     }
+    ]
+   },
+   "index_emphasis": [
+    "goal",
+    "current_state",
+    "input",
+    "rule",
+    "action",
+    "target_state"
+   ]
+  }
+ }
+}

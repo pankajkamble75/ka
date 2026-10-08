@@ -10,10 +10,10 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
 | research-01 | R1 — Retire KA compiler; emit EOS ChangeOps via propose_instance_change / propose_promotion(base_version) (MAJOR) | plan-05 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
-| research-01 | R2 — subject/predicate/object + versioned GrammarBinding on nuggets; canonical subject keys replace slug ids (MAJOR) | plan-03 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
+| research-01 | R2 — subject/predicate/object + versioned GrammarBinding on nuggets; canonical subject keys replace slug ids (MAJOR) | plan-03 | PLANNED | — | From research-01; see `docs/research/research-01.md` §Research points. |
 | research-01 | R3 — Second extraction pass for process knowledge with EOS closed type/slot lists (MAJOR) | plan-04 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
 | research-01 | R7 — Idempotency: KA content key; propose base key on EOS propose_instance_change (MAJOR) | plan-05 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
-| research-01 | R8 — EOS read-only grammar + type table with sha256; KA caches by version+digest, fails closed (MAJOR) | plan-03 | OPEN | — | From research-01; see `docs/research/research-01.md` §Research points. |
+| research-01 | R8 — EOS read-only grammar + type table with sha256; KA caches by version+digest, fails closed (MAJOR) | plan-03 | PLANNED | — | From research-01; see `docs/research/research-01.md` §Research points. |
 | research-01 | R9 — DiscoveryAgent ahead of Internet agent; search provider decision; robots/allowlist budget (MAJOR) | plan-07 | OPEN | — | From research-01; Decision parked as Q5 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R10 — ka/connectors/ with Connector protocol; local folder first; providers decision (MAJOR) | plan-08 | OPEN | — | From research-01; Decision parked as Q6 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 | research-01 | R11 — Decide: EOS routes found_new/grow_existing through KA gap request; grow GapIn (MAJOR) | plan-09 | OPEN | — | From research-01; Decision parked as Q7 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |

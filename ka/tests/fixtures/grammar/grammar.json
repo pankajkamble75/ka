@@ -1,0 +1,548 @@
+{
+ "version": "grammar/v2",
+ "node_kinds": [
+  {
+   "name": "process",
+   "title": "Process",
+   "nested_title": "Activity",
+   "description": "A piece of work the business carries out; a process may contain smaller processes to any depth."
+  },
+  {
+   "name": "event",
+   "title": "Event",
+   "description": "Something that happens at a point in time and is recorded, such as an order being placed."
+  },
+  {
+   "name": "entity",
+   "title": "Entity",
+   "description": "A thing the business keeps information about, such as a customer, a product or a document."
+  },
+  {
+   "name": "state",
+   "title": "State",
+   "description": "A condition an entity can be in, such as pending, paid or shipped."
+  },
+  {
+   "name": "attribute",
+   "title": "Attribute",
+   "description": "One piece of information held about an entity, such as a price or a date."
+  },
+  {
+   "name": "rule",
+   "title": "Rule",
+   "description": "A policy or constraint that governs how a process may be carried out."
+  },
+  {
+   "name": "actor",
+   "title": "Actor",
+   "description": "A person, role, team or system that performs a process."
+  },
+  {
+   "name": "metric",
+   "title": "Metric",
+   "description": "A measured or computed number the business tracks."
+  },
+  {
+   "name": "goal",
+   "title": "Goal",
+   "description": "An outcome a process is meant to achieve."
+  },
+  {
+   "name": "physical_source",
+   "title": "Physical source",
+   "description": "A concrete place where one business's data actually lives, such as a table, an API or a file."
+  }
+ ],
+ "tiers": [
+  {
+   "name": "structure",
+   "description": "The universal grammar every graph is built on and validated against."
+  },
+  {
+   "name": "substructure",
+   "description": "A domain's shared graph of processes and data that every business in the domain inherits; it holds data, never code."
+  },
+  {
+   "name": "instance",
+   "description": "One real business's graph, which realizes a domain's graph and adds its own physical sources."
+  },
+  {
+   "name": "pattern",
+   "description": "A stored universal process pattern that a domain's top-level process specializes by reference."
+  },
+  {
+   "name": "data_object",
+   "description": "A stored canonical data object that a domain entity specializes by reference."
+  }
+ ],
+ "edges": {
+  "process": [
+   {
+    "name": "contains",
+    "inverse": "contained_by",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "process"
+    ],
+    "description": "a process contains a sub-process (Q408: the only depth)",
+    "inverse_description": "a sub-process is contained by its parent process"
+   },
+   {
+    "name": "consumes",
+    "inverse": "consumed_by",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "entity",
+     "attribute",
+     "metric"
+    ],
+    "description": "a process reads an input",
+    "inverse_description": "an input is read by a process"
+   },
+   {
+    "name": "produces",
+    "inverse": "produced_by",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "entity",
+     "attribute",
+     "metric"
+    ],
+    "description": "a process writes an output",
+    "inverse_description": "an output is written by a process"
+   },
+   {
+    "name": "performed_by",
+    "inverse": "performs",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "actor"
+    ],
+    "description": "a process is performed by an actor",
+    "inverse_description": "an actor performs a process"
+   },
+   {
+    "name": "governed_by",
+    "inverse": "governs",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "rule"
+    ],
+    "description": "a process is governed by a rule",
+    "inverse_description": "a rule governs a process"
+   },
+   {
+    "name": "emits",
+    "inverse": "emitted_by",
+    "from": [
+     "process"
+    ],
+    "to": [
+     "event"
+    ],
+    "description": "a process emits an event",
+    "inverse_description": "an event is emitted by a process"
+   }
+  ],
+  "data": [
+   {
+    "name": "transitions_to",
+    "inverse": "transitioned_by",
+    "from": [
+     "event"
+    ],
+    "to": [
+     "state"
+    ],
+    "description": "an event records a transition into a state, optionally from props.from_state (note \u00a723-24)",
+    "inverse_description": "a state is entered by the event that records the transition"
+   },
+   {
+    "name": "has_state",
+    "inverse": "state_of",
+    "from": [
+     "entity"
+    ],
+    "to": [
+     "state"
+    ],
+    "description": "an entity has a state (note \u00a725)",
+    "inverse_description": "a state belongs to an entity"
+   }
+  ],
+  "kpi": [
+   {
+    "name": "computed_by",
+    "inverse": "computes",
+    "from": [
+     "metric"
+    ],
+    "to": [
+     "physical_source"
+    ],
+    "description": "a metric is computed by ONE computation source whose props.kpi_ref names its KPI store record (Q413)",
+    "inverse_description": "a computation source computes one metric"
+   }
+  ]
+ },
+ "slots": [
+  {
+   "name": "goal",
+   "description": "What the process is for: the outcome it serves."
+  },
+  {
+   "name": "trigger",
+   "description": "What starts the process: an event, a schedule or a request."
+  },
+  {
+   "name": "input",
+   "description": "What the process reads or consumes."
+  },
+  {
+   "name": "entity",
+   "description": "The business thing the process works on."
+  },
+  {
+   "name": "current_state",
+   "description": "The state the thing is in before the process acts."
+  },
+  {
+   "name": "actor",
+   "description": "Who or what carries out the process."
+  },
+  {
+   "name": "action",
+   "description": "What the process actually does."
+  },
+  {
+   "name": "rule",
+   "description": "The policy that governs how the process runs."
+  },
+  {
+   "name": "constraint",
+   "description": "A limit the process must respect, such as time, cost or capacity."
+  },
+  {
+   "name": "decision",
+   "description": "A choice the process makes between options."
+  },
+  {
+   "name": "output",
+   "description": "What the process writes or produces."
+  },
+  {
+   "name": "target_state",
+   "description": "The state the thing is in after the process acts."
+  },
+  {
+   "name": "event",
+   "description": "What the process records as having happened."
+  },
+  {
+   "name": "data",
+   "description": "The information the process needs or keeps."
+  },
+  {
+   "name": "feedback",
+   "description": "How the outcome is measured and fed back to improve the process."
+  }
+ ],
+ "slot_levels": [
+  {
+   "name": "required",
+   "description": "A process of this type must have the slot filled."
+  },
+  {
+   "name": "recommended",
+   "description": "A process of this type should have the slot filled when the business knows it."
+  },
+  {
+   "name": "optional",
+   "description": "The slot may be filled, and leaving it empty is not a gap."
+  },
+  {
+   "name": "not_applicable",
+   "description": "The slot does not apply to a process of this type."
+  }
+ ],
+ "intents": [
+  {
+   "name": "describe",
+   "description": "what something is, holds or consists of"
+  },
+  {
+   "name": "how",
+   "description": "how something works or is carried out: its steps, actors and flow"
+  },
+  {
+   "name": "why",
+   "description": "why something happened or is so: causes, rules, upstream inputs"
+  },
+  {
+   "name": "decide",
+   "description": "which option to choose or whether to act, judged against rules and evidence"
+  },
+  {
+   "name": "calculate",
+   "description": "a number: a count, sum, average, minimum, maximum or grouping"
+  },
+  {
+   "name": "history",
+   "description": "what happened over time: events and state changes"
+  },
+  {
+   "name": "next",
+   "description": "what happens or should be done next: downstream effects and actions"
+  }
+ ],
+ "vocabularies": {
+  "attribute_categories": [
+   {
+    "value": "master",
+    "description": "Long-lived information that defines an entity, such as a name or an address."
+   },
+   {
+    "value": "reference",
+    "description": "A value taken from a shared list, or a pointer to another entity."
+   },
+   {
+    "value": "transaction",
+    "description": "Information recorded by one business transaction, such as an amount or a quantity."
+   },
+   {
+    "value": "metric",
+    "description": "A measured or computed number held about an entity."
+   },
+   {
+    "value": "event",
+    "description": "Information recorded when something happened, such as a timestamp."
+   }
+  ],
+  "core_attribute_categories": [
+   {
+    "value": "master",
+    "description": "A core object's long-lived defining information."
+   },
+   {
+    "value": "reference",
+    "description": "A core object's value from a shared list, or its pointer to another core object."
+   },
+   {
+    "value": "transaction",
+    "description": "A core object's information recorded per transaction."
+   },
+   {
+    "value": "metric",
+    "description": "A core object's measured or computed number."
+   }
+  ],
+  "data_types": [
+   {
+    "value": "string",
+    "description": "Free text."
+   },
+   {
+    "value": "integer",
+    "description": "A whole number."
+   },
+   {
+    "value": "decimal",
+    "description": "A number with a fractional part, such as a price."
+   },
+   {
+    "value": "boolean",
+    "description": "A true or false value."
+   },
+   {
+    "value": "date",
+    "description": "A calendar date without a time of day."
+   },
+   {
+    "value": "datetime",
+    "description": "A calendar date with a time of day."
+   },
+   {
+    "value": "enum",
+    "description": "One value from a fixed list of named options."
+   }
+  ],
+  "cardinalities": [
+   {
+    "value": "one",
+    "description": "At most one related entity on the far side of a relationship."
+   },
+   {
+    "value": "many",
+    "description": "Any number of related entities on the far side of a relationship."
+   }
+  ],
+  "physical_source_kinds": [
+   {
+    "value": "table",
+    "description": "A database table or view."
+   },
+   {
+    "value": "api",
+    "description": "A service endpoint the data is fetched from."
+   },
+   {
+    "value": "document",
+    "description": "A document such as a spreadsheet, a PDF or a web page."
+   },
+   {
+    "value": "computation",
+    "description": "A computed value whose formula, operation and inputs live in the KPI store."
+   },
+   {
+    "value": "file",
+    "description": "A data file such as a CSV export."
+   }
+  ],
+  "transformations": [
+   {
+    "value": "determine",
+    "description": "Works out a value, a choice or a plan from inputs: calculates, compares, matches or assesses."
+   },
+   {
+    "value": "approve",
+    "description": "Grants a request or an item: authorises, accepts or signs it off."
+   },
+   {
+    "value": "decline",
+    "description": "Refuses a request or an item: rejects, denies or turns it down."
+   },
+   {
+    "value": "allocate",
+    "description": "Assigns stock, staff, money or capacity to a demand: reserves, assigns or dispatches it."
+   },
+   {
+    "value": "schedule",
+    "description": "Places work, a booking or a delivery in time: sequences, books or arranges it."
+   },
+   {
+    "value": "record",
+    "description": "Captures, compiles or consolidates facts into a record: logs, registers or extracts them."
+   },
+   {
+    "value": "transfer",
+    "description": "Moves goods, money or information to another party: sends, pays, delivers or notifies."
+   },
+   {
+    "value": "produce",
+    "description": "Makes or performs the offering or a work product: prepares, builds, serves or repairs."
+   },
+   {
+    "value": "measure",
+    "description": "Observes, inspects or counts against a standard: tests, monitors, audits or reconciles."
+   },
+   {
+    "value": "adjust",
+    "description": "Changes something already in place: corrects, revises, reprices or replenishes it."
+   }
+  ],
+  "lifecycle_states": [
+   {
+    "value": "pending",
+    "description": "Not yet acted on or not yet in force: drafted, requested, submitted or awaiting review."
+   },
+   {
+    "value": "active",
+    "description": "In force or in progress: started, confirmed, assigned, issued or live."
+   },
+   {
+    "value": "approved",
+    "description": "Accepted or authorised: agreed, signed, validated or passed."
+   },
+   {
+    "value": "declined",
+    "description": "Refused or failed: rejected, denied, disputed or failed a check."
+   },
+   {
+    "value": "completed",
+    "description": "Finished: done, closed, paid, delivered, recorded or resolved."
+   },
+   {
+    "value": "cancelled",
+    "description": "Ended without completing: cancelled, withdrawn, expired, superseded or written off."
+   },
+   {
+    "value": "condition",
+    "description": "An entity's standing condition rather than a stage of its lifecycle: in stock, below reorder point, on hold."
+   }
+  ]
+ },
+ "core_roles": [
+  {
+   "name": "offering",
+   "description": "what the business sells: a product, a service or a package"
+  },
+  {
+   "name": "customer",
+   "description": "the party the business sells to"
+  },
+  {
+   "name": "supplier",
+   "description": "the party the business buys from"
+  },
+  {
+   "name": "transaction",
+   "description": "one sale, order or booking"
+  },
+  {
+   "name": "resource",
+   "description": "what the business holds and uses to deliver: stock, materials, equipment or capacity"
+  }
+ ],
+ "structures": [
+  {
+   "id": "universal",
+   "version": "1",
+   "description": "The universal default: every node kind, every registered edge kind and processes nested at most eight deep, with no process type table named.",
+   "node_kinds": [
+    "process",
+    "event",
+    "entity",
+    "state",
+    "attribute",
+    "rule",
+    "actor",
+    "metric",
+    "goal",
+    "physical_source"
+   ],
+   "edge_kinds": null,
+   "max_process_depth": 8,
+   "process_type_table": null
+  },
+  {
+   "id": "universal-typed",
+   "version": "1",
+   "description": "The universal default with the governed process type table named; every founded domain is validated against it and pins it.",
+   "node_kinds": [
+    "process",
+    "event",
+    "entity",
+    "state",
+    "attribute",
+    "rule",
+    "actor",
+    "metric",
+    "goal",
+    "physical_source"
+   ],
+   "edge_kinds": null,
+   "max_process_depth": 8,
+   "process_type_table": "process-types/v2"
+  }
+ ]
+}
