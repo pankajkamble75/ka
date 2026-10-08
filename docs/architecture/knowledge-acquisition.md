@@ -42,9 +42,10 @@ fetch / get_permissions / checkpoint / sync_incremental / revoke) and `ka/connec
 `Connection` (model) names a kind, a root under `KA_CONNECTOR_ROOTS`, scope, authority, visibility and an optional `secret_ref`
 (the NAME of an environment variable; the value is never stored). `ka/connectors/sync.py::SyncService.sync` reconciles a delta
 through the one ingestion door: new → `Source`; modified → new `SourceVersion` of the same source, re-extracted; moved → same
-source, location updated; deleted → `Source.revoked_at`, versions and derived nuggets kept and flagged (retiring them is Q4);
-permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. Cloud and
-enterprise providers are decision Q6.
+source, location updated; deleted → `Source.revoked_at`, versions kept, derived nuggets flagged (plan-08) and — **Q4, ⏳ DECIDED 2026-10-08, not built** — returned to review as candidate revisions so a person decides whether each stands on other evidence or is retired;
+permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ⏳ DECIDED 2026-10-08, not built:** the first
+provider after the folder is Microsoft 365 / SharePoint (one Graph app registration; permission lists → visibility; client secret via
+`secret_ref`); Google Workspace and a file share follow the same pattern.
 
 **Store size (plan-09, R16 benchmark half).** `tools/bench_store.py` fills a fresh repository and times cold load, status and
 scope queries, search, put and get; the measured 10k and 100k rows are in `docs/research/benchmarks/store-bench-2026-10-08.md`.
@@ -61,6 +62,13 @@ the location and touches ≥2 instances.
 Inheritance states (§9) are *derived* from the graph: an instance element with `props.realizes` is compared with its
 parent — identical → INHERITED, extra props → LOCALLY_EXTENDED, changed values → OVERRIDDEN, parent missing → CONFLICTING,
 parent element with no copy → LOCALLY_REMOVED. See `InMemoryGraphAdapter.calculate_inheritance` and the enterprise-os twin.
+
+**Content as an attack surface (Q10 — ⏳ DECIDED 2026-10-08, not built).** Document text is data, never instruction: the extraction
+prompt quotes it inside a delimited block with the instructions outside, and the model is told the block may contain text aimed
+at it. Trust tiers follow authority: INTERNET_RESEARCH and LLM_GENERATED sources are heuristic-only — they may yield candidate
+statements, but a typed assertion (process type, predicate, edge) from such a source stays `proposed` and never binds without a
+reviewer's decision. A verifier model call per assertion was declined for now (doubles model cost) and is revisited on a measured
+need. Ledger: `docs/questions/knowledge-acquisition.md` Q10.
 
 ## 4. The governance pipeline (§11–§13) — `ka/governance.py`
 
@@ -82,6 +90,12 @@ CONTRADICTS; + qualifier ("international") → SPECIALIZES (both valid); candida
 candidate at a broader scope than an existing override → CONTEXTUALIZES (override preserved). The LLM, when present, only
 adds `why_conflict / both_valid / suggested_resolution` to the finding.
 
+**Duplicates (Q11 — ⏳ DECIDED 2026-10-08, not built).** When a candidate is analysed as `duplicate_of` an ACTIVE nugget, APPROVE
+does not create a second ACTIVE version. It auto-resolves as Keep Existing: the candidate closes as a duplicate, and its source
+reference and evidence are attached to the existing nugget so the second document still counts. Refusing or allowing were
+considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`, Q11 ledger). Lives in `ka/governance.py`
+(protected): characterize first, then change.
+
 ## 5. Compilation, impact, publication (§19–§22, §26, §39, §40) — plan-05
 
 `knowledge.approved` → `GraphChangeService.propose_for(v)`:
@@ -99,7 +113,7 @@ adds `why_conflict / both_valid / suggested_resolution` to the finding.
    second one. The EOS-side base key on instance changes is Q7.
 4. `validate` — Invariant 2 (lineage on every op), adapter validation, governed-knowledge check → READY or FAILED.
 5. `requires_approval` when affected instances ≥ `KA_HIGH_IMPACT_INSTANCES` or any descendant is OVERRIDDEN; the policy flag
-   `auto_approve_low_impact` may approve, and publishes only under `KA_EOS_AUTO_ACTOR` (a person) when the adapter needs one.
+   `auto_approve_low_impact` may approve, and publishes only under `KA_EOS_AUTO_ACTOR` (a person) when the adapter needs one. **Q3 — ✅ DECIDED 2026-10-08, built:** the switch is OFF by default; every proposal is a deliberate second approval by a named person; revisit with volume data.
 6. `apply` — **publication through the adapter**, never a direct write: `InMemoryGraphAdapter.publish` validates and applies to the
    shadow graph; `EnterpriseOSGraphAdapter.publish` goes through EOS's own lifecycle (`proposals.py`): INSTANCE scope →
    `propose_instance_change` → `approve(actor)` → `apply`; DOMAIN scope → `propose_promotion(base_version)` → `request_approval` →
@@ -132,6 +146,15 @@ out-of-list output is dropped and disclosed in `SourceVersion.extraction_report`
 numbered lists that emits `description`, `decomposes_into`, `performed_by` and never a type. `GovernanceService.extract_from_source`
 runs it after the statement pass, so both share source, scope and the one governance door; every assertion's evidence carries a span.
 
+**Evidence in the Enterprise console (Q9 — ✅ DECIDED 2026-10-08: not yet).** The Live Console frontend stays pinned (EOS Q418); the
+evidence behind a published node is read through KA's lineage API and the Knowledge Console. Revisit once real published graphs exist.
+
+**Repinning after a domain write (Q2 — ⏳ DECIDED 2026-10-08, not built).** KA never repins an instance automatically. After a
+promotion is applied, the graph-change page lists every instance still pinned to the previous substructure version (the
+`pinned_instances` the adapter already reports) with a Repin action; a named person repins each one, KA calls the store's own
+`repin`, and the audit records who moved which instance to which version. Until repinned, the instance's inheritance state
+shows it behind the domain. Ledger: `docs/questions/knowledge-acquisition.md` Q2.
+
 ## 6. Research (§3.2, §16–§18) — `ka/research.py`
 
 `ResearchOrchestrator.run_mission`: Enterprise Content (reads repository sources on the scope chain, filtered by
@@ -142,7 +165,7 @@ runs it after the statement pass, so both share source, scope and the one govern
 reuse ACTIVE knowledge on the scope chain, open a mission only for the gap.
 
 **Discovery (plan-07, R9).** `ka/discovery.py::DiscoveryAgent` runs first in the coordinator: the objective and questions become
-queries for a `SearchProvider` (a seam — `none` or `fixture` until Q5 names a real one); results are canonicalised (fragments and
+queries for a `SearchProvider` (`none` or `fixture` today; **Q5 — ⏳ DECIDED 2026-10-08, not built:** a paid web-search API chosen on price, one provider class behind this seam, key in the environment, `KA_SEARCH_MONTHLY_CAP` on top of the per-mission budget); results are canonicalised (fragments and
 tracking parameters dropped), deduplicated, filtered by `KA_ALLOWED_DOMAINS`, `is_safe_url` and `robots.txt` (fetched through
 `safe_fetch`, cached per run; unreachable = allowed, recorded), ranked by overlap with the objective and cut at `KA_DISCOVERY_BUDGET`;
 every skip carries its reason in `ResearchRun.discovery`. The Internet agent fetches the selection only when `KA_RESEARCH_INTERNET`
@@ -169,6 +192,8 @@ actors, inputs, outputs, entities, rules, events, states — each field carrying
 is published as; PENDING ones are listed apart; `coverage` reports the bound type's required and recommended slots as evidenced
 or not, from EOS's slot grammar, and nothing is ever filled in. It is a query, never a stored object. Surfaces:
 `GET /processes`, `GET /processes/{key}`, the "Processes" mode of Browse by scope, and the subject page for process subjects.
+**Q8 — ⏳ DECIDED 2026-10-08, not built:** Processes becomes a fifth top-level tab (Add knowledge · Knowledge nuggets · Browse by scope
+· Processes · Dashboard, plus Images) pointing at this view; the note's five-page layout is declined.
 No new tab while Q8 is parked.
 
 ## 9. Events and audit (§38, §41)
@@ -188,11 +213,11 @@ while a request is OPEN or IN_RESEARCH returns that request (`GapOutcome.dedupli
 IN_RESEARCH; approving a candidate from that mission marks it FULFILLED (`ka/service.py` subscriber → `RuntimeGuard.fulfil_from_approval`);
 `cancel` works from the live states only. Routes `GET /runtime/requests[?status=]`, `GET /runtime/requests/{id}`,
 `POST /runtime/requests/{id}/cancel`; the Dashboard's needs-attention table shows principal · intent, status and Cancel.
-The door (`retrieve_for_answer`) is unchanged. **Whether EOS calls this contract is Q7.**
+The door (`retrieve_for_answer`) is unchanged. **Q7 — ⏳ DECIDED 2026-10-08, not built (EOS repo):** Enterprise OS routes `found_new` through this contract first (intent `found_new`, principal = the EOS runtime, correlation id = the EOS gap id); `grow_existing` stays in EOS for now. The same EOS change exposes the grammar read-only with a digest and accepts a base key on instance proposals. Delivered under the Enterprise OS pipeline. Ledger: `docs/questions/knowledge-acquisition.md` Q7.
 
 ## 10. Security (§42)
 
-**Step 1 — built by plan-02 (2026-10-08).** Every `/api/knowledge-acquisition/*` route runs `require_access`
+**Step 1 — ✅ DECIDED by the author 2026-10-08 (Q1: loopback + bearer token) and built by plan-02 (2026-10-08).** Every `/api/knowledge-acquisition/*` route runs `require_access`
 (`ka/security.py`) under `KA_ACCESS_POLICY`: `token` (default, Q1's recommendation) admits loopback peers and non-loopback
 peers presenting `Authorization: Bearer <KA_ACCESS_TOKEN>`; `loopback` copies enterprise-os's containment; `open` is the
 pre-plan-02 behaviour. Uploads are capped by `KA_MAX_UPLOAD_MB` (`ka/api.py::_read_capped`, 413). `link()` and the Internet
@@ -200,7 +225,7 @@ agent fetch only through `is_safe_url` / `safe_fetch` (loopback, link-local, pri
 re-checked per hop; `KA_URL_ALLOWLIST` for intranet hosts). A CHANGE_SCOPE or promotion that would widen a nugget's
 visibility is refused unless the decision carries `widen_visibility=True`, and then records `visibility_change`
 (`ka/vocab.py::required_visibility`, `ka/governance.py` CHANGE_SCOPE branch, `ka/promotion.py::decide`). **Step 2** —
-identity provider, tenant model, retention after revocation — remains Q4.
+identity provider and tenant model remain a two-repo plan (Q4, provider not yet named). **Retention after revocation is decided (Q4, 2026-10-08): re-review** — every ACTIVE nugget derived from a revoked source becomes a candidate revision in Pending with `source_revoked`; APPROVE keeps it on its other evidence, REJECT retires the prior version (OBSOLETE) and raises a graph proposal; never automatic, never silently live. ⏳ not built.
 
 `Source.visibility`/`permissions`; a nugget's `visibility` is the narrowest of its sources; research agents skip sources more restricted
 than the mission's `permitted_visibility` unless the requester owns them. Access *enforcement* at the API edge (authn) is out of scope for

@@ -2,6 +2,27 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 21:10 UTC — question session: Q1–Q11 answered by the author
+
+**What changed**
+
+- `docs/trackers/QUESTIONS-TRACKER.md`: Class and Severity columns added (Q231); all eleven rows ANSWERED with the decision verbatim.
+- `docs/questions/knowledge-acquisition.md`: every question moved from ❓ Open to ✅ Decided with its reasoning; the original Q&A kept
+  in `<details>` ledgers; the Open block is empty.
+- `docs/architecture/knowledge-acquisition.md`: each decision written as a rule with its state — Q1 (token access) and Q3 (auto-apply
+  off) ✅ built; Q9 (no re-pin) ✅ current state; Q2, Q4, Q5, Q6, Q8, Q10, Q11 ⏳ DECIDED, not built; Q7 ⏳ DECIDED, not built, EOS repo.
+- `docs/trackers/RESEARCH-TRACKER.md`: R13 and R14 → DECIDED; R11's note records the Q7 decision.
+
+**Why** — the ship run parked eleven author decisions; the `questions` skill walked them one at a time, severity first (7 MAJOR, 4 MINOR).
+
+**Verification** — docs only; no code changed; no tests run.
+
+**Follow-ups / risks** — the unlocked work (listed in the session report) needs plans: Q11 duplicates, Q10 injection defences, Q2 repin,
+Q4 re-review on revocation, Q5 search provider, Q6 M365 connector, Q8 Processes tab; Q7 is an Enterprise OS research.
+
+**Decisions and questions** — ANSWERED: Q1–Q11 (all in `docs/questions/knowledge-acquisition.md` ✅ Decided and in the architecture).
+RAISED: none. Plan: none (question session).
+
 ## 2026-10-08 20:20 UTC — plan-09: the gap request contract (KA half), events as an outbox, the store benchmark (research-01 R11, R15, R16)
 
 **What changed**

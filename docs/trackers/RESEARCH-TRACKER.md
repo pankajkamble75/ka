@@ -9,8 +9,8 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 
 | Research | Point | Plan | State | SHA | Notes |
 |---|---|---|---|---|---|
-| research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | OPEN | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
-| research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | OPEN | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
+| research-01 | R13 — Decide console shape: four tabs + Images + Processes vs note's five pages (MINOR) | — | DECIDED (2026-10-08, Q8: add a Processes tab; plan-able) | — | From research-01; Decision parked as Q8 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
+| research-01 | R14 — Decide re-pin of EOS console frontend (Q418) for process evidence panel (MINOR) | — | DECIDED (2026-10-08, Q9: not yet; nothing to build) | — | From research-01; Decision parked as Q9 (docs/questions/knowledge-acquisition.md); see `docs/research/research-01.md` §Research points. |
 
 ## Closed
 
