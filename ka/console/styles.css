@@ -96,3 +96,6 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .img-card.focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 #paste-zone:focus { border-color: var(--accent); color: var(--ink); }
 #img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: var(--s-16); }
+.backbar { margin: 0 0 var(--s-12); }
+.backbar a { display: inline-block; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.backbar a:hover { border-color: var(--accent); text-decoration: none; color: var(--accent); }

@@ -42,12 +42,27 @@ const routes = [
   [/^#\/change\/([^/]+)$/, changeView],
   [/^#\/scope\/([A-Z_]+)\/([^/]+)(?:\/([a-z-]+))?$/, (t, i) => { location.hash = `#/browse?scope=${t}|${i}`; return ''; }],
 ];
+const TAB_LABELS = { '#/add': '1 · Add knowledge', '#/nuggets': '2 · Knowledge nuggets', '#/browse': '3 · Browse by scope', '#/dashboard': '4 · Dashboard', '#/images': '5 · Images' };
+function tabOf(hash) { const base = (hash || '#/').split('?')[0]; return base === '#/' || base === '#' ? '#/dashboard' : (TAB_LABELS[base] ? base : null); }
+let lastTab = null;
+try { lastTab = sessionStorage.getItem('ka.lastTab'); } catch { /* private mode */ }
+
 async function render() {
   const main = $('#main');
   const h = location.hash || '#/';
+  const tab = tabOf(h);
+  if (tab) { lastTab = h; try { sessionStorage.setItem('ka.lastTab', h); } catch { /* ignore */ } }
   for (const [re, fn] of routes) {
     const m = h.match(re);
-    if (m) { try { main.innerHTML = await fn(...m.slice(1)); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; } bind(main); break; }
+    if (m) {
+      try { main.innerHTML = await fn(...m.slice(1)); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+      if (!tab) {
+        const back = lastTab || '#/nuggets';
+        const label = TAB_LABELS[tabOf(back)] || 'Knowledge nuggets';
+        main.insertAdjacentHTML('afterbegin', `<div class="backbar"><a href="${esc(back)}">← Back to ${esc(label)}</a></div>`);
+      }
+      bind(main); break;
+    }
   }
   await nav();
 }
@@ -63,12 +78,14 @@ async function nav() {
   const h = location.hash || '#/';
   const on = (p) => (h === p || h.startsWith(p + '?') || (p === '#/dashboard' && h === '#/') ? 'active' : '');
   const detail = /^#\/(nugget|conflict|source|mission|change)\//.test(h);
+  const from = detail ? tabOf(lastTab || '#/nuggets') : null;
+  const onD = (p) => (from === p ? 'active' : '');
   $('#nav').innerHTML = `
-    <a href="#/add" class="${on('#/add')}">1 · Add knowledge</a>
-    <a href="#/nuggets" class="${on('#/nuggets') || (detail ? 'active' : '')}">2 · Knowledge nuggets</a>
-    <a href="#/browse" class="${on('#/browse')}">3 · Browse by scope</a>
-    <a href="#/dashboard" class="${on('#/dashboard')}">4 · Dashboard</a>
-    <a href="#/images" class="${on('#/images')}">5 · Images</a>
+    <a href="#/add" class="${on('#/add') || onD('#/add')}">1 · Add knowledge</a>
+    <a href="#/nuggets" class="${on('#/nuggets') || onD('#/nuggets')}">2 · Knowledge nuggets</a>
+    <a href="#/browse" class="${on('#/browse') || onD('#/browse')}">3 · Browse by scope</a>
+    <a href="#/dashboard" class="${on('#/dashboard') || onD('#/dashboard')}">4 · Dashboard</a>
+    <a href="#/images" class="${on('#/images') || onD('#/images')}">5 · Images</a>
     <h4>You</h4><input id="who" value="${esc(who())}" title="Your name, recorded on decisions">`;
   $('#who').addEventListener('change', (e) => { localStorage.setItem('ka.user', e.target.value); toast('Acting as ' + e.target.value); });
 }
