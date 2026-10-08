@@ -371,6 +371,10 @@ class ElementChange(BaseModel):
     operation: str                                  # create | update | remove
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
+    # [block plan-05] the EOS-shaped op this change renders to, and the edge triple for edge changes
+    op: str | None = None                           # add_node | set_props | remove_node | add_edge | remove_edge
+    edge: dict[str, str] | None = None              # {"kind", "source", "target"}
+    # [/block plan-05]
 
 
 class GraphChangeProposal(BaseModel):
@@ -394,6 +398,14 @@ class GraphChangeProposal(BaseModel):
     applied_at: str | None = None
     execution_ids: list[str] = Field(default_factory=list)
     requires_approval: bool = True
+    # plan-05 (research-01 R1, R7): publication record and content key
+    idempotency_key: str | None = None
+    ops: list[dict[str, Any]] = Field(default_factory=list)
+    eos_proposal_id: str | None = None
+    eos_base_version: str | None = None
+    eos_status: str | None = None
+    new_version: str | None = None
+    pinned_instances: list[str] = Field(default_factory=list)
 
 
 class GraphChangeExecution(BaseModel):

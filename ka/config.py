@@ -72,6 +72,10 @@ declare("KA_GRAMMAR_DIR", str, "", "ka.grammar", "Directory holding EOS grammar.
 # [block plan-04]
 declare("KA_OCR", bool, False, "ka.extraction", "OCR text-less PDFs and images (needs the 'ocr' extra: pdf2image, pytesseract).")
 # [/block plan-04]
+# [block plan-05]
+declare("KA_EOS_AUTO_ACTOR", str, "", "ka.graph_change",
+        "A person's name under which KA's auto-approved low-impact proposals are published to EOS. Empty: they wait for a person.")
+# [/block plan-05]
 
 _overrides: dict[str, Any] = {}
 

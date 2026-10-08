@@ -53,10 +53,35 @@ class GraphAdapter(Protocol):
     def validate_change(self, changes: list[ElementChange]) -> list[dict[str, Any]]: ...
     def apply_change(self, changes: list[ElementChange]) -> None: ...
     def rollback_change(self, changes: list[ElementChange]) -> None: ...
+    # plan-05: publication through the store's own lifecycle (block below)
+    def publish(self, scope: Scope, changes: list[ElementChange], *, actor: str, reason: str, base_version: str | None,
+                rollback: bool = False) -> PublishResult: ...
+    def base_version(self, scope: Scope) -> str | None: ...
+    def resolve_element_id(self, scope: Scope, local_id: str) -> str: ...
+    def edge_target_kind(self, edge: str) -> str | None: ...
+    def needs_named_actor(self) -> bool: ...
 
 
 class GraphValidationError(RuntimeError):
     pass
+
+
+# plan-05: publication types (the plan-05 block is the EOS adapter's publish below)
+class PublishRefused(RuntimeError):
+    """The target graph store refused the publication (EOS `ProposalRefused` / `GraphRejected`, or the in-memory validator)."""
+
+    def __init__(self, code: str, detail: str, findings: list[Any] | None = None):
+        super().__init__(detail)
+        self.code, self.detail, self.findings = code, detail, findings or []
+
+
+class PublishResult(BaseModel):
+    applied: bool = True
+    eos_proposal_id: str | None = None
+    eos_status: str | None = None
+    new_version: str | None = None
+    pinned_instances: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
 
 
 # ====================================================================== in-memory reference adapter
@@ -228,6 +253,7 @@ class InMemoryGraphAdapter:
                 g.pop(c.element_id, None)
                 continue
             after = copy.deepcopy(c.after or {})
+            after.pop("kind", None)                     # plan-05: the EOS node kind rides in `after`; GraphElement keeps its own `kind`
             el = g.get(c.element_id)
             if el is None:
                 g[c.element_id] = GraphElement(graph_id=c.graph_id, element_id=c.element_id, kind=c.element_kind,
@@ -236,6 +262,7 @@ class InMemoryGraphAdapter:
                 data = el.model_dump()
                 props = dict(data["props"])
                 props.update(after.pop("props", {}))
+                after.pop("source", None); after.pop("target", None)
                 data.update(after)
                 data["props"] = props
                 g[c.element_id] = GraphElement(**data)
@@ -254,6 +281,46 @@ class InMemoryGraphAdapter:
     def snapshot(self, graph_id: str, element_id: str) -> dict[str, Any] | None:
         el = self.get_graph_element(graph_id, element_id)
         return el.model_dump(include={"name", "description", "props", "source", "target"}) if el else None
+
+    # plan-05 (block at the EOS adapter): the shadow store publishes by applying.
+    def publish(self, scope, changes, *, actor, reason, base_version, rollback=False):
+        if rollback:
+            # `changes` is already the inverse list (graph_change.inverse_changes); apply it without the lineage gate,
+            # because restoring a pre-KA element legitimately restores props that carried no lineage.
+            for c in changes:
+                g = self.graphs.setdefault(c.graph_id, {})
+                if c.operation == "remove":
+                    g.pop(c.element_id, None)
+                elif c.after is not None:
+                    data = dict(c.after); data.pop("kind", None); data.pop("source", None); data.pop("target", None)
+                    el = g.get(c.element_id)
+                    g[c.element_id] = GraphElement(graph_id=c.graph_id, element_id=c.element_id, kind=c.element_kind, scope=self._scope_of[c.graph_id],
+                                                   source=el.source if el else None, target=el.target if el else None, **data)
+            self._save()
+            return PublishResult(applied=True, notes=["in-memory rollback"])
+        bad = [r for r in self.validate_change(changes) if not r["ok"]]
+        if bad:
+            raise PublishRefused("invalid_change", "; ".join(f"{b['element_id']}: {b['detail']}" for b in bad), bad)
+        self.apply_change(changes)
+        return PublishResult(applied=True, pinned_instances=[s.scope_id for s in self.find_descendants(scope)] if scope.scope_type != ScopeType.INSTANCE else [])
+
+    def base_version(self, scope):
+        return None
+
+    def resolve_element_id(self, scope, local_id):
+        gid = self._graph_of.get(scope.key())
+        if gid:
+            for eid in self.graphs.get(gid, {}):
+                if eid.endswith("/" + local_id):
+                    return eid
+        return local_id
+
+    def edge_target_kind(self, edge):
+        return {"contains": "process", "consumes": "entity", "produces": "entity", "acts_on": "entity", "performed_by": "actor",
+                "governed_by": "rule", "emits": "event", "transitions_to": "state", "has_goal": "goal"}.get(edge)
+
+    def needs_named_actor(self):
+        return False
 
 
 def _compare(parent: GraphElement, child: GraphElement) -> InheritanceState:
@@ -402,64 +469,97 @@ class EnterpriseOSGraphAdapter:
             results.append({"graph_id": c.graph_id, "element_id": c.element_id, "operation": c.operation, "ok": ok, "detail": why})
         return results
 
+    # [block plan-05]
     def apply_change(self, changes):
-        from knowledge_worker.graph_model.model import Edge, Node  # type: ignore
-
-        bad = [r for r in self.validate_change(changes) if not r["ok"]]
-        if bad:
-            raise GraphValidationError("; ".join(f"{b['element_id']}: {b['detail']}" for b in bad))
-        by_graph: dict[str, list[ElementChange]] = {}
-        for c in changes:
-            by_graph.setdefault(c.graph_id, []).append(c)
-        for gid, cs in by_graph.items():
-            is_instance = gid in self.store.list_instances()
-            g = self._graph(gid)
-            nodes = {n.id: n for n in g.nodes}
-            edges = {e.id: e for e in g.edges}
-            for c in cs:
-                after = dict(c.after or {})
-                props_patch = after.pop("props", {})
-                if c.operation == "remove":
-                    nodes.pop(c.element_id, None)
-                    edges.pop(c.element_id, None)
-                    continue
-                if c.element_kind == GraphElementKind.EDGE:
-                    cur = edges.get(c.element_id)
-                    data = cur.model_dump() if cur else {"id": c.element_id, "kind": after.get("kind", "relates_to"),
-                                                          "source": after.get("source"), "target": after.get("target"), "props": {}}
-                    data["props"] = {**data["props"], **props_patch}
-                    edges[c.element_id] = Edge(**data)
-                else:
-                    cur = nodes.get(c.element_id)
-                    data = cur.model_dump() if cur else {"id": c.element_id, "kind": after.get("kind", "rule"), "name": after.get("name", c.element_id),
-                                                          "description": after.get("description", ""), "props": {}}
-                    for k in ("name", "description"):
-                        if k in after:
-                            data[k] = after[k]
-                    data["props"] = {**data["props"], **props_patch}
-                    nodes[c.element_id] = Node(**data)
-            new_graph = g.model_copy(update={"nodes": list(nodes.values()), "edges": list(edges.values())})
-            if is_instance:
-                self.store.put_instance_graph(gid, new_graph)
-            else:
-                self.store.put_substructure(new_graph)   # new immutable domain version; instances repin separately
+        raise NotImplementedError("EnterpriseOSGraphAdapter writes only through publish() — the EOS proposal lifecycle (plan-05, research-01 R1)")
 
     def rollback_change(self, changes):
-        inverse = []
-        for c in reversed(changes):
-            if c.operation == "create":
-                inverse.append(ElementChange(graph_id=c.graph_id, element_id=c.element_id, element_kind=c.element_kind, operation="remove"))
-            elif c.before is not None:
-                inverse.append(ElementChange(graph_id=c.graph_id, element_id=c.element_id, element_kind=c.element_kind,
-                                             operation="update", after=c.before))
-        # rollback writes go straight through; the lineage they restore is the pre-change lineage
-        from knowledge_worker.graph_model.model import Edge, Node  # type: ignore  # noqa: F401
-        self._apply_unvalidated(inverse)
+        raise NotImplementedError("EnterpriseOSGraphAdapter rolls back only through publish(rollback=True) (plan-05)")
 
-    def _apply_unvalidated(self, changes):
-        saved = self.validate_change
-        self.validate_change = lambda cs: [{"ok": True}]  # type: ignore
+    def needs_named_actor(self):
+        return True
+
+    def base_version(self, scope):
+        if scope.scope_type == ScopeType.DOMAIN:
+            return self.store.list_substructures().get(scope.scope_id)
+        return None
+
+    def resolve_element_id(self, scope, local_id):
+        if scope.scope_type == ScopeType.INSTANCE:
+            manifest, g = self.store.get_instance(scope.scope_id)
+            ids = {n.id for n in g.nodes} | {e.id for e in g.edges}
+            for sid in manifest.pins:
+                if f"{sid}/{local_id}" in ids:
+                    return f"{sid}/{local_id}"
+        return local_id
+
+    def edge_target_kind(self, edge):
         try:
-            self.apply_change(changes)
-        finally:
-            self.validate_change = saved  # type: ignore
+            from knowledge_worker.graph_model.edges import EDGE_SPECS  # type: ignore
+            spec = EDGE_SPECS.get(edge)
+            to = getattr(spec, "to", None) or getattr(spec, "to_kinds", None)
+            return list(to)[0] if to else None
+        except Exception:
+            return {"contains": "process", "consumes": "entity", "produces": "entity", "acts_on": "entity", "performed_by": "actor",
+                    "governed_by": "rule", "emits": "event", "transitions_to": "state"}.get(edge)
+
+    def _typed_target(self, scope) -> bool:
+        """Does the target graph pin a structure with a process-type table? Under `universal@1` `process_type` is an ERROR."""
+        try:
+            if scope.scope_type == ScopeType.INSTANCE:
+                m, _ = self.store.get_instance(scope.scope_id)
+                sid, ver = m.structure_id, m.structure_version
+            else:
+                g = self.store.get_substructure(scope.scope_id)
+                sid, ver = g.structure_id, g.structure_version
+            st = self.store.structures.get((sid, ver))
+            return bool(st is not None and getattr(st, "process_type_table", None))
+        except Exception:
+            return False
+
+    def publish(self, scope, changes, *, actor, reason, base_version, rollback=False):
+        """Publish through EOS's own lifecycle: INSTANCE → propose_instance_change; DOMAIN → propose_promotion(base_version)
+        → request_approval; then approve(actor) + apply unless HOTL already applied it. Never writes the store directly."""
+        from knowledge_worker.graph_store import proposals as P  # type: ignore
+        from knowledge_worker.graph_store.errors import GraphRejected, StoreError  # type: ignore
+        from ka.graph_change import to_change_ops
+
+        notes: list[str] = []
+        ops = to_change_ops(changes)
+        if not self._typed_target(scope):
+            for op in ops:
+                props = (op.get("node") or {}).get("props") if op.get("node") else op.get("props")
+                if props and props.pop("process_type", None) is not None:
+                    notes.append(f"process_type omitted on {op.get('id') or op['node']['id']}: target structure has no process-type table")
+        for op in ops:
+            props = (op.get("node") or op.get("edge") or {}).get("props") if (op.get("node") or op.get("edge")) else op.get("props")
+            if props is not None:
+                props.pop("description_text", None)
+        try:
+            if scope.scope_type == ScopeType.INSTANCE:
+                pr = P.propose_instance_change(scope.scope_id, ops, actor=actor, reason=reason, store=self.store)
+                if str(pr.status.value if hasattr(pr.status, "value") else pr.status) == "awaiting_approval":
+                    pr = P.approve(pr.id, actor=actor, reason=reason, store=self.store)
+                    pr = P.apply(pr.id, store=self.store)
+                return PublishResult(applied=True, eos_proposal_id=pr.id, eos_status=str(getattr(pr.status, "value", pr.status)), notes=notes)
+            if scope.scope_type != ScopeType.DOMAIN:
+                raise PublishRefused("author_only", f"{scope.key()}: structure-tier publication is author-only in EOS")
+            base = base_version or self.base_version(scope)
+            pr = P.propose_promotion(scope.scope_id, base, ops=ops, actor=actor, reason=reason, store=self.store)
+            pinned = list(getattr(pr.preview, "pinned_instances", []) or [])
+            status = str(getattr(pr.status, "value", pr.status))
+            if status == "previewed":
+                pr = P.request_approval(pr.id, store=self.store)
+                status = str(getattr(pr.status, "value", pr.status))
+            if status == "awaiting_approval":
+                pr = P.approve(pr.id, actor=actor, reason=reason, store=self.store)
+                pr = P.apply(pr.id, store=self.store)
+            return PublishResult(applied=True, eos_proposal_id=pr.id, eos_status=str(getattr(pr.status, "value", pr.status)),
+                                 new_version=getattr(pr, "new_version", None), pinned_instances=pinned, notes=notes)
+        except P.ProposalRefused as e:
+            raise PublishRefused(getattr(e, "code", "refused"), str(e)) from e
+        except GraphRejected as e:
+            raise PublishRefused("graph_rejected", str(e), [f.model_dump() if hasattr(f, "model_dump") else str(f) for f in getattr(e, "findings", [])]) from e
+        except StoreError as e:
+            raise PublishRefused(type(e).__name__, str(e)) from e
+    # [/block plan-05]

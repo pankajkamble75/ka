@@ -69,23 +69,32 @@ CONTRADICTS; + qualifier ("international") → SPECIALIZES (both valid); candida
 candidate at a broader scope than an existing override → CONTEXTUALIZES (override preserved). The LLM, when present, only
 adds `why_conflict / both_valid / suggested_resolution` to the finding.
 
-## 5. Compilation, impact, change (§19–§22, §26, §39, §40)
+## 5. Compilation, impact, publication (§19–§22, §26, §39, §40) — plan-05
 
 `knowledge.approved` → `GraphChangeService.propose_for(v)`:
 
-1. `GraphImpactService.analyze(v)` — elements depending on prior versions of `v.canonical_id`; per element INHERITED → "proposed
-   update", OVERRIDDEN → "review only"; per descendant scope an `InheritanceEffect`; the §21 counts.
-2. `_changes_from` — new knowledge compiles to one element (`KIND_FOR_KNOWLEDGE`: rule/policy/constraint/condition → rule,
-   process_step → step, definition/concept → concept, relationship → edge …) with `props.statement`, `props.value` (first
-   number) and `props.knowledge_lineage = [{nugget_id, version, governance_decision_id, graph_change_id}]` (§40 — a reference,
-   never the nugget). A revision updates every dependent element. An instance nugget that SPECIALIZES a parent nugget updates the
-   *realized copy* of the parent's element (an override), not a second rule. Downward propagation (§26) adds updates for every
-   INHERITED realized copy in descendant scopes and leaves OVERRIDDEN / LOCALLY_REMOVED ones alone.
-3. `validate` — Invariant 2 (lineage on every change), adapter validation, governed-knowledge check → READY or FAILED.
-4. `requires_approval` when affected instances ≥ `KA_HIGH_IMPACT_INSTANCES` or any descendant is OVERRIDDEN; otherwise a policy flag
-   (`auto_approve_low_impact`) may approve + apply.
-5. `apply` — adapter writes, then `LineageService.register` for every element (retiring the old version's dependency) → Invariants 4/5.
-6. `rollback(execution_id)` — inverse of the applied changes, old lineage restored.
+1. `GraphImpactService.analyze(v)` — elements depending on prior versions of `v.canonical_id`; INHERITED → "proposed update",
+   OVERRIDDEN → "review only"; per descendant scope an `InheritanceEffect`; the §21 counts.
+2. `emit_ops` (research-01 R1, R2) — a nugget WITH a subject becomes ops on the element whose id derives from the subject's
+   canonical key (`ka/graph_change.py::element_id_for`: `p.<key>`, child process `p.<parent>.<child>`, `e.`/`ac.`/`r.`/`ev.`/`s.` by
+   kind); `typed_as` sets `props.process_type` and relation predicates add the object node and the edge ONLY when the grammar
+   binding is `bound` (§5a); `description` sets the node's description; every op carries `props.knowledge_lineage =
+   [{nugget_id, version, governance_decision_id, graph_change_id}]` (§40 — a reference, never the nugget). A nugget WITHOUT a
+   subject keeps plan-01's statement compilation (`r.<slug(title)>` + `props.statement/value`). `to_change_ops` renders KA's
+   `ElementChange`s as EOS `ChangeOp` dicts (`add_node | set_props | add_edge | remove_*`).
+3. Idempotency (R7, KA half): `idempotency_key = sha256(refs + ops)`; a live proposal with the same key is returned instead of a
+   second one. The EOS-side base key on instance changes is Q7.
+4. `validate` — Invariant 2 (lineage on every op), adapter validation, governed-knowledge check → READY or FAILED.
+5. `requires_approval` when affected instances ≥ `KA_HIGH_IMPACT_INSTANCES` or any descendant is OVERRIDDEN; the policy flag
+   `auto_approve_low_impact` may approve, and publishes only under `KA_EOS_AUTO_ACTOR` (a person) when the adapter needs one.
+6. `apply` — **publication through the adapter**, never a direct write: `InMemoryGraphAdapter.publish` validates and applies to the
+   shadow graph; `EnterpriseOSGraphAdapter.publish` goes through EOS's own lifecycle (`proposals.py`): INSTANCE scope →
+   `propose_instance_change` → `approve(actor)` → `apply`; DOMAIN scope → `propose_promotion(base_version)` → `request_approval` →
+   `approve` → `apply`, which writes a NEW immutable substructure version and leaves instance pins alone (`pinned_instances` reported
+   as "repin required", Q2). `ProposalRefused` (incl. `stale_base`) / `GraphRejected` → KA FAILED with the code. Under an untyped
+   structure (`universal@1`) `process_type` is omitted with a note. Then `LineageService.register` for every element read back
+   → Invariants 4/5. The adapter's direct `apply_change` is retired (`NotImplementedError`).
+7. `rollback(execution_id)` — publishes the inverse ops (EOS: a second proposal) and restores the old lineage.
 
 ## 5a. Process assertions and grammar binding (research-01 R2, R8 — plan-03)
 

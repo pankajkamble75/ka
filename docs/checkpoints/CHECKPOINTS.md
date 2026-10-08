@@ -2,6 +2,57 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-08 16:45 UTC — plan-05: publish through EOS — ChangeOps by canonical identity, idempotent (research-01 R1, R2 last clause, R7 KA half)
+
+**What changed**
+
+- *Compiler → emitter (protected)* `ka/graph_change.py`: `element_id_for` (subject kind prefix + canonical key; child process
+  `p.<parent>.<child>`), `emit_ops` (ops on the canonical element; `process_type` and edges only from `bound` bindings; object nodes
+  created with lineage; edge ids with a realized endpoint write `/` as `~`), `to_change_ops` (EOS `ChangeOp` dicts),
+  `idempotency_key_for` (refs + element ids; a live match is returned by `propose_for`), `apply` publishes through `adapter.publish`
+  and records `eos_proposal_id / eos_status / new_version / pinned_instances` (repin reported, never done — Q2), refusal and
+  `stale_base` → FAILED with the code; `rollback` publishes `inverse_changes`; auto-approved proposals under EOS wait unless
+  `KA_EOS_AUTO_ACTOR` names a person. Statement-only nuggets keep plan-01's compilation (`_statement_changes`).
+- *Adapters* `ka/graph_adapter.py`: `PublishRefused`, `PublishResult`; protocol `publish / base_version / resolve_element_id /
+  edge_target_kind / needs_named_actor`; in-memory publish = validate + apply (rollback applies the inverse without the lineage
+  gate); `EnterpriseOSGraphAdapter.publish` through `proposals.py` (INSTANCE → `propose_instance_change` → `approve` → `apply`;
+  DOMAIN → `propose_promotion(base_version)` → `request_approval` → `approve` → `apply`), `process_type` omitted under an untyped
+  structure with a note; `apply_change` / `rollback_change` retired (`NotImplementedError`).
+- *Model/config* `ka/model.py`: `ElementChange.op/edge`; `GraphChangeProposal` publication fields. `ka/config.py`: `KA_EOS_AUTO_ACTOR`.
+- *Console* `ka/console/app.js`: Publication card on the graph-change page (content key, EOS proposal + status, base → new version,
+  pinned instances with "repin required (Q2)", notes, ops).
+- *Docs/tests*: architecture §5 rewritten; `docs/protected.md` row names `publish` and the EOS test; `plan-05.md` (with the survey
+  correction note); `ka/tests/test_plan05_publication.py` (14 cases; characterization `60ed811`), `ka/tests/test_plan05_eos_publication.py`
+  (7 cases, EOS interpreter, temp typed store, HOTL human); `e2e/plan05_publication_flow.py`.
+
+**Why**
+
+research-01 §1 and §Why-it-matters 1: KA minted graph ids from title slugs and wrote into EOS directly, bypassing the proposal
+lifecycle EOS already runs. Now identity is the subject's canonical key, publication is EOS's own propose → approve → apply under
+the approver's name, a stale base is a refusal KA records, and a retry returns the live proposal.
+
+**Verification**
+
+- `pytest ka/tests` (in-process) → 136 passed; EOS-path suite from the EOS interpreter → 7 passed; read-only adapter tests → 3 passed;
+  ruff F clean. Verify recount: 10/10 deliverables, 12/12 positive, 9/9 negative; blocks 5/5, none undeclared.
+- Protected: characterization `60ed811` before the change; covering suites byte-identical; Verified date bumped. P7a rewritten
+  post-change as the contrast (pre-change photo in 60ed811).
+- Live: `e2e/plan05_publication_flow.py` 4/4 PASS; screenshot verified.
+- Product tests (research-01): **PT2, PT3, PT4 PASS** (this plan), PT1 (plan-04), PT5, PT6 (plan-02) PASS; PT7 FAIL (plan-07), PT8 FAIL (plan-08).
+
+**Follow-ups / risks**
+
+- Domain publications leave instances pinned to the old version; nothing repins (Q2). The proposal lists them.
+- Under HOTL `auto`, EOS applies at propose time with actor `hotl:auto`; KA still records the KA approver. The EOS tests run `human`.
+- Statement-only nuggets still compile to slug ids (`r.<slug(title)>`); out of R2's scope, noted in the plan.
+
+**Decisions and questions**
+
+- Plan `plan-05`; research points R1, R7 (KA half) → UPLOADED; R2's last clause (canonical-key ids) delivered as plan-03 promised.
+- BUILT: `knowledge-acquisition.md` §5 "Compilation, impact, publication" — rewritten with paths.
+- Deviations from plan recorded: idempotency key = refs + element ids (op bodies vary with graph state); `~` for realized endpoints in
+  edge ids; in-memory rollback bypasses the lineage gate. RAISED: none new. Q2 and Q7 remain parked.
+
 ## 2026-10-08 15:50 UTC — plan-04: the second extraction pass reads processes, on addressable evidence (research-01 R3, R16 layout half)
 
 **What changed**

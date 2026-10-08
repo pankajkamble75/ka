@@ -136,6 +136,16 @@ async function changeView(id) {
     `<div class="tile ${k === 'overridden_descendants' && s[k] ? 'warn' : ''}"><div class="k">${k.replace(/_/g, ' ')}</div><div class="v">${s[k] ?? 0}</div></div>`).join('')}</div>
   <h2>Inheritance effects</h2>${p.inheritance_effects.length ? `<table><tr><th>Descendant</th><th>State</th><th>Action</th><th>Note</th></tr>${p.inheritance_effects.map((e) =>
     `<tr><td>${scopePill(e.scope.scope_type + ':' + e.scope.scope_id)}</td><td>${pill(e.inheritance_state, e.inheritance_state === 'OVERRIDDEN' ? 'warn' : 'ok')}</td><td>${esc(e.action)}</td><td class="muted">${esc(e.note)}</td></tr>`).join('')}</table>` : '<div class="empty">No descendants.</div>'}
+  <!-- [block plan-05] publication record -->
+  ${(p.eos_proposal_id || p.ops.length) ? `<div class="card"><h3>Publication</h3><dl class="kv">
+    <dt>Content key</dt><dd class="mono small">${esc((p.idempotency_key || '').slice(0, 16))}…</dd>
+    <dt>EOS proposal</dt><dd>${p.eos_proposal_id ? `<span class="mono">${esc(p.eos_proposal_id)}</span> ${pill(p.eos_status || '')}` : '<span class="muted">not published yet</span>'}</dd>
+    <dt>Base version</dt><dd>${esc(p.eos_base_version || '—')}${p.new_version ? ` → new version <b>${esc(p.new_version)}</b>` : ''}</dd>
+    ${p.pinned_instances.length ? `<dt>Pinned instances</dt><dd>${p.pinned_instances.map(esc).join(', ')} <span class="pill warn">repin required (Q2)</span></dd>` : ''}
+    ${(p.impact_summary.publish_notes || []).length ? `<dt>Notes</dt><dd class="small muted">${p.impact_summary.publish_notes.map(esc).join('<br>')}</dd>` : ''}
+    ${p.impact_summary.note ? `<dt>Status note</dt><dd class="small muted">${esc(p.impact_summary.note)}</dd>` : ''}
+    <dt>Ops</dt><dd><pre class="small">${esc(JSON.stringify(p.ops, null, 1))}</pre></dd></dl></div>` : ''}
+  <!-- [/block plan-05] -->
   <h2>Element changes</h2>${p.changes.map((c) => `<div class="card"><b>${esc(c.operation)}</b> ${esc(c.element_kind)} <span class="mono">${esc(c.graph_id)} / ${esc(c.element_id)}</span>
     <div class="diff"><div class="before"><b>Before</b><pre class="small">${esc(JSON.stringify(c.before, null, 1))}</pre></div><div class="after"><b>After</b><pre class="small">${esc(JSON.stringify(c.after, null, 1))}</pre></div></div></div>`).join('')}
   <h2>Validation</h2><table><tr><th>Element</th><th>OK</th><th>Detail</th></tr>${p.validation_results.map((r) => `<tr><td class="mono">${esc(r.element_id)}</td><td>${pill(r.ok ? 'ok' : 'FAILED')}</td><td>${esc(r.detail)}</td></tr>`).join('')}</table>
