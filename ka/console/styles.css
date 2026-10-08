@@ -35,7 +35,8 @@ textarea { min-height: 96px; resize: vertical; }
 label { display: block; font-size: var(--fs-12); color: var(--label); text-transform: uppercase; letter-spacing: .04em; margin: var(--s-12) 0 var(--s-4); }
 .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
 .sidebar { border-right: 1px solid var(--rule); padding: var(--s-16); background: var(--surface); position: sticky; top: 0; height: 100vh; overflow: auto; }
-.brand { font-size: var(--fs-18); font-weight: 600; margin-bottom: var(--s-4); }
+.brand { display: block; font-size: var(--fs-18); font-weight: 600; margin-bottom: var(--s-4); color: var(--ink); }
+.brand:hover { text-decoration: none; color: var(--accent); }
 .brand small { display: block; font-size: var(--fs-12); color: var(--label); font-weight: 400; }
 .nav h4 { margin: var(--s-24) 0 var(--s-8); font-size: var(--fs-12); color: var(--label); text-transform: uppercase; letter-spacing: .06em; }
 .nav a { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 6px; color: var(--ink); }
