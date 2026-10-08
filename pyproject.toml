@@ -1,0 +1,48 @@
+[project]
+name = "knowledge-acquisition"
+version = "0.1.0"
+description = "Enterprise OS Knowledge Acquisition — acquires, governs, versions and traces the Knowledge Nuggets that compile into Enterprise OS graphs."
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [{ name = "Pankaj Kamble", email = "pankajkamble75@gmail.com" }]
+dependencies = [
+    # Same ceiling as enterprise-os-070626: FastAPI 0.116+/Starlette made include_router lazy, which
+    # breaks every guard that enumerates app.routes.
+    "fastapi>=0.115.0,<0.116.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "python-dotenv>=1.0.0",
+    "anthropic>=0.40.0",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "ruff>=0.6"]
+# Document extractors are optional; ka.extraction degrades to "extraction unavailable" without them.
+extract = ["pypdf>=4.0", "python-docx>=1.1", "python-pptx>=0.6", "openpyxl>=3.1", "beautifulsoup4>=4.12"]
+
+[project.scripts]
+knowledge-acquisition = "ka.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["ka/tests"]
+
+[tool.ruff]
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E", "F"]
+# E501 in src is tolerated at 140; tests may chain short setup statements with ';' (E702) for readability.
+[tool.ruff.lint.per-file-ignores]
+"ka/tests/*" = ["E501", "E702"]
+"ka/api.py" = ["E501"]
+"ka/console/*" = ["E501"]
+
+[build-system]
+requires = ["hatchling>=1.20.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ka"]

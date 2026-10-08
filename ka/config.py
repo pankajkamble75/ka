@@ -1,0 +1,110 @@
+"""Declared settings, in the style of enterprise-os's config registry: every key is declared with a type,
+a default and an owner; `get()` refuses undeclared names so a typo cannot silently fall back to a default.
+"""
+from __future__ import annotations
+
+import os
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Iterator
+
+from dotenv import load_dotenv
+
+from ka.vocab import DEFAULT_AUTHORITY_RANK, AuthorityType, ScopeType
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+
+
+class UnknownSetting(KeyError):
+    pass
+
+
+@dataclass(frozen=True)
+class Setting:
+    name: str
+    type: Callable[[str], Any]
+    default: Any
+    owner: str
+    doc: str
+
+    def parse(self, raw: str | None) -> Any:
+        if raw is None or raw == "":
+            return self.default
+        if self.type is bool:
+            return raw.strip().lower() in {"1", "true", "yes", "on"}
+        return self.type(raw)
+
+
+SETTINGS: dict[str, Setting] = {}
+
+
+def declare(name: str, type_: Callable[[str], Any], default: Any, owner: str, doc: str) -> None:
+    SETTINGS[name] = Setting(name, type_, default, owner, doc)
+
+
+declare("KA_STORAGE_ROOT", str, "", "ka.repository", "Directory for the JSON object store. Default: <repo>/ka_storage.")
+declare("KA_BACKEND_PORT", int, 8011, "ka.api", "Port the Knowledge Console backend listens on.")
+declare("KA_LLM_PROVIDER", str, "", "ka.llm", "anthropic | stub. Empty: anthropic when ANTHROPIC_API_KEY is set, else stub.")
+declare("ANTHROPIC_API_KEY", str, "", "ka.llm", "Anthropic API key (secret).")
+declare("KA_LLM_MODEL", str, "claude-sonnet-4-6", "ka.llm", "Default model for extraction, synthesis and conflict explanation.")
+declare("KA_LLM_MAX_TOKENS", int, 4000, "ka.llm", "Max output tokens per call.")
+declare("KA_LLM_TIMEOUT", float, 120.0, "ka.llm", "Per-call timeout in seconds.")
+declare("KA_RESEARCH_INTERNET", bool, False, "ka.research", "Allow the Internet Research Agent to fetch URLs.")
+declare("KA_AUTO_RESOLVE_AUTHORITY_GAP", int, 40, "ka.governance",
+        "§13: a candidate whose authority rank is at least this far below a contradicting ACTIVE nugget is auto-resolved "
+        "(kept as a CONFLICT record with explanation). 0 disables.")
+declare("KA_DUPLICATE_THRESHOLD", float, 0.82, "ka.conflict", "Token-similarity at or above which two statements are DUPLICATES.")
+declare("KA_RELATED_THRESHOLD", float, 0.35, "ka.conflict", "Token-similarity at or above which two statements are compared at all.")
+declare("KA_PROMOTION_MIN_INSTANCES", int, 3, "ka.promotion", "§25: instances that must share a statement before promotion is proposed.")
+declare("KA_HIGH_IMPACT_INSTANCES", int, 5, "ka.graph_change", "A proposal touching at least this many instances requires explicit approval.")
+declare("KA_ENTERPRISE_OS_ROOT", str, "", "ka.graph_adapter", "Path to an enterprise-os checkout; enables the live GraphStore adapter.")
+declare("KW_STORAGE_ROOT", str, "", "ka.graph_adapter", "Enterprise OS storage root (its graph_v2 lives under it).")
+
+_overrides: dict[str, Any] = {}
+
+
+def get(name: str) -> Any:
+    if name not in SETTINGS:
+        raise UnknownSetting(name)
+    if name in _overrides:
+        return _overrides[name]
+    return SETTINGS[name].parse(os.environ.get(name))
+
+
+@contextmanager
+def scoped(**values: Any) -> Iterator[None]:
+    """Temporary overrides, mostly for tests."""
+    for k in values:
+        if k not in SETTINGS:
+            raise UnknownSetting(k)
+    saved = dict(_overrides)
+    _overrides.update(values)
+    try:
+        yield
+    finally:
+        _overrides.clear()
+        _overrides.update(saved)
+
+
+def storage_root() -> Path:
+    raw = get("KA_STORAGE_ROOT")
+    return Path(raw) if raw else Path(__file__).resolve().parent.parent / "ka_storage"
+
+
+class AuthorityPolicy:
+    """§13 — authority_rank is configurable by organization/domain. Ranks are looked up per scope with
+    fallback to the default table."""
+
+    def __init__(self, overrides: dict[str, dict[AuthorityType, int]] | None = None):
+        self._overrides = overrides or {}
+
+    def rank(self, authority: AuthorityType, scope_type: ScopeType | None = None, scope_id: str | None = None) -> int:
+        if scope_type and scope_id:
+            table = self._overrides.get(f"{scope_type.value}:{scope_id}")
+            if table and authority in table:
+                return table[authority]
+        return DEFAULT_AUTHORITY_RANK[authority]
+
+    def set_rank(self, scope_type: ScopeType, scope_id: str, authority: AuthorityType, rank: int) -> None:
+        self._overrides.setdefault(f"{scope_type.value}:{scope_id}", {})[authority] = rank

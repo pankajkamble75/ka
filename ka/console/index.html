@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Console</title>
+<link rel="stylesheet" href="/console/styles.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Knowledge Console<small>Add → Resolve → Apply → Browse</small></div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <main class="main" id="main"><div class="empty">Loading the Knowledge Console… <noscript>This console needs JavaScript.</noscript><br><span class="small muted">If this message stays, the backend at <code>/api/knowledge-acquisition/healthz</code> is not reachable from this page.</span></div></main>
+</div>
+<div id="toast"></div>
+<script src="/console/app.js"></script>
+</body>
+</html>

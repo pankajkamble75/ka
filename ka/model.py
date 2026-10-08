@@ -1,0 +1,390 @@
+"""Core domain objects (spec §37), with the field lists of §4.1, §6, §16 and §22 carried verbatim.
+
+Everything here is a pydantic model persisted as one JSON document per object by ka.repository.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from ka.ids import new_id, version_ref
+from ka.timeutil import now_iso
+from ka.vocab import (
+    AcquisitionChannel,
+    AuthorityType,
+    CorrectionStatus,
+    DecisionOutcome,
+    ExtractionStatus,
+    GraphElementKind,
+    InheritanceState,
+    KnowledgeType,
+    MissionStatus,
+    NuggetStatus,
+    ProposalStatus,
+    RelationshipType,
+    RunStatus,
+    ScopeType,
+    SourceType,
+    Visibility,
+)
+
+
+class Scope(BaseModel):
+    """§7 — an explicit semantic scope. `scope_id` names the structure / parent domain / domain / instance."""
+    scope_type: ScopeType
+    scope_id: str
+
+    def key(self) -> str:
+        return f"{self.scope_type.value}:{self.scope_id}"
+
+    def __hash__(self) -> int:  # pragma: no cover - trivial
+        return hash(self.key())
+
+
+# ---------------------------------------------------------------- raw content (§4.1)
+
+
+class Source(BaseModel):
+    """Raw content record. Immutable once stored; a changed document becomes a new SourceVersion."""
+    id: str = Field(default_factory=lambda: new_id("source"))
+    source_type: SourceType
+    channel: AcquisitionChannel = AcquisitionChannel.CONTENT
+    title: str
+    original_location: str | None = None          # path / URL / connector locator
+    original_filename: str | None = None
+    owner: str | None = None
+    author: str | None = None
+    ingested_at: str = Field(default_factory=now_iso)
+    source_created_at: str | None = None
+    effective_date: str | None = None
+    checksum: str
+    visibility: Visibility = Visibility.ENTERPRISE
+    permissions: list[str] = Field(default_factory=list)   # principals allowed to see it
+    domain_id: str | None = None
+    instance_id: str | None = None
+    scope: Scope | None = None
+    extraction_status: ExtractionStatus = ExtractionStatus.PENDING
+    content_version: int = 1
+    current_version_id: str | None = None
+    authority_type: AuthorityType = AuthorityType.USER_KNOWLEDGE
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SourceVersion(BaseModel):
+    """One immutable snapshot of a source's content."""
+    id: str = Field(default_factory=lambda: new_id("source_version"))
+    source_id: str
+    version: int
+    checksum: str
+    media_type: str = "text/plain"
+    text: str = ""                                  # extracted text (empty when extraction unavailable)
+    byte_size: int = 0
+    stored_path: str | None = None                  # where the original bytes live, if kept
+    created_at: str = Field(default_factory=now_iso)
+    extraction_status: ExtractionStatus = ExtractionStatus.PENDING
+    extraction_note: str | None = None
+
+
+class Evidence(BaseModel):
+    """A located excerpt of a source version that supports a nugget. Evidence is not knowledge (§4.1)."""
+    id: str = Field(default_factory=lambda: new_id("evidence"))
+    source_id: str
+    source_version_id: str
+    locator: str | None = None                       # "Section 4.2", "p.3", char offsets, URL fragment
+    excerpt: str
+    created_at: str = Field(default_factory=now_iso)
+    created_by: str = "system"
+    research_run_id: str | None = None
+    visibility: Visibility = Visibility.ENTERPRISE
+
+
+# ---------------------------------------------------------------- knowledge nugget (§5, §6)
+
+
+class GraphRef(BaseModel):
+    """§15 reverse lineage — what a nugget version materialized as."""
+    graph_id: str
+    element_id: str
+    element_kind: GraphElementKind
+    graph_change_id: str | None = None
+
+
+class KnowledgeNuggetVersion(BaseModel):
+    """§6 schema. One row per (canonical_id, version). Immutable once status is governed (§14)."""
+    id: str = Field(default_factory=lambda: new_id("nugget"))
+    canonical_id: str
+    version: int = 1
+    title: str
+    statement: str
+    normalized_meaning: str = ""
+
+    scope_type: ScopeType
+    scope_id: str
+    domain_id: str | None = None
+    instance_id: str | None = None
+    parent_domain_id: str | None = None
+    structure_id: str | None = None
+
+    knowledge_type: KnowledgeType = KnowledgeType.FACT
+    status: NuggetStatus = NuggetStatus.CANDIDATE
+    authority_type: AuthorityType = AuthorityType.USER_KNOWLEDGE
+    authority_rank: int = 0
+    confidence: float = 0.5
+    visibility: Visibility = Visibility.ENTERPRISE
+
+    effective_from: str | None = None
+    effective_to: str | None = None
+
+    created_at: str = Field(default_factory=now_iso)
+    created_by: str = "system"
+    approved_at: str | None = None
+    approved_by: str | None = None
+    activated_at: str | None = None
+
+    supersedes: str | None = None                   # version ref  "KN-983:v2"
+    superseded_by: str | None = None
+
+    source_refs: list[str] = Field(default_factory=list)      # source ids
+    evidence_refs: list[str] = Field(default_factory=list)    # evidence ids
+    relationships: list[str] = Field(default_factory=list)    # relationship ids
+    tags: list[str] = Field(default_factory=list)
+    graph_group: str | None = None                  # §29 — domain graph area the nugget belongs to
+
+    governance_decision_id: str | None = None
+    derived_graph_refs: list[GraphRef] = Field(default_factory=list)
+    graph_change_refs: list[str] = Field(default_factory=list)
+
+    research_run_refs: list[str] = Field(default_factory=list)
+    correction_refs: list[str] = Field(default_factory=list)
+
+    channel: AcquisitionChannel = AcquisitionChannel.CONTENT
+    inherited_from: str | None = None               # version ref of the parent-scope nugget this derives from
+    inheritance_state: InheritanceState | None = None
+
+    change_reason: str | None = None
+    comments: list[dict[str, Any]] = Field(default_factory=list)
+    analysis: dict[str, Any] = Field(default_factory=dict)   # conflict/scope engine output, by name
+
+    @property
+    def ref(self) -> str:
+        return version_ref(self.canonical_id, self.version)
+
+    @property
+    def scope(self) -> Scope:
+        return Scope(scope_type=self.scope_type, scope_id=self.scope_id)
+
+    def is_governed(self) -> bool:
+        return self.status in {NuggetStatus.APPROVED, NuggetStatus.ACTIVE, NuggetStatus.SUPERSEDED, NuggetStatus.OBSOLETE}
+
+
+class KnowledgeRelationship(BaseModel):
+    """§10 — typed edge between two nugget versions."""
+    id: str = Field(default_factory=lambda: new_id("relationship"))
+    from_ref: str
+    to_ref: str
+    relationship_type: RelationshipType
+    confidence: float = 0.5
+    explanation: str = ""
+    created_at: str = Field(default_factory=now_iso)
+    created_by: str = "system"
+
+
+# ---------------------------------------------------------------- governance (§11, §13, §33)
+
+
+class GovernanceDecision(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("decision"))
+    subject_ref: str                                # the candidate version decided on
+    related_refs: list[str] = Field(default_factory=list)  # existing versions involved (conflict partner, etc.)
+    outcome: DecisionOutcome
+    decided_by: str
+    decided_at: str = Field(default_factory=now_iso)
+    reason: str = ""
+    comments: str | None = None
+    automatic: bool = False
+    resulting_refs: list[str] = Field(default_factory=list)  # versions created by the decision
+    llm_recommendation: dict[str, Any] | None = None
+
+
+class KnowledgeCorrection(BaseModel):
+    """§23 — a correction captured in the Enterprise Console. Knowledge first, graph second (Inv. 6)."""
+    id: str = Field(default_factory=lambda: new_id("correction"))
+    graph_id: str | None = None
+    element_id: str | None = None
+    what_is_incorrect: str
+    correct_value: str
+    reason: str = ""
+    comments: str | None = None
+    submitted_by: str
+    submitted_at: str = Field(default_factory=now_iso)
+    evidence_refs: list[str] = Field(default_factory=list)
+    source_refs: list[str] = Field(default_factory=list)
+    resolved_lineage: list[str] = Field(default_factory=list)   # nugget version refs behind the element
+    suggested_scope: Scope | None = None
+    user_scope: Scope | None = None
+    scope_rationale: str = ""
+    status: CorrectionStatus = CorrectionStatus.SUBMITTED
+    candidate_ref: str | None = None
+    decision_id: str | None = None
+
+
+# ---------------------------------------------------------------- research (§16, §17)
+
+
+class ResearchMission(BaseModel):
+    mission_id: str = Field(default_factory=lambda: new_id("mission"))
+    scope_type: ScopeType
+    scope_id: str
+    objective: str
+    research_questions: list[str] = Field(default_factory=list)
+    preferred_source_types: list[str] = Field(default_factory=list)
+    created_by: str
+    status: MissionStatus = MissionStatus.REQUESTED
+    created_at: str = Field(default_factory=now_iso)
+    trigger: str = "manual"                          # manual | domain_creation | instance_creation | graph_gap | on_demand
+    # §42 — the most restricted class of source the requester may read (ENTERPRISE = only enterprise-wide
+    # sources; TEAM = team-and-wider; PERSONAL = everything they own). Agents never see further.
+    permitted_visibility: Visibility = Visibility.ENTERPRISE
+    run_ids: list[str] = Field(default_factory=list)
+    candidate_refs: list[str] = Field(default_factory=list)
+    completed_at: str | None = None
+
+    @property
+    def id(self) -> str:
+        return self.mission_id
+
+
+class ResearchRun(BaseModel):
+    run_id: str = Field(default_factory=lambda: new_id("run"))
+    mission_id: str
+    agent_id: str
+    model: str | None = None
+    started_at: str = Field(default_factory=now_iso)
+    completed_at: str | None = None
+    sources_examined: list[str] = Field(default_factory=list)
+    evidence_created: list[str] = Field(default_factory=list)
+    candidate_nuggets_created: list[str] = Field(default_factory=list)
+    token_usage: dict[str, int] = Field(default_factory=dict)
+    cost: float = 0.0
+    status: RunStatus = RunStatus.STARTED
+    errors: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+    @property
+    def id(self) -> str:
+        return self.run_id
+
+
+# ---------------------------------------------------------------- graph lineage (§20–§22, §40)
+
+
+class GraphDependency(BaseModel):
+    """§20 registry row: a graph element depends on a nugget version. Both directions are indexed."""
+    id: str = Field(default_factory=lambda: new_id("dependency"))
+    graph_id: str
+    element_id: str
+    element_kind: GraphElementKind
+    scope: Scope
+    nugget_ref: str
+    governance_decision_id: str | None = None
+    graph_change_id: str | None = None
+    inheritance_state: InheritanceState = InheritanceState.INHERITED
+    created_at: str = Field(default_factory=now_iso)
+    active: bool = True
+
+
+class InheritanceEffect(BaseModel):
+    """§21 — one descendant's verdict in an impact analysis."""
+    scope: Scope
+    inheritance_state: InheritanceState
+    action: str                                     # "proposed update" | "review only" | "no change"
+    element_ids: list[str] = Field(default_factory=list)
+    note: str = ""
+
+
+class ElementChange(BaseModel):
+    graph_id: str
+    element_id: str
+    element_kind: GraphElementKind
+    operation: str                                  # create | update | remove
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+
+
+class GraphChangeProposal(BaseModel):
+    """§22 schema."""
+    id: str = Field(default_factory=lambda: new_id("proposal"))
+    knowledge_change_ids: list[str] = Field(default_factory=list)   # nugget version refs
+    affected_graph_ids: list[str] = Field(default_factory=list)
+    affected_element_ids: list[str] = Field(default_factory=list)
+    before_state: dict[str, Any] = Field(default_factory=dict)
+    proposed_after_state: dict[str, Any] = Field(default_factory=dict)
+    changes: list[ElementChange] = Field(default_factory=list)
+    reason: str = ""
+    impact_summary: dict[str, Any] = Field(default_factory=dict)
+    inheritance_effects: list[InheritanceEffect] = Field(default_factory=list)
+    validation_results: list[dict[str, Any]] = Field(default_factory=list)
+    status: ProposalStatus = ProposalStatus.PROPOSED
+    created_at: str = Field(default_factory=now_iso)
+    created_by: str = "system"
+    approved_at: str | None = None
+    approved_by: str | None = None
+    applied_at: str | None = None
+    execution_ids: list[str] = Field(default_factory=list)
+    requires_approval: bool = True
+
+
+class GraphChangeExecution(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("execution"))
+    proposal_id: str
+    started_at: str = Field(default_factory=now_iso)
+    completed_at: str | None = None
+    applied_changes: list[ElementChange] = Field(default_factory=list)
+    status: str = "RUNNING"                          # RUNNING | APPLIED | FAILED | ROLLED_BACK
+    error: str | None = None
+    rollback_of: str | None = None
+
+
+class PromotionProposal(BaseModel):
+    """§25 — repeated instance knowledge proposed for a higher scope. Never automatic (Inv. 10)."""
+    id: str = Field(default_factory=lambda: new_id("promotion"))
+    target_scope: Scope
+    pattern_refs: list[str] = Field(default_factory=list)     # the instance versions that match
+    instance_ids: list[str] = Field(default_factory=list)
+    statement: str
+    title: str
+    status: str = "PROPOSED"                         # PROPOSED | APPROVED | REJECTED
+    created_at: str = Field(default_factory=now_iso)
+    decided_by: str | None = None
+    decided_at: str | None = None
+    candidate_ref: str | None = None
+
+
+class KnowledgeAcquisitionRequest(BaseModel):
+    """§43 — what the runtime raises on GRAPH GAP DETECTED instead of reading raw knowledge."""
+    id: str = Field(default_factory=lambda: new_id("request"))
+    scope: Scope
+    question: str
+    gap_description: str
+    requested_by: str = "runtime"
+    created_at: str = Field(default_factory=now_iso)
+    mission_id: str | None = None
+    status: str = "OPEN"
+
+
+# ---------------------------------------------------------------- audit (§41)
+
+
+class AuditRecord(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("audit"))
+    who: str
+    what: str
+    when: str = Field(default_factory=now_iso)
+    why: str = ""
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    source: str | None = None
+    scope: Scope | None = None
+    approval: str | None = None
+    affected_objects: list[str] = Field(default_factory=list)
