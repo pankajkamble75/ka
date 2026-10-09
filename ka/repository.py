@@ -16,6 +16,7 @@ from ka.model import (
     AuditRecord,
     Connection,
     Evidence,
+    PhysicalBinding,
     GovernanceDecision,
     GrammarBinding,
     GraphChangeExecution,
@@ -108,6 +109,9 @@ class Repository:
         # [block plan-08]
         self.connections = Collection(r, "connections", Connection)
         # [/block plan-08]
+        # [block plan-18]
+        self.physical_bindings = Collection(r, "physical_bindings", PhysicalBinding)
+        # [/block plan-18]
         # [block plan-03]
         self.bindings = Collection(r, "bindings", GrammarBinding)
         self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")
@@ -230,6 +234,29 @@ class Repository:
 
     def audit(self) -> list[AuditRecord]:
         return [AuditRecord.model_validate(r) for r in read_jsonl(self.audit_log)]
+
+    # [block plan-18] research-03 R3: one binding per (tenant, source, version); `available` gates the version
+    def binding_for_version(self, source_version_id: str) -> PhysicalBinding | None:
+        hits = self.physical_bindings.where(lambda b: b.source_version_id == source_version_id)
+        return hits[0] if hits else None
+
+    def put_binding(self, b: PhysicalBinding) -> PhysicalBinding:
+        same = self.physical_bindings.where(lambda x: x.tenant_id == b.tenant_id and x.ka_source_id == b.ka_source_id
+                                             and x.ka_source_version == b.ka_source_version and x.id != b.id)
+        if same:
+            if same[0].sha256 != b.sha256:
+                raise ValueError(f"binding for ({b.tenant_id}, {b.ka_source_id}, v{b.ka_source_version}) already targets sha {same[0].sha256[:12]}…; "
+                                 f"a committed physical target is immutable")
+            return same[0]                                   # idempotent: same key, same bytes
+        return self.physical_bindings.put(b)
+
+    def version_available(self, source_version_id: str) -> bool:
+        b = self.binding_for_version(source_version_id)
+        if b is not None:
+            return b.status == "available"
+        v = self.source_versions.get(source_version_id)      # legacy (pre-plan-18) versions: the file is the binding
+        return bool(v and v.stored_path and __import__("pathlib").Path(v.stored_path).exists())
+    # [/block plan-18]
 
     # [block plan-09] research-01 R15: events.jsonl is the outbox — every record carries a monotonic `seq` and a schema
     # `version`; records written before this plan are served with their 1-based line number so `after=` is total.

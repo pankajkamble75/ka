@@ -244,8 +244,17 @@ async function sourceView(id) {
   <dl class="kv card"><dt>Location</dt><dd>${esc(s.original_location || s.original_filename || '—')}</dd><dt>Owner</dt><dd>${esc(s.owner || '—')}</dd><dt>Author</dt><dd>${esc(s.author || '—')}</dd><dt>Ingested</dt><dd>${when(s.ingested_at)}</dd><dt>Effective date</dt><dd>${esc(s.effective_date || '—')}</dd><dt>Checksum</dt><dd class="mono">${esc(s.checksum)}</dd><dt>Content version</dt><dd>${s.content_version}</dd><dt>Channel</dt><dd>${esc(s.channel)}</dd>${s.connection_id ? `<dt>Connection</dt><dd>${esc(s.connection_id)}${s.revoked_at ? ` · <b>revoked</b> ${when(s.revoked_at)} — versions and derived knowledge kept and flagged (Q4)` : ''}</dd>` : ''}</dl>
   <h2>Knowledge extracted <span class="muted">${d.nuggets.length}</span></h2>${nuggetRows(d.nuggets)}
   ${extractionReport(d)}
-  <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} · ${esc(v.extraction_version || 'ka-extract/1')} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
+  <h2>Versions</h2>${d.versions.map((v) => `<div class="card"><b>v${v.version}</b> ${pill(v.extraction_status, v.extraction_status === 'EXTRACTED' ? 'ok' : 'warn')}${bindingPill(d.bindings, v)} <span class="small muted">${when(v.created_at)} · ${v.byte_size} bytes · ${esc(v.media_type)} · ${esc(v.extraction_version || 'ka-extract/1')} ${v.extraction_note ? '· ' + esc(v.extraction_note) : ''}</span><div class="quote small">${esc((v.text || '').slice(0, 3000))}${(v.text || '').length > 3000 ? '…' : ''}</div></div>`).join('')}`;
 }
+
+// [block plan-18] research-03 R2/R3: where a version's bytes live
+function bindingPill(bindings, v) {
+  const b = (bindings || []).find((x) => x.source_version_id === v.id);
+  if (!b) return ` <span class="pill" title="ingested before plan-18; the file at stored_path is the binding">bytes · legacy</span>`;
+  const tone = b.status === 'available' ? 'ok' : b.status === 'pending' ? 'warn' : 'halt';
+  return ` ${pill(`bytes · ${b.backend} · ${b.status}`, tone)} <span class="mono muted small" title="${esc(b.sha256)}">${esc(b.sha256.slice(0, 12))}…</span>${b.reason ? ` <span class="muted small">${esc(b.reason)}</span>` : ''}`;
+}
+// [/block plan-18]
 
 // [block plan-17] research-01 R18 (Q14): the mission page follows a background run — polls every 2 s while RUNNING, shows progress
 let missionPoll = null;
@@ -557,6 +566,9 @@ async function dashboard() {
     <div class="small">${d.grammar.loaded ? `${esc(d.grammar.grammar_version)} · ${esc(d.grammar.type_table_version)} · ${d.grammar.types.length} process types · ${d.grammar.edges.length} edge pairs · ${d.grammar.slots.length} slots · ${d.grammar.bindings} bindings on ${d.grammar.subjects} subjects<div class="mono muted">${esc(d.grammar.source_dir)}</div>` : 'Set KA_GRAMMAR_DIR (or KA_ENTERPRISE_OS_ROOT) to bind assertions to EOS process types and edges. Until then every binding is unresolved.'}
     ${d.grammar.stale ? `<div class="quote">${esc(d.grammar.stale_reason)}</div>` : ''}</div>
     <div class="actions"><button data-act="grammar-refresh">Refresh grammar</button>${d.grammar.stale ? `<button class="danger" data-act="grammar-refresh" data-force="1">Accept changed files (force)</button>` : ''}<button data-act="rebind-all">Rebind all</button></div></div>
+  <!-- [block plan-18] research-03: the physical store -->
+  <div class="card small"><b>Physical store</b> · backend <span class="pill">${esc(d.physical ? d.physical.backend : 'local')}</span>${d.physical && d.physical.requested !== d.physical.backend ? ` <span class="muted">(requested ${esc(d.physical.requested)} — ${esc(d.physical.note || 'failing closed')})</span>` : ''} · tenant <span class="mono">${esc(d.physical ? d.physical.tenant_id : '')}</span> · ${d.physical ? d.physical.bindings : 0} binding${d.physical && d.physical.bindings === 1 ? '' : 's'}${d.physical && d.physical.legacy_versions_without_binding ? ` · ${d.physical.legacy_versions_without_binding} legacy version${d.physical.legacy_versions_without_binding === 1 ? '' : 's'} without a binding (backfill is plan-23)` : ''}</div>
+  <!-- [/block plan-18] -->
   <!-- [block plan-13] research-02 R5 (Q5): requested provider, key presence, used / cap -->
   <div class="card small"><b>Research discovery</b> · search provider <span class="pill">${esc((d.research && d.research.search_provider) || 'none')}</span>${d.research && d.research.search_requested && d.research.search_requested !== d.research.search_provider ? ` <span class="muted">(requested ${esc(d.research.search_requested)} — ${d.research.search_key_present ? 'key present' : 'KA_SEARCH_API_KEY missing, Q12'}; failing closed)</span>` : ''} · internet gate ${d.research && d.research.internet_gate ? pill('on', 'ok') : pill('off', 'warn')} · searches this month <b>${d.research ? d.research.search_used : 0}</b> / ${d.research ? d.research.search_cap : '—'}${d.research && d.research.search_provider === 'brave' ? ` · key ${d.research.search_key_present ? pill('present', 'ok') : pill('missing', 'halt')}` : ''}</div>
   <!-- [/block plan-13] -->

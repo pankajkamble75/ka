@@ -375,6 +375,7 @@ def get_source(source_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> di
     versions = ka.repo.source_versions.where(lambda v: v.source_id == source_id)
     nuggets = ka.repo.nuggets.where(lambda n: source_id in n.source_refs)
     return {"source": s.model_dump(mode="json"), "versions": [v.model_dump(mode="json") for v in versions],
+            "bindings": [b.model_dump(mode="json") for v in versions if (b := ka.repo.binding_for_version(v.id)) is not None],   # plan-18
             "nuggets": [_nugget_row(n) for n in nuggets],
             "evidence": [e.model_dump(mode="json") for e in ka.repo.evidence.where(lambda e: e.source_id == source_id)]}   # plan-04 spans
 
@@ -663,6 +664,13 @@ def mission(mission_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict
     cands = [_nugget_row(v) for v in (ka.repo.version(ref) for ref in m.candidate_refs) if v]
     sources = [s.model_dump(mode="json") for s in ka.repo.sources.where(lambda s: s.metadata.get("mission_id") == mission_id)]
     return {"mission": m.model_dump(mode="json"), "runs": runs, "candidates": cands, "sources_discovered": sources}
+
+
+# [block plan-18] research-03 R2/R3: where bytes live
+@router.get("/physical/status")
+def physical_status(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return ka.physical_status()
+# [/block plan-18]
 
 
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)

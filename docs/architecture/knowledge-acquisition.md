@@ -248,3 +248,20 @@ plan-01 and tracked as a question.
 ## 11. What is deliberately not here (§45)
 
 No vector index, no chat, no document browser as the primary view, no agent path that writes to the graph, no runtime answer endpoint.
+
+## 11. Physical storage and the Data Platform (research-03) — `ka/physical.py`
+
+**Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
+[`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
+
+**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-23 completes this section.
+
+- **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
+  go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
+  before and is the default; `KA_STORAGE_BACKEND=data_platform` selects the HTTP store (plan-19) and fails closed to local with a note
+  until it exists. KA never imports a cloud SDK.
+- **The binding (R3, ✅ plan-18).** `PhysicalBinding` — unique on `(tenant_id, ka_source_id, ka_source_version)`, carrying backend, asset
+  ids, sha256, owner, visibility and `status` — says where a `SourceVersion`'s bytes are; a version is usable only when its binding is
+  `available` (`Repository.version_available`). A failed physical write or a blocked link yields a `failed` binding and never an
+  available version. `SourceVersion` is unchanged; `stored_path` stays for the local backend and for versions ingested before plan-18.
+- **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.

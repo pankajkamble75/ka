@@ -49,7 +49,11 @@ class KnowledgeAcquisition:
         self.adapter = adapter if adapter is not None else self._default_adapter()
         self.versioning = VersioningService(self.repo)
         self.lineage = LineageService(self.repo)
-        self.ingestion = IngestionService(self.repo, self.bus, self.auditor)
+        # [block plan-18] research-03 R2: the physical store beneath ingestion, selected by KA_STORAGE_BACKEND (fails closed to local)
+        from ka.physical import select_physical_store
+        self.physical, self.physical_note = select_physical_store(self.repo.root)
+        self.ingestion = IngestionService(self.repo, self.bus, self.auditor, physical=self.physical)
+        # [/block plan-18]
         # [block plan-03]
         self.grammar = GrammarRegistry.from_config(self.repo.root)
         self.subjects = SubjectRegistry(self.repo)
@@ -195,6 +199,7 @@ class KnowledgeAcquisition:
         sources = self.repo.sources.all()
         att = self.needs_attention()
         return {
+            "physical": self.physical_status(),   # plan-18
             "sources": {"total": len(sources), "by_type": Counter(s.source_type.value for s in sources),
                         "extraction": Counter(s.extraction_status.value for s in sources)},
             "nuggets": {"total": len(nuggets), "canonical": len(self.repo.canonical_ids()), "by_status": by_status,
@@ -242,6 +247,15 @@ class KnowledgeAcquisition:
         return out
 
     # ---- dashboards (§29, §30, §32) -------------------------------------------------------------------
+
+    # [block plan-18]
+    def physical_status(self) -> dict[str, Any]:
+        from collections import Counter
+        bs = self.repo.physical_bindings.all()
+        legacy = sum(1 for v in self.repo.source_versions.all() if self.repo.binding_for_version(v.id) is None)
+        return {"backend": self.physical.name, "requested": (config.get("KA_STORAGE_BACKEND") or "local"), "tenant_id": config.get("KA_TENANT_ID"),
+                "note": self.physical_note, "bindings": len(bs), "by_status": dict(Counter(b.status for b in bs)), "legacy_versions_without_binding": legacy}
+    # [/block plan-18]
 
     def needs_attention(self) -> dict[str, list[dict[str, Any]]]:
         pending = self.repo.nuggets_by_status(NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT)

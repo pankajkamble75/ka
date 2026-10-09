@@ -2,6 +2,33 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 11:20 UTC — plan-18: the PhysicalStore port beneath ingestion, the local store, the binding record (research-03 R2, R3)
+
+**What changed** — `ka/physical.py` (new): `PhysicalRef`, the `PhysicalStore` protocol (`put` / `get` / `put_derived` / `exists`),
+`LocalPhysicalStore` (writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did; derived artefacts under `derived/<kind>/`),
+`select_physical_store` (`KA_STORAGE_BACKEND`: `local` default; `data_platform` fails closed to local with a note until plan-19;
+unknown → local with a note). `ka/model.py`: `PhysicalBinding` unique on `(tenant_id, ka_source_id, ka_source_version)` with backend,
+asset ids, sha256, owner, visibility, `status` (pending | available | failed | revoked), reason. `ka/repository.py`: the collection,
+`binding_for_version`, `put_binding` (idempotent on the same sha, refuses a different sha — a committed target is immutable),
+`version_available` (legacy versions: the file is the binding). `ka/ingestion.py`: `_ingest` writes bytes through the port and records
+the binding (`available`, or `failed` with the reason when there are no bytes or the write fails); `reextract` reads through the port via
+the binding, refuses unavailable versions (wording keeps plan-04's "no stored bytes"), falls back to `stored_path` for legacy versions.
+`ka/config.py`: `KA_STORAGE_BACKEND`, `KA_TENANT_ID` (research-03 R10 interim, Q16). `ka/service.py`: store selection + `physical_status`;
+`ka/api.py`: `GET /physical/status`, bindings on source detail; console: version-card pill "bytes · backend · status · sha" ("bytes ·
+legacy" before plan-18) and a Dashboard line. Architecture §11 stub; `.env.example`; `test_plan18_physical_store.py` (12 cases);
+`e2e/plan18_physical_flow.py`.
+
+**Why** — research-03 §1–§2: the Data Platform needs a seam, and nothing in KA said where a version's bytes were or whether they were
+available. The local backend reproduces today's files so nothing visible changes.
+
+**Verification** — in-process 285 passed, 2 skipped (exit checked); ruff F clean; no protected code (diff confirmed). Verify recount
+8/8 D, 7/7 P, 5/5 N; blocks 7/7 files. Live flow 4/4 (source page pill, Dashboard line: local · 1 binding · 69 legacy versions awaiting
+plan-23's backfill); screenshot verified. Product tests (research-03, 9): all still RED — PT1–PT3 need plan-19's store and fake, the rest
+later plans; the local halves of PT2/PT3 hold here.
+
+**Decisions and questions** — BUILT: research-03 R2, R3 (architecture §11 ✅ for these two). PARKED: Q15 (connector timing), Q16 (tenant
+interim) — registered at set start. Plan `plan-18`; R2, R3 → UPLOADED.
+
 ## 2026-10-09 08:05 UTC — plan-17: missions run in the background; the mission page polls a RUNNING state (research-01 R18, Q14)
 
 **What changed** — `ka/research.py`: `_begin` / `start_mission` (daemon thread, kept in `_threads`, refuses a mission already RUNNING) /

@@ -8,12 +8,15 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from ka import config
 from ka.audit import Auditor
 from ka.events import EventBus
 from ka.extraction import EXTRACTION_VERSION, TextExtraction, extract_text, source_type_for_filename
-from ka.model import Scope, Source, SourceVersion
+from ka.model import PhysicalBinding, Scope, Source, SourceVersion
+from ka.physical import LocalPhysicalStore, PhysicalRef, PhysicalStore, binding_key
 from ka.repository import Repository
 from ka.security import UnsafeURL, is_safe_url, safe_fetch
+from ka.timeutil import now_iso as _now_iso
 from ka.vocab import AcquisitionChannel, AuthorityType, ExtractionStatus, SourceType, Visibility
 
 
@@ -26,9 +29,10 @@ class Ingested:
 
 
 class IngestionService:
-    def __init__(self, repo: Repository, bus: EventBus, auditor: Auditor):
+    def __init__(self, repo: Repository, bus: EventBus, auditor: Auditor, physical: PhysicalStore | None = None):
         self.repo, self.bus, self.auditor = repo, bus, auditor
         self.blob_dir = repo.root / "blobs"
+        self.physical: PhysicalStore = physical or LocalPhysicalStore(repo.root)      # plan-18: the port beneath the funnel
 
     # ---- public entry points: Upload / Paste / Write / Link / Connect ----------------------------
 
@@ -118,9 +122,19 @@ class IngestionService:
         new extraction_version). The only path that bypasses same-bytes dedupe, deliberately."""
         src = self.repo.sources.require(source_id)
         cur = self.repo.source_versions.get(src.current_version_id or "")
-        if cur is None or not cur.stored_path or not Path(cur.stored_path).exists():
+        if cur is None:
             raise ValueError(f"source {source_id} has no stored bytes to re-extract (blocked or not fetched)")
-        data = Path(cur.stored_path).read_bytes()
+        # plan-18: read through the physical store via the binding; legacy versions fall back to stored_path
+        b = self.repo.binding_for_version(cur.id)
+        if b is not None and b.status != "available":
+            raise ValueError(f"source {source_id} has no stored bytes to re-extract — version {cur.version} is not available ({b.status}: {b.reason or 'no reason recorded'})")
+        if b is not None and b.backend == self.physical.name:
+            data = self.physical.get(PhysicalRef(backend=b.backend, asset_id=b.dp_asset_id or "", asset_version_id=b.dp_asset_version_id or "1",
+                                                 sha256=b.sha256, locator=b.locator))
+        elif cur.stored_path and Path(cur.stored_path).exists():
+            data = Path(cur.stored_path).read_bytes()
+        else:
+            raise ValueError(f"source {source_id} has no stored bytes to re-extract (blocked or not fetched)")
         extraction = extract_text(data, src.source_type, src.original_filename)
         src.content_version += 1
         ver = SourceVersion(source_id=src.id, version=src.content_version, checksum=cur.checksum, media_type=extraction.media_type,
@@ -164,12 +178,30 @@ class IngestionService:
         ver = SourceVersion(source_id=src.id, version=src.content_version, checksum=checksum, media_type=extraction.media_type,
                             text=extraction.text, byte_size=len(data), extraction_status=extraction.status,
                             extraction_note=extraction.note, extraction_version=EXTRACTION_VERSION)
+        # [block plan-18] research-03 R2/R3: bytes go through the physical store; the binding says where they are and whether the
+        # version is available. The local store writes the same blob path as before, so `stored_path` keeps working.
+        tenant = config.get("KA_TENANT_ID") or "default"
+        key = binding_key(tenant, src.id, src.content_version)
+        binding = PhysicalBinding(tenant_id=tenant, ka_source_id=src.id, ka_source_version=src.content_version, source_version_id=ver.id,
+                                  backend=self.physical.name, sha256=checksum, owner=owner, visibility=visibility)
         if data:
-            self.blob_dir.mkdir(parents=True, exist_ok=True)
-            blob = self.blob_dir / f"{ver.id}{Path(filename).suffix if filename else '.bin'}"
-            blob.write_bytes(data)
-            ver.stored_path = str(blob)
+            try:
+                ref = self.physical.put(data, content_type=extraction.media_type, sha256=checksum, idempotency_key=f"{key}:{ver.id}",
+                                        owner=owner, visibility=visibility.value, tenant_id=tenant, filename_hint=filename)
+                if ref.sha256 != checksum:
+                    raise ValueError(f"physical store returned sha {ref.sha256[:12]}… for bytes with sha {checksum[:12]}…")
+                binding.status, binding.locator = ref.state, ref.locator
+                binding.dp_asset_id, binding.dp_asset_version_id = ref.asset_id, ref.asset_version_id
+                if ref.backend == "local":
+                    ver.stored_path = ref.locator
+            except Exception as e:  # noqa: BLE001 — a failed physical write never yields an available version
+                binding.status, binding.reason = "failed", f"{type(e).__name__}: {e}"
+        else:
+            binding.status, binding.reason = "failed", extraction.note or "no bytes (blocked or empty)"
+        binding.last_synced_at = _now_iso()
         self.repo.source_versions.put(ver)
+        self.repo.put_binding(binding)
+        # [/block plan-18]
         src.checksum = checksum
         src.current_version_id = ver.id
         src.extraction_status = extraction.status

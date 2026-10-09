@@ -471,6 +471,32 @@ class KnowledgeAcquisitionRequest(BaseModel):
     # [/block plan-09]
 
 
+# ---------------------------------------------------------------- physical bindings (research-03 R3 — plan-18)
+
+# [block plan-18]
+class PhysicalBinding(BaseModel):
+    """Where one SourceVersion's bytes physically live. Separate from the version so the version's constructor and every test stay
+    as they are. Unique on (tenant_id, ka_source_id, ka_source_version); `available` is what makes the version usable."""
+    id: str = Field(default_factory=lambda: new_id("binding"))
+    tenant_id: str
+    ka_source_id: str
+    ka_source_version: int
+    source_version_id: str
+    backend: str                                   # local | data_platform
+    dp_asset_id: str | None = None
+    dp_asset_version_id: str | None = None
+    sha256: str
+    extracted_text_asset_id: str | None = None
+    status: str = "pending"                         # pending | available | failed | revoked
+    reason: str | None = None
+    owner: str | None = None
+    visibility: Visibility = Visibility.ENTERPRISE
+    locator: str | None = None
+    created_at: str = Field(default_factory=now_iso)
+    last_synced_at: str | None = None
+# [/block plan-18]
+
+
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
 
 

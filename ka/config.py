@@ -97,6 +97,10 @@ declare("KA_M365_PERMISSION_SWEEP_EVERY", int, 10, "ka.connectors.m365", "Re-rea
 # [block plan-16]
 declare("KA_RESEARCH_MAX_SOURCES", int, 3, "ka.research", "Never-extracted sources the Enterprise Content agent re-extracts with the model per mission (most relevant first).")
 # [/block plan-16]
+# [block plan-18]
+declare("KA_STORAGE_BACKEND", str, "local", "ka.physical", "local | data_platform. Where source bytes and derived artefacts live; data_platform needs plan-19's HTTP store.")
+declare("KA_TENANT_ID", str, "default", "ka.physical", "Tenant recorded on every physical binding (research-03 R10 interim until Q4/Q16).")
+# [/block plan-18]
 
 _overrides: dict[str, Any] = {}
 
