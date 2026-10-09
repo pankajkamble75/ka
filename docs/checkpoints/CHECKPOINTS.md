@@ -2,6 +2,18 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 UTC — Q7 built in Enterprise OS (research-230, plan-1033); live test data cleaned
+
+**What changed** — `docs/questions/knowledge-acquisition.md` and `docs/architecture/knowledge-acquisition.md`: Q7 ✅ built in Enterprise OS by
+plan-1033 (`KW_KA_URL` → `found_new` posts to KA's `/runtime/graph-gap`; `GET /api/knowledge-worker/graph-model` with digests; instance
+changes with `base_digest` / `idempotency_key`). Live storage (not in git): KN-625–627 rejected, SRC-536f1c66 revoked (test data from the
+hung plan-10 flow). Grammar confirmed loaded on the live server through `KA_ENTERPRISE_OS_ROOT`.
+
+**Verification** — cross-service call from the EOS client to a throwaway KA on 8021: accepted, repeat deduplicated. EOS full suite still running
+at commit time.
+
+**Decisions and questions** — BUILT: Q7.
+
 ## 2026-10-10 01:20 UTC — plan-28: review and publication; the regression gate — research-04 SET SHIPPED (R8, R14)
 
 **What changed** — `ka/wiki.py`: `list_proposals`, `_produced` (status, open contradictions, graph proposals per produced ref),

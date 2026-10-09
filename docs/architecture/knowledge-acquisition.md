@@ -118,7 +118,7 @@ considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`,
    subject keeps plan-01's statement compilation (`r.<slug(title)>` + `props.statement/value`). `to_change_ops` renders KA's
    `ElementChange`s as EOS `ChangeOp` dicts (`add_node | set_props | add_edge | remove_*`).
 3. Idempotency (R7, KA half): `idempotency_key = sha256(refs + ops)`; a live proposal with the same key is returned instead of a
-   second one. The EOS-side base key on instance changes is Q7.
+   second one. The EOS-side base key on instance changes is Q7 — ✅ built by EOS plan-1033 (`base_digest`, `idempotency_key`).
 4. `validate` — Invariant 2 (lineage on every op), adapter validation, governed-knowledge check → READY or FAILED.
 5. `requires_approval` when affected instances ≥ `KA_HIGH_IMPACT_INSTANCES` or any descendant is OVERRIDDEN; the policy flag
    `auto_approve_low_impact` may approve, and publishes only under `KA_EOS_AUTO_ACTOR` (a person) when the adapter needs one. **Q3 — ✅ DECIDED 2026-10-08, built:** the switch is OFF by default; every proposal is a deliberate second approval by a named person; revisit with volume data.
@@ -265,7 +265,7 @@ while a request is OPEN or IN_RESEARCH returns that request (`GapOutcome.dedupli
 IN_RESEARCH; approving a candidate from that mission marks it FULFILLED (`ka/service.py` subscriber → `RuntimeGuard.fulfil_from_approval`);
 `cancel` works from the live states only. Routes `GET /runtime/requests[?status=]`, `GET /runtime/requests/{id}`,
 `POST /runtime/requests/{id}/cancel`; the Dashboard's needs-attention table shows principal · intent, status and Cancel.
-The door (`retrieve_for_answer`) is unchanged. **Q7 — ⏳ DECIDED 2026-10-08, not built (EOS repo):** Enterprise OS routes `found_new` through this contract first (intent `found_new`, principal = the EOS runtime, correlation id = the EOS gap id); `grow_existing` stays in EOS for now. The same EOS change exposes the grammar read-only with a digest and accepts a base key on instance proposals. Delivered under the Enterprise OS pipeline. Ledger: `docs/questions/knowledge-acquisition.md` Q7.
+The door (`retrieve_for_answer`) is unchanged. **Q7 — ✅ BUILT 2026-10-10 in Enterprise OS (research-230, plan-1033; `KW_KA_URL` / `KW_KA_TOKEN` on the EOS side):** Enterprise OS routes `found_new` through this contract first (intent `found_new`, principal = the EOS runtime, correlation id = the EOS gap id); `grow_existing` stays in EOS for now. The same EOS change exposes the grammar read-only with a digest and accepts a base key on instance proposals. Delivered under the Enterprise OS pipeline. Ledger: `docs/questions/knowledge-acquisition.md` Q7.
 
 ## 10. Security (§42)
 
