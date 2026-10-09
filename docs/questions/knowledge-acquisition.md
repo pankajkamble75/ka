@@ -209,4 +209,15 @@ when a live tenant sync is wanted.
 
 ## ❓ Open
 
+### Q17 — Console shape for the Knowledge Wiki (research-04 R10; beside Q8)
+**Scenario.** research-04 proposes readable articles computed from governed nuggets. Q8's rule is that a kind of knowledge earns a
+top-level tab and nothing else moves. **Decision required.** A seventh tab "7 · Wiki" (`#/wiki`), or a mode inside Browse by scope.
+**Recommendation:** the seventh tab. **Cost.** none.
+
+### Q18 — Human retirement of an ACTIVE nugget (research-04 R7; beside Q4 and the plan-10 re-review)
+**Scenario.** Governance has no path for a person to say an ACTIVE nugget is no longer true; plan-10's revoked-source re-review is the
+closest mechanism (a same-statement revision; REJECT retires the prior and proposes the graph retirement). **Decision required.**
+Generalise it with a `review_reason` ("retirement requested by …") under the protected-code protocol, or leave retirement to reviewers
+rejecting ordinary revisions. **Recommendation:** generalise. **Cost.** one protected-code phase.
+
 

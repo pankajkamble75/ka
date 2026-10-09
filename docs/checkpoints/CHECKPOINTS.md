@@ -2,6 +2,20 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 19:55 UTC — research-04: the Knowledge Wiki (from the author's KA-Human-Knowledge-Wiki note)
+
+**What changed** — `docs/research/research-04.md` (verdict: Aligned with corrections; R1–R14; PT1–PT12 adopting the note's twelve acceptance
+tests); 14 OPEN rows on `RESEARCH-TRACKER.md`; Q17 (seventh tab) and Q18 (human retirement) registered in the questions tracker and the
+questions document's open block; index row for research-04. No code changed.
+
+**Why** — the author asked for an independent research pass before any wiki code. Core corrections: the published article is a computed
+projection (the profile's rule), not a stored page; identity cannot be server-derived until Q4; retirement needs a governance path; no HTML,
+a block model rendered through `esc`.
+
+**Verification** — every claim cited `path:line` and spot-checked; suite not run (docs only; last run 354 passed).
+
+**Decisions and questions** — RAISED: Q17, Q18 (registered). No answers given.
+
 ## 2026-10-09 18:20 UTC — questions: Q15, Q16, Q13 answered; research-02 and research-03 both SET SHIPPED
 
 **What changed** — `docs/trackers/QUESTIONS-TRACKER.md`: Q15 ANSWERED (keep KA's connectors until DP's connector registry exists, then a
