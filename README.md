@@ -113,3 +113,15 @@ Register a folder under `KA_CONNECTOR_ROOTS` as a connection on the Add knowledg
 ## Processes tab (plan-15)
 
 The console's fourth tab, Processes, lists process subjects composed from governed knowledge and opens a profile per process (the plan-06 view); Browse by scope keeps its Processes mode. Tabs: 1 Add knowledge · 2 Knowledge nuggets · 3 Browse by scope · 4 Processes · 5 Dashboard · 6 Images.
+
+## Running as a service (VPS)
+
+`deploy/enterprise-os-ka.service` is the systemd unit installed on the VPS as `/etc/systemd/system/enterprise-os-ka.service`. It starts
+`python -m ka serve` on port 8011 from `/root/ka/.env` (gitignored: access token, Brave and Anthropic keys, the Internet gate) with
+`KA_ENTERPRISE_OS_ROOT` pointing at the Enterprise OS checkout, restarts on failure and comes back on boot.
+
+    systemctl status enterprise-os-ka      # is it up
+    systemctl restart enterprise-os-ka     # after a pull or an .env change
+    journalctl -u enterprise-os-ka -f      # follow the log
+
+From a laptop, reach the console through an SSH tunnel on 8011 (`http://127.0.0.1:8011/console/`); a loopback peer needs no access token.

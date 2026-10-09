@@ -1,0 +1,15 @@
+[Unit]
+Description=Enterprise OS — Knowledge Acquisition backend + Knowledge Console (port 8011)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/ka
+# Settings and keys come from /root/ka/.env (gitignored); the Enterprise OS checkout gives the grammar and the graph adapter.
+Environment=KA_ENTERPRISE_OS_ROOT=/root/enterprise-os-070626
+ExecStart=/bin/bash -c 'set -a; source /root/ka/.env; set +a; exec /root/ka/.venv/bin/python -m ka serve'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
