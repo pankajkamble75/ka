@@ -168,22 +168,45 @@ longer client timeout; (c) cap the agents per mission. **Cost.** (a) one plan (a
 
 </details>
 
+<details><summary>Q15 — Connector ownership timing under the Data Platform (research-03 R8; beside Q6) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** The Data Platform specification says DP owns connector registration, secrets and execution. KA's local-folder and
+Microsoft 365 connectors (Q6, plan-14) exist and hold secrets by `secret_ref`; DP's connector registry does not exist yet.
+**Decision required.** When ownership moves. **Options.** (a) keep KA's connectors until DP's registry exists, then delegate through
+the plan-08 contract; (b) retire KA's connectors now; (c) keep both permanently. **Cost.** none now; one plan later.
+
+**Answer (2026-10-09, the author):** keep KA's connectors until DP's connector registry exists, then delegate — a `data_platform`
+connector kind behind the plan-08 contract, the existing kinds kept for compatibility. Not built yet: nothing to build until DP's
+registry exists.
+
+</details>
+
+<details><summary>Q16 — Tenant and principal for Data Platform calls (research-03 R10; beside Q4) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** DP calls carry a tenant id and a caller identity; KA has one service token and no tenant model (Q4 open). The ship run
+took the research's interim: `KA_TENANT_ID` as configuration (default `default`), the service identity as the DP principal, `owner`
+and `visibility` recorded on every binding. **Decision required.** Confirm the interim, or decide Q4 now. **Options.** (a) confirm the
+interim; (b) decide Q4 now; (c) single-tenant forever. **Cost.** none for the interim.
+
+**Answer (2026-10-09, the author):** the interim is confirmed. Every DP key, binding, derived artefact and the inbound cursor stay
+keyed by the configured tenant; when Q4 names the provider, the tenant becomes per-deployment configuration from it and the recorded
+owner/visibility let DP derive access rules. ✅ built (plans 18–24) as the interim.
+
+</details>
+
+<details><summary>Q13 — Microsoft 365 app registration (research-02 R9; beside Q6) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** Q6 chose Microsoft 365 / SharePoint first. plan-14 builds the connector with app-only Graph auth, verified against a
+recorded Graph fixture. **Decision required.** Register the app (Files.Read.All, Sites.Read.All, application permissions), and give
+KA the tenant id, client id and the name of the variable holding the client secret. **Options.** (a) register and supply the values;
+(b) leave fixture-only for now. **Cost.** an admin consent in the tenant.
+
+**Answer (2026-10-09, the author):** leave fixture-only for now. The connector stays verified against the recorded fixture; the live
+product test PT6 stays NOT RUN; nothing else waits on it (Q15 keeps the connector on KA's side until DP's registry exists). Re-raise
+when a live tenant sync is wanted.
+
+</details>
+
 ## ❓ Open
 
 
-### Q13 — Microsoft 365 app registration (research-02 R9; beside Q6)
-**Scenario.** Q6 chose Microsoft 365 / SharePoint first. plan-14 builds the connector with app-only Graph auth, verified against a
-recorded Graph fixture. **Decision required.** Register the app (Files.Read.All, Sites.Read.All, application permissions), and give
-KA the tenant id, client id and the name of the variable holding the client secret. **Big picture.** Until then the connector
-cannot be used live and PT6 is NOT RUN. **Cost.** an admin consent in the tenant.
-
-### Q15 — Connector ownership timing under the Data Platform (research-03 R8; beside Q6)
-**Scenario.** The Data Platform specification says DP owns connector registration, secrets and execution. KA's local-folder and
-Microsoft 365 connectors (Q6, plan-14) exist and hold secrets by `secret_ref`; DP's connector registry does not exist yet.
-**Decision required.** When ownership moves. **Recommendation:** keep KA's connectors until DP's registry exists, then add a
-`data_platform` connector kind behind the plan-08 contract and demote the others to compatibility. **Cost.** none now; one plan later.
-
-### Q16 — Tenant and principal for Data Platform calls (research-03 R10; beside Q4)
-**Scenario.** DP calls carry a tenant id and a caller identity; KA has one service token and no tenant model (Q4 open). The ship run
-took the research's interim: `KA_TENANT_ID` as configuration (default `default`), the service identity as the DP principal, `owner`
-and `visibility` recorded on every binding. **Decision required.** Confirm the interim, or decide Q4 now. **Cost.** none for the interim.

@@ -2,6 +2,29 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 18:20 UTC — questions: Q15, Q16, Q13 answered; research-02 and research-03 both SET SHIPPED
+
+**What changed** — `docs/trackers/QUESTIONS-TRACKER.md`: Q15 ANSWERED (keep KA's connectors until DP's connector registry exists, then a
+`data_platform` kind behind the plan-08 contract), Q16 ANSWERED (the interim is confirmed: `KA_TENANT_ID` configuration, service token as
+DP principal, owner/visibility on every binding; Q4 names the provider later), Q13 ANSWERED (leave the M365 connector fixture-only for
+now; PT6 NOT RUN by the author's decision). `docs/questions/knowledge-acquisition.md`: the three Q&A moved from `❓ Open` into `<details>`
+ledgers beside Q6 and Q4; the open block is empty. `docs/architecture/knowledge-acquisition.md` §11: connector ownership rule (⏳ decided,
+nothing to build yet), tenant/principal rule (✅ built as the interim), M365 note. `docs/trackers/RESEARCH-TRACKER.md`: research-03 R1,
+R8, R10 and research-02 R9 DECIDED and moved to Closed. `tools/set_status.py`: a `DECIDED` row counts as terminal (it never did; the
+renderer under-reported every set with a decide row).
+
+**Why** — the ship run parks decisions; the author answered them in one sitting (the `questions` loop). A decided row with its answer on
+record is terminal per the tracker rules.
+
+**Verification** — set tables: research-02 9/9 terminal, research-03 15/15 terminal, both SET SHIPPED. Registry: 0 OPEN. No code changed
+except the renderer line; suite not re-run for a docs-only change (last run 354 passed at plan-24).
+
+**Follow-ups** — user-side: run `tools/backfill_physical.py --storage ka_storage --repair-conflicts --apply` (one live duplicate version);
+the Q7 EOS-side plan lives in the other repository. Architecture states checked: §11 says ✅ built for plans 18–24; the Q15 rule is
+honestly ⏳ decided with nothing to build until DP's registry exists.
+
+**Decisions and questions** — ANSWERED: Q15, Q16, Q13 → `docs/questions/knowledge-acquisition.md`, `docs/architecture/knowledge-acquisition.md` §11.
+
 ## 2026-10-09 17:50 UTC — plan-24: version numbers that cannot collide; repair for the live duplicate (research-03 R15)
 
 **What changed** — `ka/ingestion.py`: `_next_version(src)` derives a new number from the versions on disk (never lower than any), and

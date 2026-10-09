@@ -43,7 +43,7 @@ fetch / get_permissions / checkpoint / sync_incremental / revoke) and `ka/connec
 (the NAME of an environment variable; the value is never stored). `ka/connectors/sync.py::SyncService.sync` reconciles a delta
 through the one ingestion door: new → `Source`; modified → new `SourceVersion` of the same source, re-extracted; moved → same
 source, location updated; deleted → `Source.revoked_at`, versions kept, derived nuggets flagged (plan-08) and — **Q4, ✅ built by plan-10** — returned to review as same-statement candidate revisions (`GovernanceService.reopen_for_revocation`) so a person decides: APPROVE keeps, REJECT retires the prior (OBSOLETE) and `GraphChangeService.propose_retirement` proposes removing its elements;
-permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ✅ built by plan-14, 2026-10-09:** `ka/connectors/m365.py::M365Connector`
+permission-changed → `Source.visibility` updated, derived nuggets flagged. A revoked connection refuses to sync. **Q6 — ✅ built by plan-14, 2026-10-09:** `ka/connectors/m365.py::M365Connector` Q13 (2026-10-09): no app registration yet by the author's decision — the connector stays fixture-verified and PT6 NOT RUN until one is supplied.
 (`kind="m365"`): client-credentials token from the secret the connection's `secret_ref` names (memory only), the drive's `@odata.deltaLink`
 as the checkpoint, moves by path, permissions → visibility (tenant-wide/anonymous link or an "Everyone" group → ENTERPRISE, a group → TEAM,
 named users → PERSONAL, never above the connection's ceiling), a full permission sweep every `KA_M365_PERMISSION_SWEEP_EVERY` syncs.
@@ -250,7 +250,7 @@ plan-01 and tracked as a question.
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ✅ built 2026-10-09 (plans 18–23).** plan-18 the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-22 derived artefacts and reads through DP; plan-23 asset families, this section, the backfill rehearsal. Still parked for the author: R8 connector ownership timing (Q15), R10 tenant/principal (Q16). DP search (research-03 §7) is later by the research's own word.
+**State: ✅ built 2026-10-09 (plans 18–23).** plan-18 the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-22 derived artefacts and reads through DP; plan-23 asset families, this section, the backfill rehearsal. Q15 and Q16 answered 2026-10-09; nothing parked. DP search (research-03 §7) is later by the research's own word.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -303,7 +303,11 @@ plan-01 and tracked as a question.
   between the two writes leaves a gap, never a duplicate — the binding key `(tenant, source, version)` depends on it. The one live
   duplicate (found by plan-23's rehearsal) is repaired by `tools/backfill_physical.py --repair-conflicts --apply`, which keeps the earliest
   version's number, renumbers later ones past the highest, and never changes a version id.
-- **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.
+- **Connector ownership (R8, Q15 ⏳ decided 2026-10-09, not built — nothing to build yet).** KA's connectors (plan-08 contract: `Connection`
+  with `secret_ref`, the sync delta, the one revocation rule) remain the only ingestion path until the Data Platform's connector registry
+  exists. When it does, a `data_platform` connector kind is added behind the same contract and the existing kinds stay for compatibility;
+  ownership of registration, secrets and execution moves then, not before.
+- **Tenant and principal (R10, Q16 ✅ confirmed 2026-10-09).** `KA_TENANT_ID` (default `default`) is the tenant on every DP key, binding, derived artefact and the inbound cursor; the service token (`KA_DP_SERVICE_TOKEN`) is the DP principal; `owner` and `visibility` are recorded on every binding so DP can derive access rules later. When Q4 names the identity provider, the tenant value becomes per-deployment configuration from it — the keys do not change shape.
 
 ## 12. What is deliberately not here (§45)
 

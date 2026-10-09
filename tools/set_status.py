@@ -37,7 +37,7 @@ def render_set_status(nn: str | int, tracker: Path | None = None) -> str:
     out = [f"SET STATUS — research-{nn}", f"{'pt':4} {'point':{min(width, 70)}} {'plan':9} {'state':12} {'sha':9} section"]
     for pt, point, plan, state, sha, sec in rows:
         out.append(f"{pt:4} {point[:70]:{min(width, 70)}} {plan:9} {state:12} {sha:9} {sec}")
-    terminal = sum(1 for r in rows if r[3] in TERMINAL)
+    terminal = sum(1 for r in rows if r[3] in TERMINAL or r[3].startswith("DECIDED"))   # a decide row with its answer on record is terminal
     out.append(f"{terminal}/{len(rows)} terminal" + (" — SET SHIPPED" if terminal == len(rows) else ""))
     return "\n".join(out)
 
