@@ -56,6 +56,8 @@ def main() -> int:
     results = []
     proc = None
     try:
+        fix = json.loads(subprocess.run([PY, "tools/backfill_physical.py", "--storage", str(copy), "--repair-conflicts", "--apply"], capture_output=True, text=True, cwd="/root/ka", env=env).stdout)
+        print("REPAIR", json.dumps({k: fix[k] for k in ("duplicate_keys", "renumbered")}))
         dry = json.loads(subprocess.run([PY, "tools/backfill_physical.py", "--storage", str(copy)], capture_output=True, text=True, cwd="/root/ka", env=env).stdout)
         run = subprocess.run([PY, "tools/backfill_physical.py", "--storage", str(copy), "--apply", "--publish-active"], capture_output=True, text=True, cwd="/root/ka", env=env)
         if not run.stdout.strip():
@@ -69,7 +71,7 @@ def main() -> int:
             print("  CONFLICT:", c["source"], "v" + str(c["version"]), c["source_version_id"], "—", c["reason"][:110])
         results.append(("dry run bound nothing and reported the work", dry["available"] == 0 and dry["would_bind"] == rep["available"] + rep["failed"] + rep["conflicts"]))
         results.append(("every version accounted for: available + failed + skipped + conflicts == versions", rep["available"] + rep["failed"] + rep["skipped"] + rep["conflicts"] == rep["versions"]))
-        results.append(("conflicts (duplicate version numbers) are reported by id, not hidden", all(c["source_version_id"] for c in rep["conflict_versions"])))
+        results.append(("plan-24 repair renumbered the duplicate on the copy; the backfill then reports 0 conflicts", fix["duplicate_keys"] >= 1 and rep["conflicts"] == 0))
         results.append(("no SHA mismatch", rep["sha_mismatch"] == 0))
         results.append(("every byte-less version failed with a reason", all(f["reason"] for f in rep["failures"])))
         results.append(("ACTIVE nuggets published and the outbox drained", rep["published"] > 0 and rep["outbox"].get("pending", 0) == 0 and rep["outbox"].get("dead", 0) == 0))

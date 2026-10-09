@@ -2,6 +2,29 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 17:50 UTC — plan-24: version numbers that cannot collide; repair for the live duplicate (research-03 R15)
+
+**What changed** — `ka/ingestion.py`: `_next_version(src)` derives a new number from the versions on disk (never lower than any), and
+both `_ingest` and `reextract` write the source's counter BEFORE the version, so a process stop between the two writes leaves a gap and
+never a duplicate `(source, version)` (the binding key depends on it). `tools/backfill_physical.py --repair-conflicts [--apply]`: keeps
+the earliest version's number, renumbers later duplicates past the highest, updates the source counter and any binding's
+`ka_source_version`, never changes a version id; dry-run default. The rehearsal repairs the COPY first and then reports 0 conflicts.
+Architecture §11 note. `test_plan24_version_numbering.py` (7 cases).
+
+**Why** — plan-23's rehearsal found `SRC-d3a5c783` with two v5 versions of different bytes (22:40 and 22:48 on 2026-10-08), consistent
+with a service restart between the version write and the source write while background missions were ingesting.
+
+**Verification** — in-process 354 passed, 2 skipped (exit checked); ruff F clean; no protected code; plan-04 and plan-18 tests byte-identical
+to HEAD (`test_N3`). Recount 4/4 D, 4/4 P, 3/3 N. Rehearsal 14/14 over a COPY of the live storage: repair renumbered `SRV-a6551e3c` v5 → v6
+on the copy; backfill then 71 → 67 available, 4 failed with reasons, 0 conflicts, 51 ACTIVE nuggets published; rollback proven; the live
+`ka_storage/` byte-identical before and after.
+
+**Follow-ups / risks** — the LIVE duplicate still exists (the run does not write production data unattended): the user runs
+`.venv/bin/python tools/backfill_physical.py --storage ka_storage --repair-conflicts --apply` (dry-run without `--apply`). Q15 (R8) and
+Q16 (R10) remain the author's.
+
+**Decisions and questions** — BUILT: R15 (architecture §11). Plan `plan-24`; R15 → UPLOADED. No new question.
+
 ## 2026-10-09 17:05 UTC — plan-23: asset families, the finished architecture section, the backfill rehearsal with local as rollback (research-03 R12, R13, R14)
 
 **What changed** — `tools/backfill_physical.py` (new): binds every legacy `SourceVersion` to the configured backend with SHA-256

@@ -138,7 +138,8 @@ class IngestionService:
         else:
             raise ValueError(f"source {source_id} has no stored bytes to re-extract (blocked or not fetched)")
         extraction = extract_text(data, src.source_type, src.original_filename)
-        src.content_version += 1
+        src.content_version = self._next_version(src)                       # plan-24: derived from disk, never a duplicate
+        self.repo.sources.put(src)                                           # plan-24: counter first
         ver = SourceVersion(source_id=src.id, version=src.content_version, checksum=cur.checksum, media_type=extraction.media_type,
                             text=extraction.text, byte_size=len(data), stored_path=cur.stored_path, extraction_status=extraction.status,
                             extraction_note=extraction.note, extraction_version=EXTRACTION_VERSION)
@@ -167,7 +168,8 @@ class IngestionService:
 
         if existing:
             src = existing
-            src.content_version += 1
+            src.content_version = self._next_version(src)                   # plan-24: derived from disk, never a duplicate
+            self.repo.sources.put(src)                                       # plan-24: counter first — a crash leaves a gap, not a collision
             is_new = True
         else:
             src = Source(source_type=source_type, channel=channel, title=title, original_location=location, original_filename=filename,
@@ -233,6 +235,14 @@ class IngestionService:
                             after={"checksum": checksum, "extraction_status": extraction.status.value},
                             affected=[src.id, ver.id])
         return Ingested(src, ver, extraction, is_new_version=is_new)
+
+    # [block plan-24] research-03 R15: a version number is derived from the versions that EXIST for the source — never from the
+    # in-memory counter alone — and the counter is written to disk before the version, so a stop between the two writes leaves a gap
+    # in the numbering (harmless) and never a duplicate (which breaks the binding key `(tenant, source, version)`).
+    def _next_version(self, src: Source) -> int:
+        highest = max((v.version for v in self.repo.source_versions.where(lambda v: v.source_id == src.id)), default=0)
+        return max(src.content_version, highest) + 1
+    # [/block plan-24]
 
     def _find_existing(self, location: str | None, title: str, owner: str) -> Source | None:
         if location:

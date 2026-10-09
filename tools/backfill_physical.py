@@ -3,6 +3,7 @@
 
     KA_STORAGE_BACKEND=data_platform KA_DP_BASE_URL=... KA_DP_SERVICE_TOKEN=... \\
         python tools/backfill_physical.py --storage <root> [--apply] [--publish-active]
+    python tools/backfill_physical.py --storage <root> --repair-conflicts [--apply]      # plan-24: renumber duplicate version numbers
 
 Dry-run by default: prints what WOULD happen and writes nothing. With --apply: bytes present → upload under the ingestion key shape →
 the returned sha must equal the version's checksum (else the binding is `failed: sha mismatch`, never available) → binding `available`;
@@ -97,13 +98,54 @@ def backfill(ka: KnowledgeAcquisition, *, apply: bool, publish_active: bool = Fa
     return rep
 
 
+def repair_conflicts(ka: KnowledgeAcquisition, *, apply: bool) -> dict:
+    """plan-24 (research-03 R15): where more than one SourceVersion holds the same (source, version), keep the earliest and renumber the
+    others, in created_at order, past the source's highest number. Version ids never change (evidence references ids). Dry-run by default."""
+    rep = {"apply": apply, "sources_checked": 0, "duplicate_keys": 0, "renumbered": [], "would_renumber": 0}
+    by_src: dict[str, list] = {}
+    for v in ka.repo.source_versions.all():
+        by_src.setdefault(v.source_id, []).append(v)
+    for sid, vers in by_src.items():
+        rep["sources_checked"] += 1
+        src = ka.repo.sources.get(sid)
+        groups: dict[int, list] = {}
+        for v in vers:
+            groups.setdefault(v.version, []).append(v)
+        dups = {n: sorted(g, key=lambda v: v.created_at) for n, g in groups.items() if len(g) > 1}
+        if not dups:
+            continue
+        rep["duplicate_keys"] += len(dups)
+        nxt = max(v.version for v in vers) + 1
+        for n in sorted(dups):
+            for v in dups[n][1:]:                                            # the earliest keeps its number
+                rep["would_renumber"] += 1
+                entry = {"source": sid, "source_version_id": v.id, "from": v.version, "to": nxt}
+                if apply:
+                    v.version = nxt
+                    ka.repo.source_versions.put(v)
+                    b = ka.repo.binding_for_version(v.id)
+                    if b is not None:
+                        b.ka_source_version = nxt
+                        ka.repo.physical_bindings.put(b)
+                    rep["renumbered"].append(entry)
+                nxt += 1
+        if apply and src is not None and src.content_version < nxt - 1:
+            src.content_version = nxt - 1
+            ka.repo.sources.put(src)
+    return rep
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--storage", required=True)
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--publish-active", action="store_true")
+    ap.add_argument("--repair-conflicts", action="store_true", help="renumber duplicate (source, version) pairs (plan-24); with --apply writes them")
     a = ap.parse_args(argv)
     ka = KnowledgeAcquisition(Path(a.storage), provider=StubLLMProvider(), auto_propose_graph_changes=False, start_workers=False)
+    if a.repair_conflicts:
+        print(json.dumps(repair_conflicts(ka, apply=a.apply), indent=2))
+        return 0
     if a.apply and ka.physical.name == "local":
         print(f"refusing --apply: the backend is local ({ka.physical_note or 'KA_STORAGE_BACKEND=local'}) — nothing to migrate to", file=sys.stderr)
         return 2

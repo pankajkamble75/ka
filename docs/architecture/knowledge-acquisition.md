@@ -298,6 +298,11 @@ plan-01 and tracked as a question.
   byte-less versions, derived publication of ACTIVE nuggets through the outbox, idempotent by key; dry-run by default; refused on the local
   backend. Rehearsed by `e2e/plan23_backfill_rehearsal.py` over a COPY of `ka_storage/` against the fake over HTTP. `KA_STORAGE_BACKEND=local`
   stays in the code as the rollback and is removed only from configuration.
+- **Version numbers cannot collide (R15, ✅ plan-24).** `IngestionService._next_version` derives a new number from the versions on disk
+  (never lower than any of them) and both `_ingest` and `reextract` write the source's counter before the version, so a process stop
+  between the two writes leaves a gap, never a duplicate — the binding key `(tenant, source, version)` depends on it. The one live
+  duplicate (found by plan-23's rehearsal) is repaired by `tools/backfill_physical.py --repair-conflicts --apply`, which keeps the earliest
+  version's number, renumbers later ones past the highest, and never changes a version id.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.
 
 ## 12. What is deliberately not here (§45)
