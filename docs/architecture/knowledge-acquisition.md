@@ -219,7 +219,7 @@ No new tab while Q8 is parked.
 
 **Owner:** [research-04](../research/research-04.md). Q&A: Q17–Q20 in [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: read side ✅ built 2026-10-09 (plan-25: `ka/wiki.py`, routes `GET /wiki/pages`, `/wiki/pages/{key}`, `/wiki/pages/{key}/evidence`, `/wiki/search`, tab `7 · Wiki`); editing ✅ built (plan-26: `ka/wiki_markdown.py`, draft routes, `#/wiki/:key/edit`); reconciliation ✅ built (plan-27: `ka/wiki_reconcile.py` — classify, submit through `ingest_candidate` / `propose_revision` / `request_retirement`); review and publication ⏳ decided, plan-28.**
+**State: ✅ built 2026-10-09/10 (plans 25–28).** plan-25 the read side (`ka/wiki.py`, tab `7 · Wiki`); plan-26 the editor (`ka/wiki_markdown.py`, drafts, lock); plan-27 reconciliation (`ka/wiki_reconcile.py`) and Q18's `request_retirement`; plan-28 review and publication (`proposal_review`, `publish` as a recorded digest, `reject_proposal`) and the regression gate (`test_plan28_regression_gate.py`). All twelve research-04 product tests pass against the stub provider.
 
 - **The article is a projection, never a stored page (Q19).** A wiki article is computed on read from the ACTIVE versions selected by the
   page's key (process, subject, scope, or an authored page that pins refs) at the page's visibility ceiling, exactly as the process profile
@@ -238,6 +238,12 @@ No new tab while Q8 is parked.
   evidence sidebar), `#/wiki/:key/edit`, `#/wiki/:key/review/:proposal`. Tabs 1–6 and every existing route stay unchanged (Q8's rule;
   gated by research-04 R14); §12's "no document browser as the primary view" stands — the primary view remains Add → Nuggets → Browse.
   "Original Source" is the existing source page.
+- **Review and publication (R8, ✅ plan-28).** `#/wiki/:key/review/:proposal` shows the current article and the draft side by side, the
+  classified operations and every produced candidate with its status, open contradictions and the graph proposals its approval raised;
+  decisions are the existing `POST /nugget/{ref}/decide`; the proposal is RESOLVED when no produced version is still open; `publish`
+  applies an authored page's blocks as its layout (`layout_rev` + 1), records a `WikiPublication` (digest, manifest, who, proposal) and
+  closes the draft — a second publish with the same digest and layout says "already published". Graph proposals are shown and never
+  advanced (Q3). Publication writes no nugget, decision or graph proposal.
 - **Model prose (Q20).** Off by default: articles are deterministic. A per-article switch enables model-written prose; when on, every
   output sentence must cite a nugget from the section's input or a verifier drops it; the text is labelled synthesized and is never
   evidence or a typed assertion (Q10).

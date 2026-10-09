@@ -938,6 +938,61 @@ def wiki_proposal(proposal_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) 
 # [/block plan-27]
 
 
+# [block plan-28] research-04 R8: review, resolution, publication — decisions stay on the existing decide route
+class PublishIn(BaseModel):
+    by: str
+
+
+class RejectIn(BaseModel):
+    by: str
+    reason: str = ""
+
+
+@router.get("/wiki/proposals")
+def wiki_proposals(state: str | None = None, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return {"proposals": ka.wiki.list_proposals(state)}
+
+
+@router.get("/wiki/proposals/{proposal_id}/review")
+def wiki_review(proposal_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_proposals.get(proposal_id) is None:
+        raise HTTPException(404, "proposal not found")
+    try:
+        return ka.wiki.proposal_review(proposal_id)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+
+
+@router.post("/wiki/proposals/{proposal_id}/publish")
+def wiki_publish_proposal(proposal_id: str, body: PublishIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    p = ka.repo.wiki_proposals.get(proposal_id)
+    if p is None:
+        raise HTTPException(404, "proposal not found")
+    try:
+        return ka.wiki.publish(p.page_key, by=body.by, proposal_id=proposal_id)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+
+
+@router.post("/wiki/proposals/{proposal_id}/reject")
+def wiki_reject_proposal(proposal_id: str, body: RejectIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_proposals.get(proposal_id) is None:
+        raise HTTPException(404, "proposal not found")
+    try:
+        return {"proposal": ka.wiki.reject_proposal(proposal_id, by=body.by, reason=body.reason).model_dump(mode="json")}
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+
+
+@router.post("/wiki/pages/{key}/publish")
+def wiki_publish_page(key: str, body: PublishIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        return ka.wiki.publish(key, by=body.by)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+# [/block plan-28]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"

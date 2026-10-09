@@ -56,6 +56,7 @@ const routes = [
   [/^#\/change\/([^/]+)$/, changeView],
   [/^#\/wiki(?:\?(.*))?$/, wikiView],                       // plan-25 (Q17)
   [/^#\/wiki\/([^/?]+)\/edit(?:\?(.*))?$/, wikiEditView],                   // plan-26 (R5)
+  [/^#\/wiki\/([^/?]+)\/review\/([^/?]+)$/, wikiReviewView],          // plan-28 (R8)
   [/^#\/wiki\/([^/?]+)(?:\?(.*))?$/, wikiArticleView],
   [/^#\/scope\/([A-Z_]+)\/([^/]+)(?:\/([a-z-]+))?$/, (t, i) => { location.hash = `#/browse?scope=${t}|${i}`; return ''; }],
 ];
@@ -685,6 +686,8 @@ async function wikiView(qs) {
   const { scopes } = await api('/scopes');
   const tree = await api(`/wiki/pages${t && id ? `?scope_type=${t}&scope_id=${encodeURIComponent(id)}` : ''}`);
   const hits = q ? (await api(`/wiki/search?q=${encodeURIComponent(q)}`)).hits : null;
+  const props = await api('/wiki/proposals?state=SUBMITTED').then((r) => ({ proposals: r.proposals.concat([]) })).catch(() => ({ proposals: [] }));
+  const resolved = await api('/wiki/proposals?state=RESOLVED').catch(() => ({ proposals: [] })); props.proposals = props.proposals.concat(resolved.proposals);
   const row = (x) => `<li><a href="#/wiki/${encodeURIComponent(x.key)}">${esc(x.title)}</a> <span class="small muted">${x.assertions} statement${x.assertions === 1 ? '' : 's'}</span></li>`;
   return `<div class="crumbs">7 · Wiki</div><h1>Knowledge Wiki</h1>
   <p class="sub">Readable articles computed from governed knowledge — every sentence is an approved statement with its citation; nothing here is stored as a fact (Q19). Processes come from their profile; subjects and scopes are grouped from ACTIVE nuggets.</p>
@@ -696,6 +699,7 @@ async function wikiView(qs) {
     <div class="card"><h3>Subjects <span class="muted">${tree.subjects.length}</span></h3>${tree.subjects.length ? `<ul class="wk-list">${tree.subjects.map(row).join('')}</ul>` : '<div class="empty">No subject pages yet.</div>'}</div>
   </div>
   <div class="card"><h3>By scope</h3><ul class="wk-list">${tree.scopes.filter((s) => s.assertions).map((s) => `<li><a href="#/wiki/${encodeURIComponent(s.key)}">${esc(s.title)}</a> ${scopePill(s.scope)} <span class="small muted">${s.assertions} statements</span></li>`).join('') || '<li class="muted">No scope has ACTIVE knowledge yet.</li>'}</ul></div>
+  ${props.proposals.length ? `<div class="card"><h3>Proposals awaiting review <span class="muted">${props.proposals.length}</span></h3><table><tr><th>Proposal</th><th>Page</th><th>By</th><th>Operations</th><th>When</th></tr>${props.proposals.map((p) => `<tr><td><a href="#/wiki/${encodeURIComponent(p.page_key)}/review/${p.id}">${p.id}</a> ${pill(p.state, p.state === 'RESOLVED' ? 'ok' : 'warn')}</td><td><a href="#/wiki/${encodeURIComponent(p.page_key)}">${esc(p.page_key)}</a></td><td>${esc(p.submitted_by)}</td><td class="small">${Object.entries(p.summary).map(([k, n]) => `${pill(k, CLS_TONE[k])} ${n}`).join(' ')}</td><td class="small">${when(p.created_at)}</td></tr>`).join('')}</table></div>` : ''}
   <div class="card"><h3>New authored page</h3><p class="small muted">A page you write yourself, citing governed statements with <span class="mono">[[KN-001:v1]]</span>. It starts as a draft; facts still arrive through governance.</p>
     <div class="row"><div><label>Slug</label><input id="wk-slug" placeholder="refund-handbook"></div><div><label>Title</label><input id="wk-title" placeholder="Refund handbook"></div><div><label>Scope</label><select id="wk-pscope"><option value="">—</option>${scopeOptions(scopes, '')}</select></div><div><label>Ceiling</label><select id="wk-ceiling"><option>ENTERPRISE</option><option>DOMAIN</option><option>INSTANCE</option><option>TEAM</option><option>PERSONAL</option></select></div></div>
     <div class="actions"><button class="primary" data-act="wk-new-page">Create page and open the editor</button></div></div>
@@ -716,8 +720,8 @@ async function wikiArticleView(key, qs) {
     ${it.published_as.length ? `<div class="small muted">in graph: ${it.published_as.map(esc).join(', ')}</div>` : ''}</div>`; }).join('');
   return `<div class="crumbs"><a href="#/wiki">Wiki</a> / ${esc(a.kind)} / <span class="mono">${esc(k)}</span></div>
   <div class="wk-bar">${pill(a.kind)} ${pill(`ceiling ${a.ceiling}`)} ${stale} <span class="small muted">${a.refs.length} governed statements · ${a.sources.length} sources${a.published_at ? ` · published ${when(a.published_at)}` : ''}</span>
-    <span class="wk-tools">${prose === 'llm' ? `<a href="#/wiki/${encodeURIComponent(k)}">Show statements</a>` : `<a href="#/wiki/${encodeURIComponent(k)}?prose=llm" title="model prose; every sentence must cite a statement (Q20)">Connected prose</a>`}${a.kind === 'process' ? ` · <a href="#/subject/${encodeURIComponent(k.slice(8))}">Technical profile</a>` : ''} · <button data-act="wk-edit" data-key="${esc(k)}">Edit</button></span></div>
-  ${drafts.drafts.filter((d) => d.state !== 'CLOSED').length ? `<div class="card small"><b>Drafts on this page</b> ${drafts.drafts.filter((d) => d.state !== 'CLOSED').map((d) => `<div>${pill(d.state, d.state === 'SUBMITTED' ? 'warn' : '')} <a href="#/wiki/${encodeURIComponent(k)}/edit?draft=${d.id}">${d.id}</a> rev ${d.rev} · ${esc(d.editor)} · ${when(d.updated_at)}${d.note ? ` · ${esc(d.note)}` : ''}</div>`).join('')}</div>` : ''}
+    <span class="wk-tools">${prose === 'llm' ? `<a href="#/wiki/${encodeURIComponent(k)}">Show statements</a>` : `<a href="#/wiki/${encodeURIComponent(k)}?prose=llm" title="model prose; every sentence must cite a statement (Q20)">Connected prose</a>`}${a.kind === 'process' ? ` · <a href="#/subject/${encodeURIComponent(k.slice(8))}">Technical profile</a>` : ''} · <button data-act="wk-edit" data-key="${esc(k)}">Edit</button>${(!a.published || a.stale) ? ` <button class="primary" data-act="wk-publish-page" data-key="${esc(k)}" title="record this digest as published (plan-28)">Publish</button>` : ''}</span></div>
+  ${drafts.drafts.filter((d) => d.state !== 'CLOSED').length ? `<div class="card small"><b>Drafts on this page</b> ${drafts.drafts.filter((d) => d.state !== 'CLOSED').map((d) => `<div>${pill(d.state, d.state === 'SUBMITTED' ? 'warn' : '')} <a href="#/wiki/${encodeURIComponent(k)}/edit?draft=${d.id}">${d.id}</a> rev ${d.rev} · ${esc(d.editor)} · ${when(d.updated_at)}${d.note ? ` · ${esc(d.note)}` : ''}${d.proposal_id ? ` · <a href="#/wiki/${encodeURIComponent(k)}/review/${d.proposal_id}"><b>Review ${d.proposal_id}</b></a>` : ''}</div>`).join('')}</div>` : ''}
   <div class="wk"><article class="wk-article card">${body}
     ${a.not_known.length ? `<h2 class="wk-h">Not yet known</h2><ul class="wk-list">${a.not_known.map((n) => `<li><span class="mono">${esc(n.slot)}</span> <span class="small muted">${esc(n.level || '')} · ${esc(n.status || 'not evidenced')}</span></li>`).join('')}</ul>` : ''}
     ${a.pending.length ? `<h2 class="wk-h">Pending review <span class="muted">${a.pending.length}</span></h2><ul class="wk-list">${a.pending.map((x) => `<li><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a> ${pill(x.status)} <span class="small">${esc(x.statement || '')}</span></li>`).join('')}</ul>` : ''}
@@ -767,6 +771,31 @@ function wikiOpsHtml(c) {
   return `<div class="small" style="margin-bottom:8px">${sum}</div><table><tr><th>Block</th><th>Class</th><th>Statement</th><th>Target</th><th>Note</th></tr>${c.operations.map((o) => `<tr><td class="mono small">${esc(o.block_id || 'request')}</td><td>${pill(o.cls, CLS_TONE[o.cls])}</td><td class="small">${esc(o.statement || '')}</td><td class="small">${o.target_ref ? `<a href="#/nugget/${encodeURIComponent(o.target_ref)}">${esc(o.target_ref)}</a>` : '—'}${o.produced_ref ? ` → <a href="#/nugget/${encodeURIComponent(o.produced_ref)}">${esc(o.produced_ref)}</a>` : ''}</td><td class="small muted">${esc(o.note || '')}${o.error ? ` <span class="pill halt">${esc(o.error)}</span>` : ''}</td></tr>`).join('')}</table>`;
 }
 // [/block plan-27]
+
+// [block plan-28] research-04 R8: the review screen — article and draft side by side, operations, produced candidates decided through the
+// existing decide route, graph proposals shown never advanced, publish as a recorded digest
+async function wikiReviewView(key, pid) {
+  const k = decodeURIComponent(key);
+  const r = await api(`/wiki/proposals/${encodeURIComponent(pid)}/review`);
+  const refsA = [], refsB = [];
+  const left = r.current_blocks.map((b) => wikiBlock(b, refsA)).join('') || '<div class="empty">No article yet.</div>';
+  const right = r.draft_blocks.map((b) => wikiBlock(b, refsB)).join('');
+  const st = r.proposal.state;
+  const produced = r.produced.map((x) => `<div class="wk-ev"><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a> ${pill(x.status)}${x.retirement_requested ? ' ' + pill('retirement requested', 'halt') : ''}
+    <div class="small">${esc(x.statement)}</div>
+    ${x.conflicts.length ? `<div class="small"><span class="pill CONFLICT">contradicts</span> ${x.conflicts.map((c) => `<a href="#/nugget/${encodeURIComponent(c.existing_ref)}">${esc(c.existing_ref)}</a> — ${esc(c.explanation || '')}`).join('; ')}</div>` : ''}
+    ${x.graph_changes.length ? `<div class="small muted">graph proposals (decided on their own page, never here): ${x.graph_changes.map((g) => `<a href="#/change/${g.id}">${g.id}</a> ${pill(g.status)}`).join(' ')}</div>` : ''}
+    ${x.open ? `<div class="actions"><input id="rv-reason-${esc(x.ref)}" placeholder="reason" style="max-width:260px;display:inline-block"> <button class="primary" data-act="wk-decide" data-ref="${esc(x.ref)}" data-outcome="APPROVE">Approve</button> ${x.conflicts.length ? `<button data-act="wk-decide" data-ref="${esc(x.ref)}" data-outcome="ACCEPT_NEW">Accept new</button>` : ''} <button class="danger" data-act="wk-decide" data-ref="${esc(x.ref)}" data-outcome="REJECT">Reject</button></div>` : `<div class="small muted">decided${x.decision_id ? ` · ${esc(x.decision_id)}` : ''}</div>`}
+  </div>`).join('') || '<div class="small muted">No governance operation was needed (editorial only).</div>';
+  return `<div class="crumbs"><a href="#/wiki">Wiki</a> / <a href="#/wiki/${encodeURIComponent(k)}">${esc(r.page.title)}</a> / review</div>
+  <h1>Review <span class="mono small">${esc(pid)}</span> ${pill(st, st === 'PUBLISHED' ? 'ok' : st === 'REJECTED' ? 'halt' : st === 'RESOLVED' ? 'ok' : 'warn')} ${r.resolved ? pill('resolved', 'ok') : pill(`${r.pending_refs.length} awaiting decision`, 'warn')}</h1>
+  <p class="small muted">Submitted by ${esc(r.draft.editor)} · ${when(r.proposal.created_at)}${r.draft.note ? ` · ${esc(r.draft.note)}` : ''}. Approve or reject each produced candidate here — the same decisions as on the nugget page. When all are decided, Publish records the article's digest; graph changes stay separate (Q3).</p>
+  <div class="actions">${r.publishable ? `<button class="primary" data-act="wk-publish" data-pid="${esc(pid)}" data-key="${esc(k)}">Publish</button>` : ''}${['SUBMITTED', 'RESOLVED'].includes(st) ? ` <button class="danger" data-act="wk-reject-proposal" data-pid="${esc(pid)}">Reject proposal</button>` : ''} ${r.published ? pill(r.stale ? 'page updated since publication' : 'page published', r.stale ? 'warn' : 'ok') : pill('page never published')}</div>
+  <div class="card"><h3>Operations</h3>${wikiOpsHtml({ operations: r.operations, summary: r.operations.reduce((m, o) => (m[o.cls] = (m[o.cls] || 0) + 1, m), {}) })}</div>
+  <div class="card"><h3>Produced candidates <span class="muted">${r.produced.length}</span></h3>${produced}</div>
+  <div class="diff"><div class="before wk-article"><h3>Current article</h3>${left}</div><div class="after wk-article"><h3>Draft</h3>${right}</div></div>`;
+}
+// [/block plan-28]
 function bind(root) {
   root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => act(e.currentTarget).catch((err) => toast(err.message, true))));
   const q = $('#br-q'); if (q) q.addEventListener('keydown', (e) => { if (e.key === 'Enter') act($('[data-act="browse"]')); });
@@ -833,6 +862,10 @@ async function act(b) {
   if (a === 'wk-search') { const q = $('#wk-q').value.trim(); const sc = $('#wk-scope').value; location.hash = `#/wiki?${sc ? `scope=${encodeURIComponent(sc)}&` : ''}${q ? `q=${encodeURIComponent(q)}` : ''}`; return; }   // plan-25
   if (a === 'wk-edit') { location.hash = `#/wiki/${encodeURIComponent(b.dataset.key)}/edit`; return; }   // plan-26
   if (a === 'wk-new-page') { const sc = $('#wk-pscope').value; const [st, sid] = (sc || '|').split('|'); const r = await api('/wiki/pages', { method: 'POST', body: { slug: $('#wk-slug').value.trim(), title: $('#wk-title').value.trim(), by: who(), scope_type: st || null, scope_id: sid || null, ceiling: $('#wk-ceiling').value } }); toast(`Page ${r.page.key} created`); location.hash = `#/wiki/${encodeURIComponent(r.page.key)}/edit?draft=${r.draft.id}`; return; }
+  if (a === 'wk-decide') { try { await api(`/nugget/${encodeURIComponent(b.dataset.ref)}/decide`, { method: 'POST', body: { outcome: b.dataset.outcome, by: who(), reason: $(`#rv-reason-${CSS.escape(b.dataset.ref)}`)?.value || '' } }); toast(`${b.dataset.outcome} recorded`); render(); } catch (e) { toast(e.message, true); } return; }   // plan-28
+  if (a === 'wk-publish') { try { const r = await api(`/wiki/proposals/${encodeURIComponent(b.dataset.pid)}/publish`, { method: 'POST', body: { by: who() } }); toast(r.published ? `Published · digest ${r.digest.slice(0, 12)}` : `Not published: ${r.reason}`); render(); } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-publish-page') { try { const r = await api(`/wiki/pages/${encodeURIComponent(b.dataset.key)}/publish`, { method: 'POST', body: { by: who() } }); toast(r.published ? `Published · digest ${r.digest.slice(0, 12)}` : `Not published: ${r.reason}`); render(); } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-reject-proposal') { try { await api(`/wiki/proposals/${encodeURIComponent(b.dataset.pid)}/reject`, { method: 'POST', body: { by: who(), reason: 'rejected on review' } }); toast('Proposal rejected'); render(); } catch (e) { toast(e.message, true); } return; }
   if (a === 'wk-reconcile') { try { const c = await api(`/wiki/drafts/${b.dataset.id}/reconcile`, { method: 'POST' }); $('#wk-out').innerHTML = `<div class="card"><h3>Reconciliation preview <span class="muted small">what Submit would ask governance for</span></h3>${wikiOpsHtml(c)}</div>`; } catch (e) { toast(e.message, true); } return; }   // plan-27
   if (a === 'wk-request') { try { await api(`/wiki/drafts/${b.dataset.id}/requests`, { method: 'POST', body: { ref: $('#wk-ret-ref').value, why: $('#wk-ret-why').value, by: who() } }); toast('Retirement request added to the draft'); render(); } catch (e) { toast(e.message, true); } return; }
   if (a === 'wk-save') { try { const r = await api(`/wiki/drafts/${b.dataset.id}`, { method: 'PUT', body: { text: $('#wk-md').value, expected_rev: Number(b.dataset.rev), by: who() } }); toast(`Saved rev ${r.draft.rev}`); render(); } catch (e) { toast(e.message, true); } return; }

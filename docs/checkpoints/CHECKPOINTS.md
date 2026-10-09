@@ -2,6 +2,30 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 01:20 UTC — plan-28: review and publication; the regression gate — research-04 SET SHIPPED (R8, R14)
+
+**What changed** — `ka/wiki.py`: `list_proposals`, `_produced` (status, open contradictions, graph proposals per produced ref),
+`resolve_proposal` (SUBMITTED → RESOLVED when no produced version is open), `proposal_review` (both sides, operations, produced,
+`resolved`, `publishable`, `pending_refs`, staleness), `publish` (agents refused; proposal must be resolved; authored layout applied with
+`layout_rev` + 1; derived page record created on first publication; same digest + layout → "already published"; records
+`WikiPublication`, closes the draft, marks the proposal PUBLISHED, emits `wiki.published`, audits), `reject_proposal`. `ka/api.py`: five
+routes. Console: `#/wiki/:key/review/:proposal` (side-by-side, operations, decide buttons through the existing decide route, Publish,
+Reject proposal), proposals list on the index, Publish on a never-published or stale article, Review links on drafts. `ka/events.py`:
+two names. `test_plan28_review_publish.py` (10 cases), `test_plan28_regression_gate.py` (3 cases: pre-wiki API routes and methods from
+83fe82c all registered; tabs 1–6 and pre-wiki console routes verbatim; pre-wiki test files byte-identical except the structurally
+checked plan-26 lint cleanup), `e2e/plan28_review_flow.py`. Architecture §8a ✅ built; README.
+
+**Why** — research-04 §7 (R8), §9 (R14). Decisions stay on the one decide path; graph proposals are shown and never advanced (Q3).
+
+**Verification** — in-process 414 passed, 2 skipped (exit checked); ruff F clean; no protected code by diff. Recount 7/7 D, 7/7 P, 4/4 N;
+blocks in 4 files. Live flow 8/8 over real HTTP (Review link from the article → both sides → decision resolves → Publish → published, not
+stale → second publish "already published" → graph proposals listed, none applied); screenshot verified. Product tests (research-04):
+PT1–PT12 all PASS (PT4, PT10, PT11 turn green here).
+
+**Decisions and questions** — BUILT: R8, the publication half of Q19 (§8a now ✅ built for plans 25–28). Plan `plan-28`; R8, R14 →
+UPLOADED. research-04: every row terminal — SET SHIPPED. Still for the user: the three test candidates (KN-625…627) and source
+SRC-536f1c66 that the hung plan-10 flow pasted into the live storage during plan-27 (Reject them in the console).
+
 ## 2026-10-10 00:20 UTC — plan-27: reconciliation through the one pipeline; a person can request retirement (research-04 R6; builds R7 / Q18 — PROTECTED governance)
 
 **What changed** — `ka/wiki_reconcile.py` (new): `Reconciler.classify` (block diff → changed blocks through the existing extractor with

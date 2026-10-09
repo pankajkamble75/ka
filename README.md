@@ -112,7 +112,7 @@ Register a folder under `KA_CONNECTOR_ROOTS` as a connection on the Add knowledg
 
 ## Processes tab (plan-15)
 
-The console's fourth tab, Processes, lists process subjects composed from governed knowledge and opens a profile per process (the plan-06 view); Browse by scope keeps its Processes mode. Tabs: 1 Add knowledge · 2 Knowledge nuggets · 3 Browse by scope · 4 Processes · 5 Dashboard · 6 Images · 7 Wiki (plan-25: articles computed from governed knowledge, every sentence cited).
+The console's fourth tab, Processes, lists process subjects composed from governed knowledge and opens a profile per process (the plan-06 view); Browse by scope keeps its Processes mode. Tabs: 1 Add knowledge · 2 Knowledge nuggets · 3 Browse by scope · 4 Processes · 5 Dashboard · 6 Images · 7 Wiki (plans 25–28: articles computed from governed knowledge with every sentence cited; a Markdown-subset editor whose submissions become governance proposals; review and publication as a recorded digest).
 
 ## Running as a service (VPS)
 

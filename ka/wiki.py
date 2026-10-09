@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from ka.conflict import tokens
-from ka.model import KnowledgeNuggetVersion, Scope, WikiDraft, WikiPage
+from ka.model import KnowledgeNuggetVersion, Scope, WikiDraft, WikiPage, WikiPublication
 from ka.timeutil import now_iso
 from ka.wiki_markdown import block_diff, parse, to_markdown
 from ka.vocab import VISIBILITY_ORDER, NuggetStatus, ScopeType, Visibility
@@ -408,6 +408,116 @@ class WikiService:
                       scope_type=scope.scope_type if scope else None, scope_id=scope.scope_id if scope else None, owner=by)
         self.repo.wiki_pages.put(pg)
         return pg, self.start_draft(key, by=by)
+
+    # [block plan-28]
+    # ---- review and publication (plan-28, research-04 R8) ---------------------------------------------------------------------------
+    OPEN_STATUSES = {NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT, NuggetStatus.ANALYZED, NuggetStatus.CANDIDATE}
+
+    def list_proposals(self, state: str | None = None) -> list[dict[str, Any]]:
+        out = []
+        for p in sorted(self.repo.wiki_proposals.all(), key=lambda p: p.created_at, reverse=True):
+            if state and p.state != state:
+                continue
+            summary: dict[str, int] = {}
+            for o in p.operations:
+                summary[o["cls"]] = summary.get(o["cls"], 0) + 1
+            out.append({"id": p.id, "page_key": p.page_key, "draft_id": p.draft_id, "state": p.state, "submitted_by": p.submitted_by, "created_at": p.created_at,
+                        "produced": len(p.produced_refs), "summary": summary})
+        return out
+
+    def _produced(self, p) -> list[dict[str, Any]]:
+        rows = []
+        for r in p.produced_refs:
+            v = self.repo.version(r)
+            if v is None:
+                continue
+            graph = [{"id": g.id, "status": getattr(g.status, "value", str(g.status))} for g in self.repo.proposals.where(lambda g: r in g.knowledge_change_ids)]
+            rows.append({"ref": r, "canonical_id": v.canonical_id, "version": v.version, "statement": v.statement, "status": v.status.value,
+                         "open": v.status in self.OPEN_STATUSES, "decision_id": v.governance_decision_id,
+                         "conflicts": [f for f in v.analysis.get("findings", []) if f.get("relationship") == "CONTRADICTS"],
+                         "retirement_requested": v.analysis.get("retirement_requested"), "graph_changes": graph})
+        return rows
+
+    def resolve_proposal(self, proposal_id: str):
+        p = self.repo.wiki_proposals.require(proposal_id)
+        produced = self._produced(p)
+        if p.state == "SUBMITTED" and not any(x["open"] for x in produced):
+            p.state, p.updated_at = "RESOLVED", now_iso()
+            self.repo.wiki_proposals.put(p)
+        return p, produced
+
+    def proposal_review(self, proposal_id: str) -> dict[str, Any]:
+        p, produced = self.resolve_proposal(proposal_id)
+        d = self.repo.wiki_drafts.require(p.draft_id)
+        pg = self.page(p.page_key)
+        try:
+            current = self.article(p.page_key)["blocks"]
+        except KeyError:
+            current = []
+        resolved = p.state in ("RESOLVED", "PUBLISHED", "REJECTED") or not any(x["open"] for x in produced)
+        return {"proposal": p.model_dump(mode="json"), "page": {"key": pg.key, "title": pg.title, "kind": pg.kind, "ceiling": pg.ceiling.value},
+                "draft": d.model_dump(mode="json", exclude={"blocks"}), "current_blocks": current, "draft_blocks": d.blocks, "operations": p.operations,
+                "produced": produced, "resolved": resolved, "publishable": resolved and p.state in ("SUBMITTED", "RESOLVED") and d.state == "SUBMITTED",
+                "pending_refs": [x["ref"] for x in produced if x["open"]], **self.stale(p.page_key)}
+
+    def publish(self, key: str, *, by: str, proposal_id: str | None = None) -> dict[str, Any]:
+        agents = getattr(getattr(getattr(self, "reconciler", None), "governance", None), "research_agent_ids", set()) or set()
+        if by in agents:
+            raise PermissionError("research agents cannot publish wiki pages (§17)")
+        pg = self.page(key)
+        p = d = None
+        if proposal_id:
+            p, produced = self.resolve_proposal(proposal_id)
+            if p.page_key != key:
+                raise ValueError(f"proposal {proposal_id} belongs to {p.page_key}, not {key}")
+            pending = [x["ref"] for x in produced if x["open"]]
+            if pending:
+                raise PermissionError(f"proposal {proposal_id} is not resolved: {', '.join(pending)} still await a decision")
+            if p.state not in ("SUBMITTED", "RESOLVED"):
+                raise PermissionError(f"proposal {proposal_id} is {p.state}")
+            d = self.repo.wiki_drafts.require(p.draft_id)
+            if pg.kind == "page":
+                pg.layout = dict(pg.layout, blocks=[dict(b) for b in d.blocks])
+                pg.layout_rev += 1
+                pg.updated_at = now_iso()
+        stored = self.repo.wiki_pages.get(key)
+        if stored is None or pg.kind == "page":
+            self.repo.wiki_pages.put(pg)                                   # a derived page gets its record on first publication
+        digest, manifest = self.digest(key), self.manifest(key)
+        last = sorted(self.repo.wiki_publications.where(lambda x: x.page_key == key), key=lambda x: x.created_at)
+        if last and last[-1].digest == digest and last[-1].layout_rev == pg.layout_rev and p is None:
+            return {"published": False, "reason": "already published", "digest": digest, "publication": last[-1].model_dump(mode="json")}
+        if last and last[-1].digest == digest and last[-1].layout_rev == pg.layout_rev and p is not None and p.state == "PUBLISHED":
+            return {"published": False, "reason": "already published", "digest": digest, "publication": last[-1].model_dump(mode="json")}
+        pub = WikiPublication(page_key=key, layout_rev=pg.layout_rev, digest=digest, manifest=manifest, by=by, proposal_id=p.id if p else None)
+        self.repo.wiki_publications.put(pub)
+        if p is not None:
+            p.state, p.updated_at = "PUBLISHED", now_iso()
+            self.repo.wiki_proposals.put(p)
+            d.state, d.updated_at = "CLOSED", now_iso()
+            self.repo.wiki_drafts.put(d)
+        self._emit("wiki.published", page_key=key, publication_id=pub.id, proposal_id=p.id if p else "")
+        if self.auditor is not None:
+            self.auditor.record(who=by, what="wiki.published", why=f"digest {digest[:12]} · {len(manifest)} statements", affected=[key, pub.id] + ([p.id] if p else []))
+        return {"published": True, "digest": digest, "publication": pub.model_dump(mode="json")}
+
+    def reject_proposal(self, proposal_id: str, *, by: str, reason: str):
+        p = self.repo.wiki_proposals.require(proposal_id)
+        if p.state in ("PUBLISHED", "REJECTED"):
+            raise PermissionError(f"proposal {proposal_id} is {p.state}")
+        p.state, p.updated_at = "REJECTED", now_iso()
+        p.decisions.append({"by": by, "at": now_iso(), "outcome": "REJECTED", "reason": reason})
+        self.repo.wiki_proposals.put(p)
+        d = self.repo.wiki_drafts.get(p.draft_id)
+        if d is not None:
+            d.state, d.updated_at = "CLOSED", now_iso()
+            self.repo.wiki_drafts.put(d)
+        self._emit("wiki.proposal.rejected", proposal_id=p.id, page_key=p.page_key)
+        if self.auditor is not None:
+            self.auditor.record(who=by, what="wiki.proposal.rejected", why=reason, affected=[p.id, p.page_key])
+        return p
+
+    # [/block plan-28]
 
 
 class StaleDraft(ValueError):
