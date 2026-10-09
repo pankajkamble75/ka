@@ -371,10 +371,26 @@ class WikiService:
         d.state, d.updated_at = "SUBMITTED", now_iso()
         d.note = note if note is not None else d.note
         self.repo.wiki_drafts.put(d)
+        if getattr(self, "reconciler", None) is not None:                 # plan-27 (R6): the submission becomes governance operations
+            self.reconciler.submit(d, by=by or d.editor)
+            d = self.repo.wiki_drafts.require(d.id)
         self._emit("wiki.draft.submitted", draft_id=d.id, page_key=d.page_key, by=by or d.editor)
         if self.auditor is not None:
             self.auditor.record(who=by or d.editor, what="wiki.draft.submitted", why=d.note or "", affected=[d.id, d.page_key])
         return d
+
+    def add_request(self, draft_id: str, *, kind: str, ref: str, why: str, by: str) -> WikiDraft:
+        """plan-27: an explicit request riding with the draft — today `retire` (Q18): the cited nugget should be retired."""
+        d = self.repo.wiki_drafts.require(draft_id)
+        if d.state != "DRAFT":
+            raise PermissionError(f"draft {draft_id} is {d.state}")
+        if kind != "retire":
+            raise ValueError("only 'retire' requests exist")
+        if self.repo.version(ref) is None:
+            raise KeyError(f"unknown nugget version {ref}")
+        d.requests = [r for r in d.requests if r.get("ref") != ref] + [{"kind": kind, "ref": ref, "why": why.strip(), "by": by, "at": now_iso()}]
+        d.updated_at = now_iso()
+        return self.repo.wiki_drafts.put(d)
 
     def close_draft(self, draft_id: str, *, by: str) -> WikiDraft:
         d = self.repo.wiki_drafts.require(draft_id)

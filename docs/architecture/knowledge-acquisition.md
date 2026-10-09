@@ -99,7 +99,7 @@ does not create a second ACTIVE version. It auto-resolves as Keep Existing: the 
 reference and evidence are attached to the existing nugget so the second document still counts. Refusing or allowing were
 considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`, Q11 ledger). Same scope only: the same statement approved in sibling instances is repeated instance knowledge for promotion (§25), not a duplicate. Lives in `ka/governance.py::decide` (the duplicate branch) and `attach_provenance`; characterization 48d4685.
 
-- **Human retirement (Q18 ⏳ decided 2026-10-09, not built).** A person retires an ACTIVE nugget the way a revoked source does (plan-10):
+- **Human retirement (Q18 ✅ built 2026-10-09 by plan-27 — `GovernanceService.request_retirement`; the REJECT branch of `decide` reads a second review reason `retirement_requested`).** A person retires an ACTIVE nugget the way a revoked source does (plan-10):
   a same-statement revision carrying a `review_reason` — `source revoked` or `retirement requested by <person>: <why>` — and REJECT on it
   retires the prior version and proposes the graph retirement through the separate graph-change route. One mechanism, two reasons; no
   second retirement path. Deleting prose in the Knowledge Wiki never retires anything (research-04 §5).
@@ -219,7 +219,7 @@ No new tab while Q8 is parked.
 
 **Owner:** [research-04](../research/research-04.md). Q&A: Q17–Q20 in [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: read side ✅ built 2026-10-09 (plan-25: `ka/wiki.py`, routes `GET /wiki/pages`, `/wiki/pages/{key}`, `/wiki/pages/{key}/evidence`, `/wiki/search`, tab `7 · Wiki`); editing ✅ built (plan-26: `ka/wiki_markdown.py`, draft routes, `#/wiki/:key/edit`); reconciliation, review and publication ⏳ decided, plans 27–28.**
+**State: read side ✅ built 2026-10-09 (plan-25: `ka/wiki.py`, routes `GET /wiki/pages`, `/wiki/pages/{key}`, `/wiki/pages/{key}/evidence`, `/wiki/search`, tab `7 · Wiki`); editing ✅ built (plan-26: `ka/wiki_markdown.py`, draft routes, `#/wiki/:key/edit`); reconciliation ✅ built (plan-27: `ka/wiki_reconcile.py` — classify, submit through `ingest_candidate` / `propose_revision` / `request_retirement`); review and publication ⏳ decided, plan-28.**
 
 - **The article is a projection, never a stored page (Q19).** A wiki article is computed on read from the ACTIVE versions selected by the
   page's key (process, subject, scope, or an authored page that pins refs) at the page's visibility ceiling, exactly as the process profile

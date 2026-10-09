@@ -1,6 +1,7 @@
-"""plan-27 Phase 2, step 2 — CHARACTERIZATION of `ka/governance.py` at the seam the plan changes, run green against the UNCHANGED file
-and committed alone (docs/protected.md protocol). Pins what governance does TODAY: an ordinary REJECT retires nothing; a revision
-stamped with a reason other than `source_revoked` and rejected ALSO retires nothing; there is no `request_retirement`."""
+"""plan-27 Phase 2 — CHARACTERIZATION of `ka/governance.py` at the seam the plan changed. The BEFORE photo is commit b8dce22 (green
+against the unchanged file, committed alone): an ordinary REJECT retires nothing; a stamped `retirement_requested` was IGNORED; there was
+no `request_retirement`. After the change, P1b and P1c pin the decided behaviour (Q18); P1 and P7 are unchanged — they must hold both
+before and after."""
 from __future__ import annotations
 
 from ka.tests.conftest import D, approve_all, ingest_policy
@@ -21,18 +22,19 @@ def test_P1_characterization_an_ordinary_reject_retires_nothing_today(ka):
     assert d.related_refs == [prior.ref] and d.resulting_refs == []          # the prior is the conflict partner; nothing is produced or retired
 
 
-def test_P1b_characterization_a_stamped_retirement_request_is_ignored_today(ka):
-    """The seam plan-27 changes: today only `source_revoked` makes REJECT retire the prior."""
+def test_P1b_characterization_a_stamped_retirement_request_now_retires_on_reject(ka):
+    """The seam plan-27 changed. BEFORE (b8dce22): the prior stayed ACTIVE — only `source_revoked` made REJECT retire. AFTER: Q18."""
     prior = _active(ka)
     rev = ka.governance.propose_revision(prior.canonical_id, statement=prior.statement, by="u", reason="retirement requested by u: wrong")
     rev.analysis["retirement_requested"] = {"by": "u", "why": "wrong", "prior_ref": prior.ref}
     ka.repo.nuggets.put(rev)
     ka.governance.decide(rev.ref, DecisionOutcome.REJECT, by="reviewer", reason="agreed")
-    assert ka.repo.require_version(prior.ref).status == NuggetStatus.ACTIVE          # TODAY: ignored (plan-27 makes this OBSOLETE)
+    assert ka.repo.require_version(prior.ref).status == NuggetStatus.OBSOLETE        # was ACTIVE before plan-27 (b8dce22)
 
 
-def test_P1c_characterization_there_is_no_request_retirement_today(ka):
-    assert not hasattr(ka.governance, "request_retirement")
+def test_P1c_characterization_request_retirement_exists_now(ka):
+    """BEFORE (b8dce22): `not hasattr(ka.governance, "request_retirement")`."""
+    assert callable(getattr(ka.governance, "request_retirement", None))
 
 
 def test_P7_characterization_the_revoked_source_path_retires_on_reject(ka):

@@ -170,7 +170,10 @@ def test_N4_PT3_half_editing_changes_no_nugget_article_or_proposal(ka):
     d = ka.wiki.start_draft(KEY, by="a")
     ka.wiki.save_draft(d.id, text=ka.wiki.draft_markdown(d).replace("level 0.", "level 99.") + "\nInvented activity: approve by phone.\n", expected_rev=0, by="a")
     ka.wiki.submit_draft(d.id, by="a")
-    assert _tree(ka) == before and ka.wiki.article(KEY)["blocks"] == art0
+    now = _tree(ka)
+    assert all(now[p] == b for p, b in before.items()) and ka.wiki.article(KEY)["blocks"] == art0   # existing versions, proposals and the article untouched
+    assert len(ka.repo.proposals.all()) == len([p for p in before if "proposals" in str(p)])         # no graph proposal
+    # plan-27: submission MAY add new candidate files (PENDING_REVIEW) — that is the point of PT3; nothing governed moved
 
 
 def test_N5_unknown_key_bad_slug_and_missing_by(ka):

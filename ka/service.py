@@ -91,6 +91,10 @@ class KnowledgeAcquisition:
         from ka.wiki import WikiService
         self.wiki = WikiService(self.repo, self.profiles, self.registry, self.lineage, self.provider, self.bus, self.auditor)
         # [/block plan-25]
+        # [block plan-27] research-04 R6: a submitted draft becomes governance operations through the one pipeline
+        from ka.wiki_reconcile import Reconciler
+        self.wiki.reconciler = Reconciler(self.repo, self.governance, self.ingestion, self.wiki, self.governance.extractor)
+        # [/block plan-27]
         # [/block plan-06]
         # [block plan-08]
         self.connectors = SyncService(self.repo, self.ingestion, self.governance, self.auditor, self.bus)

@@ -346,14 +346,18 @@ class GovernanceService:
             self.versioning.transition(v, NuggetStatus.REJECTED)
             self.bus.emit("knowledge.rejected", ref=v.ref, decision_id=d.id)
             # research-02 R2 (Q4): rejecting a re-review revision retires the prior version it was re-reviewing.
-            if outcome == DecisionOutcome.REJECT and v.analysis.get("source_revoked"):
+            # [block plan-27] research-04 R7 (Q18, decided 2026-10-09): the same mechanism carries a second review reason — a person's
+            # explicit retirement request (`request_retirement`). One mechanism, two reasons; never a second retirement path.
+            review_reason = "source revoked" if v.analysis.get("source_revoked") else ("retirement requested" if v.analysis.get("retirement_requested") else None)
+            if outcome == DecisionOutcome.REJECT and review_reason:
                 prior = self.repo.active_version(v.canonical_id)
                 if prior is not None and prior.ref != v.ref:
                     self.versioning.transition(prior, NuggetStatus.OBSOLETE)
-                    prior.comments.append({"by": by, "at": now_iso(), "text": f"retired: source revoked and re-review {v.ref} rejected — {reason}"})
+                    prior.comments.append({"by": by, "at": now_iso(), "text": f"retired: {review_reason} and re-review {v.ref} rejected — {reason}"})
                     self.repo.nuggets.put(prior)
                     self.repo.relationships.put(KnowledgeRelationship(from_ref=v.ref, to_ref=prior.ref, relationship_type=RelationshipType.OBSOLETES,
-                                                                      explanation=f"source revoked; re-review rejected by {by}", created_by=by))
+                                                                      explanation=f"{review_reason}; re-review rejected by {by}", created_by=by))
+            # [/block plan-27]
                     d.related_refs = sorted(set(d.related_refs) | {prior.ref})
                     if self.on_retire is not None:
                         try:
@@ -513,6 +517,24 @@ class GovernanceService:
             out.append(rev.ref)
         return out
     # [/block plan-10]
+
+    # [block plan-27] research-04 R7 (Q18): a person retires an ACTIVE nugget the way a revoked source does — a same-statement revision
+    # carrying a review reason; REJECT on it retires the prior and proposes the graph retirement; APPROVE keeps the knowledge.
+    def request_retirement(self, canonical_id: str, *, by: str, why: str) -> KnowledgeNuggetVersion | None:
+        if by in self.research_agent_ids:
+            raise GovernanceError("research agents cannot request retirement of governed knowledge (§17)")
+        prior = self.repo.active_version(canonical_id)
+        if prior is None:
+            raise GovernanceError(f"no ACTIVE version of {canonical_id} to retire")
+        if self.repo.nuggets.where(lambda n: n.canonical_id == canonical_id and n.status in {NuggetStatus.PENDING_REVIEW, NuggetStatus.CONFLICT}):
+            return None                                             # already under review — one re-review at a time, as reopen_for_revocation does
+        rev = self.propose_revision(canonical_id, statement=prior.statement, by=by, reason=f"retirement requested by {by}: {why}",
+                                    subject=prior.subject, predicate=prior.predicate, object=prior.object)
+        rev.analysis["retirement_requested"] = {"by": by, "why": why, "prior_ref": prior.ref, "at": now_iso()}
+        self.repo.nuggets.put(rev)
+        self.auditor.record(who=by, what="knowledge.retirement.requested", why=why, scope=prior.scope, affected=[prior.ref, rev.ref])
+        return rev
+    # [/block plan-27]
 
     def add_comment(self, ref: str, by: str, text: str) -> KnowledgeNuggetVersion:
         v = self.repo.require_version(ref)

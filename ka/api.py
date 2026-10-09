@@ -882,7 +882,7 @@ def wiki_submit(draft_id: str, body: DraftActIn, ka: KnowledgeAcquisition = Depe
         d = ka.wiki.submit_draft(draft_id, by=body.by, note=body.note)
     except Exception as e:  # noqa: BLE001
         _wiki_edit_err(e)
-    return {"draft": d.model_dump(mode="json", exclude={"blocks"}), "diff": ka.wiki.diff(draft_id)["diff"]}
+    return {"draft": d.model_dump(mode="json", exclude={"blocks"}), "diff": ka.wiki.diff(draft_id)["diff"], "proposal_id": d.proposal_id}   # plan-27
 
 
 @router.post("/wiki/drafts/{draft_id}/close")
@@ -891,6 +891,51 @@ def wiki_close(draft_id: str, body: DraftActIn, ka: KnowledgeAcquisition = Depen
         raise HTTPException(404, "draft not found")
     return {"draft": ka.wiki.close_draft(draft_id, by=body.by).model_dump(mode="json", exclude={"blocks"})}
 # [/block plan-26]
+
+
+# [block plan-27] research-04 R6 (+ Q18): reconciliation preview, explicit requests, the proposal a submission produced
+class RequestIn(BaseModel):
+    ref: str
+    why: str
+    by: str
+    kind: str = "retire"
+
+
+@router.post("/wiki/drafts/{draft_id}/reconcile")
+def wiki_reconcile(draft_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    d = ka.repo.wiki_drafts.get(draft_id)
+    if d is None:
+        raise HTTPException(404, "draft not found")
+    try:
+        return ka.wiki.reconciler.classify(d)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+
+
+@router.post("/wiki/drafts/{draft_id}/requests")
+def wiki_add_request(draft_id: str, body: RequestIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_drafts.get(draft_id) is None:
+        raise HTTPException(404, "draft not found")
+    try:
+        d = ka.wiki.add_request(draft_id, kind=body.kind, ref=body.ref, why=body.why, by=body.by)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+    return {"draft": d.model_dump(mode="json", exclude={"blocks"})}
+
+
+@router.get("/wiki/proposals/{proposal_id}")
+def wiki_proposal(proposal_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    p = ka.repo.wiki_proposals.get(proposal_id)
+    if p is None:
+        raise HTTPException(404, "proposal not found")
+    produced = []
+    for r in p.produced_refs:
+        v = ka.repo.version(r)
+        if v is not None:
+            produced.append({"ref": r, "status": v.status.value, "statement": v.statement, "canonical_id": v.canonical_id,
+                             "retirement_requested": v.analysis.get("retirement_requested"), "governance_decision_id": v.governance_decision_id})
+    return {"proposal": p.model_dump(mode="json"), "produced": produced}
+# [/block plan-27]
 
 
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)

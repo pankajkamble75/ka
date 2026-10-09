@@ -2,6 +2,38 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 00:20 UTC — plan-27: reconciliation through the one pipeline; a person can request retirement (research-04 R6; builds R7 / Q18 — PROTECTED governance)
+
+**What changed** — `ka/wiki_reconcile.py` (new): `Reconciler.classify` (block diff → changed blocks through the existing extractor with
+citations and inline marks stripped → each statement compared with the block's cited nuggets and the page's selection → EDITORIAL_ONLY /
+LINK_EXISTING / ADD_CANDIDATE / PROPOSE_REVISION / PROPOSE_RETIREMENT / NEEDS_EVIDENCE / UNRESOLVED; deletes and moves are editorial;
+sentences the extractor does not type go to review as plain facts) and `Reconciler.submit` (one FEEDBACK source per submission with
+evidence offsets; `ingest_candidate` for new claims with the cited subject; `propose_revision` with the prior's subject/predicate/object;
+`request_retirement` for explicit requests; the `WikiEditProposal` records operations and produced refs). `ka/wiki.py`: `submit_draft`
+hands the draft to the reconciler; `add_request`. `ka/model.py`: `WikiDraft.requests`, `proposal_id`. `ka/api.py`: `POST …/reconcile`,
+`POST …/requests`, `GET /wiki/proposals/{id}`; submit returns `proposal_id`. Console: Reconcile preview table, retirement request form,
+produced refs after submit. **Protected:** `ka/governance.py` — the REJECT branch retires on a second review reason
+`retirement_requested` (wording generalised), and `request_retirement(canonical_id, by, why)` creates the same-statement revision (agents
+refused, one re-review at a time); `docs/protected.md` Verified bumped. `test_plan27_characterization_governance.py` (before-photo
+b8dce22, flipped to the after-photo here), `test_plan27_wiki_reconcile.py` (13 cases), `e2e/plan27_reconcile_flow.py`. Architecture §4
+and §8a states.
+
+**Why** — research-04 §5–§6; Q18 (2026-10-09): one retirement mechanism, two reasons.
+
+**Verification** — in-process 401 passed, 2 skipped (exit checked); ruff F clean. Protected protocol: characterization committed alone
+(b8dce22) green against the unchanged file; every covering suite in `docs/protected.md` byte-identical to b8dce22 (`test_P7`); plan-10's own
+`test_N1` gate green. Live: `e2e/plan27_reconcile_flow.py` 8/8 (Reconcile preview, retirement request, submit → produced revision +
+retirement revision, ACTIVE/article unchanged until decision, REJECT → OBSOLETE and gone from the article). Recount 8/8 D, 8/8 P, 5/5 N;
+blocks in 5 files. Product tests: PT3, PT5, PT6, PT7 PASS. plan-26's `test_N4` gate relaxed to existing files (submission now creates
+candidate files on purpose).
+
+**Findings / incident** — `e2e/plan10_governance_flow.py` targets the LIVE server (8011) and was started as the protected area's re-verify
+flow; it hung and was stopped, but not before pasting one test source and creating candidates (owner `flow`, KN-625…KN-627, 2026-10-09
+06:19 UTC) in the live storage. They are PENDING_REVIEW and were NOT deleted by the run (production data): the user should Reject them in
+the console. The flow itself needs a port/storage override before it is run again; re-verification was done by plan-27's flow instead.
+
+**Decisions and questions** — BUILT: R7 (Q18) and the reconciliation half of §8a. Plan `plan-27`; R6 → UPLOADED. No new question.
+
 ## 2026-10-09 23:10 UTC — plan-26: the wiki editor — a Markdown subset parsed into blocks, no HTML ever, an optimistic lock, authored pages (research-04 R5)
 
 **What changed** — `ka/wiki_markdown.py` (new): `parse` (headings, paragraphs, ordered/unordered lists, quotes, tables; bold, italics,

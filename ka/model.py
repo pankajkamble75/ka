@@ -568,6 +568,8 @@ class WikiDraft(BaseModel):
     editor: str = "console-user"
     state: str = "DRAFT"                               # DRAFT | SUBMITTED | CLOSED
     note: str | None = None
+    requests: list[dict[str, Any]] = Field(default_factory=list)   # plan-27: explicit requests, e.g. {"kind": "retire", "ref", "why", "by"}
+    proposal_id: str | None = None                                 # plan-27: the WikiEditProposal submission produced
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
