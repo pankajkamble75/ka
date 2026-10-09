@@ -31,6 +31,9 @@ EVENT_NAMES = {
     # [block plan-20]
     "physical.binding.available", "physical.outbox.dead",
     # [/block plan-20]
+    # [block plan-21]
+    "physical.event.received", "physical.binding.revoked",
+    # [/block plan-21]
 }
 
 Handler = Callable[[dict[str, Any]], None]

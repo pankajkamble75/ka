@@ -111,6 +111,9 @@ declare("KA_DP_RETRIES", int, 3, "ka.data_platform", "Attempts the plan-20 outbo
 declare("KA_DP_OUTBOX_INTERVAL", float, 15.0, "ka.outbox", "Seconds between outbox worker runs when the backend is data_platform.")
 declare("KA_DP_BACKOFF_BASE", float, 5.0, "ka.outbox", "First retry delay in seconds; doubles per attempt.")
 # [/block plan-20]
+# [block plan-21]
+declare("KA_DP_INBOUND_INTERVAL", float, 15.0, "ka.data_platform.inbound", "Seconds between inbound Data Platform event polls (runs on the outbox worker's tick).")
+# [/block plan-21]
 
 _overrides: dict[str, Any] = {}
 

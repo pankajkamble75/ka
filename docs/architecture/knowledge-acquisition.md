@@ -254,7 +254,7 @@ No vector index, no chat, no document browser as the primary view, no agent path
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-23 completes this section.
+**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-23 completes this section.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -276,4 +276,10 @@ No vector index, no chat, no document browser as the primary view, no agent path
   after `KA_DP_RETRIES` (`physical.outbox.dead`), and reconciles pending bindings on start. A replay of a committed upload returns the
   same asset ids, so a crash between content and commit never duplicates. Non-retryable errors (401/403/409/413/422) fail the binding at once.
   Routes `GET /physical/outbox`, `POST /physical/outbox/run`, `POST /physical/outbox/{id}/retry`; the Dashboard's physical line shows the counts.
+- **Inbound events and the one revocation rule (R5, R9, ✅ plan-21).** `ka/data_platform/inbound.py` polls `GET /v1/events?after=` on the
+  worker's tick with a durable cursor (`<storage>/dp_inbound.json`) and handles each `event_id` once: `committed` flips a pending binding
+  to available; `access_revoked`, `quarantined` and `deleted` set the binding `revoked` and call `SyncService.revoke_source` — THE rule a
+  deleted connector file also takes: `Source.revoked_at`, derived nuggets flagged, every ACTIVE nugget returned to review (Q4, plan-10),
+  `source.revoked`, audit; `index.ready` records the derived text asset; unknown types and unknown assets are recorded and ignored; a
+  failed poll leaves the cursor where it was. Routes `GET /physical/inbound`, `POST /physical/inbound/poll`.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.

@@ -173,6 +173,7 @@ class OutboxWorker:
         self._stop = threading.Event()
         self.thread: threading.Thread | None = None
         self.runs = 0
+        self.ticks: list[Callable[[], Any]] = []        # plan-21: extra work per run (inbound event polling)
 
     def start(self) -> None:
         if self.thread is not None:
@@ -190,6 +191,11 @@ class OutboxWorker:
                 self.outbox.process_once()
             except Exception:  # noqa: BLE001 — the worker must survive anything
                 pass
+            for tick in list(self.ticks):                 # plan-21
+                try:
+                    tick()
+                except Exception:  # noqa: BLE001
+                    pass
             self.runs += 1
             self._stop.wait(float(config.get("KA_DP_OUTBOX_INTERVAL")))
 # [/block plan-20]

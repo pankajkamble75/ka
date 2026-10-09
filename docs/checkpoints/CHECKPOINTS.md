@@ -2,6 +2,30 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 15:05 UTC — plan-21: inbound Data Platform events and the one revocation rule (research-03 R5, R9)
+
+**What changed** — `ka/data_platform/inbound.py` (new): `InboundEvents` polls `GET /v1/events?after=` with a durable cursor
+(`<storage>/dp_inbound.json`, last 5,000 handled ids), handles each `event_id` once: `committed` flips a pending binding to available;
+`access_revoked` / `quarantined` / `deleted` set the binding `revoked` and call the one rule; `index.ready` records the derived text asset;
+unknown types and assets are recorded and ignored; a failed poll leaves the cursor. `ka/connectors/sync.py`: `revoke_source(src, by, reason)`
+factored out of the deletion loop (behaviour unchanged; plan-08/plan-10 tests unmodified) — THE rule for connector deletions and DP
+revocations alike (R9). `ka/outbox.py`: worker `ticks`; `ka/service.py`: inbound wiring on the DP backend, `physical_status.inbound`;
+`ka/api.py`: `GET /physical/inbound`, `POST /physical/inbound/poll` (409 on the local backend); console: inbound cursor on the Dashboard's
+physical line, and the revoked badge says "re-review pending" instead of "null remaining sources" when the row is the prior version
+(pre-existing plan-10 display nit, found by this plan's live flow). `ka/events.py`: two names; `ka/config.py`: `KA_DP_INBOUND_INTERVAL`;
+`.env.example`; architecture §11. `test_plan21_inbound_events.py` (12 cases); `e2e/plan21_inbound_flow.py`.
+
+**Why** — research-03 §5: KA must hear revocation, quarantine and deletion from the Data Platform and answer exactly as it answers a
+deleted connector file (Q4: derived knowledge returns to review). One function, two callers, so the two paths cannot drift.
+
+**Verification** — in-process 323 passed, 2 skipped (exit checked); ruff F clean; no protected code (`reopen_for_revocation` is called as
+plan-10 built it). Recount 7/7 D, 7/7 P, 5/5 N; blocks in 6 files (`app.js` changes ride inline comments beside plan-18's line and plan-10's
+badge). Live flow 6/6: DP-backed server, paste + approve, `fake.revoke` → within seconds the source shows "revoked at source", the version
+pill "bytes · data_platform · revoked · access revoked at the Data Platform (evt-…)", the Dashboard lists the re-review and the inbound
+cursor; screenshots verified. Product tests: PT1, PT2, PT3, PT6, PT7, PT8 PASS; PT5 physical half; PT4, PT9 await plans 22, 23.
+
+**Decisions and questions** — BUILT: R5, R9 (architecture §11). Plan `plan-21`; R5, R9 → UPLOADED. No new question.
+
 ## 2026-10-09 14:10 UTC — plan-20: the pending-operations outbox — retry with backoff, dead-letter, reconcile by idempotency key (research-03 R4)
 
 **What changed** — `ka/outbox.py` (new): `Outbox` (`enqueue` one op per key, `due`, `process_once`, backoff `KA_DP_BACKOFF_BASE`·2ⁿ, dead-letter

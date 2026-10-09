@@ -696,6 +696,20 @@ def outbox_retry(op_id: str, by: str = "user", ka: KnowledgeAcquisition = Depend
 # [/block plan-20]
 
 
+# [block plan-21] research-03 R5: inbound Data Platform events
+@router.get("/physical/inbound")
+def inbound_status(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return ka.inbound.status()
+
+
+@router.post("/physical/inbound/poll")
+def inbound_poll(by: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.physical.name != "data_platform":
+        raise HTTPException(409, "inbound events exist only on the data_platform backend")
+    return {"polled": ka.inbound.poll(ka.physical.client, by=by), "status": ka.inbound.status()}
+# [/block plan-21]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"

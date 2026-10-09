@@ -59,9 +59,15 @@ class KnowledgeAcquisition:
         self.outbox = Outbox(self.repo, self.bus, self.auditor, self.physical)
         self.ingestion.outbox = self.outbox
         self.outbox_worker = OutboxWorker(self.outbox)
+        # [/block plan-20]
+        # [block plan-21] research-03 R5: inbound Data Platform events ride on the worker's tick (DP backend only)
+        from ka.data_platform.inbound import InboundEvents
+        self.inbound = InboundEvents(self.repo, self.bus, self.auditor, None)      # the connectors service is attached below
+        if self.physical.name == "data_platform":
+            self.outbox_worker.ticks.append(lambda: self.inbound.poll(self.physical.client))
         if self.physical.name == "data_platform" and start_workers:
             self.outbox_worker.start()
-        # [/block plan-20]
+        # [/block plan-21]
         # [block plan-03]
         self.grammar = GrammarRegistry.from_config(self.repo.root)
         self.subjects = SubjectRegistry(self.repo)
@@ -92,6 +98,7 @@ class KnowledgeAcquisition:
         # [/block plan-11]
         if auto_propose_graph_changes:
             self.bus.subscribe("knowledge.approved", self._on_approved)
+        self.inbound.connectors = self.connectors                            # plan-21: the one revocation rule lives on the sync service
         # [block plan-10] research-02 R2: a rejected re-review retires its prior version's graph elements through a proposal;
         # the needs-attention row below points at the re-review candidates
         self.governance.on_retire = lambda prior, by: self.graph_change.propose_retirement(prior, by=by)
@@ -264,7 +271,8 @@ class KnowledgeAcquisition:
         legacy = sum(1 for v in self.repo.source_versions.all() if self.repo.binding_for_version(v.id) is None)
         return {"backend": self.physical.name, "requested": (config.get("KA_STORAGE_BACKEND") or "local"), "tenant_id": config.get("KA_TENANT_ID"),
                 "note": self.physical_note, "bindings": len(bs), "by_status": dict(Counter(b.status for b in bs)), "legacy_versions_without_binding": legacy,
-                "outbox": outbox, "worker_running": bool(getattr(getattr(self, "outbox_worker", None), "thread", None))}
+                "outbox": outbox, "worker_running": bool(getattr(getattr(self, "outbox_worker", None), "thread", None)),
+                "inbound": self.inbound.status() if hasattr(self, "inbound") else {}}   # plan-21
     # [/block plan-18]
 
     def needs_attention(self) -> dict[str, list[dict[str, Any]]]:

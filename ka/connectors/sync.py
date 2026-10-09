@@ -129,17 +129,12 @@ class SyncService:
         for loc in delta.deleted:
             src = self._source_for(conn, loc)
             if src is not None and not src.revoked_at:
-                src.revoked_at = now_iso()
-                self.repo.sources.put(src)
-                self._flag_derived(src, "source_revoked")
-                # [block plan-10] research-02 R2 (Q4): revocation is a governance event — derived knowledge returns to review
-                try:
-                    report.reviews += self.governance.reopen_for_revocation(src.id, by=by, revoked_at=src.revoked_at)
-                except Exception as e:  # noqa: BLE001 — a re-review failure must not abort the sync
-                    report.skipped.append({"locator": loc, "reason": f"re-review failed: {type(e).__name__}: {e}"})
-                # [/block plan-10]
-                self.bus.emit("source.revoked", source_id=src.id, connection_id=conn.id)
-                self.auditor.record(who=by, what="source.revoked", why="deleted at the connector", source=src.id, scope=conn.scope, affected=[src.id])
+                # [block plan-21] research-03 R9: one revocation rule for connector deletions and Data Platform revocations alike
+                out = self.revoke_source(src, by=by, reason="deleted at the connector")
+                report.reviews += out["reviews"]
+                if out.get("error"):
+                    report.skipped.append({"locator": loc, "reason": out["error"]})
+                # [/block plan-21]
             report.deleted += 1
         for item in delta.permission_changed:
             src = self._source_for(conn, item.locator)
@@ -164,6 +159,23 @@ class SyncService:
         return report
 
     # ---- helpers ------------------------------------------------------------------------------------------
+
+    def revoke_source(self, src: Source, *, by: str, reason: str) -> dict[str, Any]:
+        """THE revocation rule (research-03 R9; Q4): mark the source revoked, flag derived knowledge, return every ACTIVE nugget derived
+        from it to review (plan-10), emit `source.revoked`, audit. Used by the connector deletion loop and by Data Platform events."""
+        if src.revoked_at:
+            return {"reviews": [], "already": True}
+        src.revoked_at = now_iso()
+        self.repo.sources.put(src)
+        self._flag_derived(src, "source_revoked")
+        out: dict[str, Any] = {"reviews": []}
+        try:
+            out["reviews"] = self.governance.reopen_for_revocation(src.id, by=by, revoked_at=src.revoked_at)
+        except Exception as e:  # noqa: BLE001 — a re-review failure must not abort the caller
+            out["error"] = f"re-review failed: {type(e).__name__}: {e}"
+        self.bus.emit("source.revoked", source_id=src.id, connection_id=src.connection_id or "")
+        self.auditor.record(who=by, what="source.revoked", why=reason, source=src.id, scope=src.scope, affected=[src.id])
+        return out
 
     def _source_for(self, conn: Connection, locator: str) -> Source | None:
         hits = self.repo.sources.where(lambda s: s.connection_id == conn.id and s.metadata.get("locator") == locator)
