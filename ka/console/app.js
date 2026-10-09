@@ -55,6 +55,7 @@ const routes = [
   [/^#\/mission\/([^/]+)$/, missionView],
   [/^#\/change\/([^/]+)$/, changeView],
   [/^#\/wiki(?:\?(.*))?$/, wikiView],                       // plan-25 (Q17)
+  [/^#\/wiki\/([^/?]+)\/edit(?:\?(.*))?$/, wikiEditView],                   // plan-26 (R5)
   [/^#\/wiki\/([^/?]+)(?:\?(.*))?$/, wikiArticleView],
   [/^#\/scope\/([A-Z_]+)\/([^/]+)(?:\/([a-z-]+))?$/, (t, i) => { location.hash = `#/browse?scope=${t}|${i}`; return ''; }],
 ];
@@ -653,9 +654,16 @@ document.addEventListener('change', async (e) => {
 /* ------------------------------------------------------------------ actions */
 
 // [block plan-25] research-04 (Q17, Q19, Q20): the Knowledge Wiki, read side — articles computed on read, every sentence cited
+function wikiInline(escaped) {
+  // plan-26: the inline Markdown subset, applied AFTER esc — bold, italics, http(s) links, image-store images. No raw HTML ever reaches here.
+  return escaped
+    .replace(/!\[([^\]]*)\]\(image:(\d{1,6})\)/g, (m, alt, n) => `<img class="wk-img" src="${API}/images/${n}" alt="${alt}">`)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, t, u) => `<a href="${u.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${t}</a>`)
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
+}
 function wikiCite(text, refs) {
   // `[[KN-001:v1]]` → a numbered citation that opens the nugget; numbering follows first appearance in the article
-  return esc(text).replace(/\[\[([A-Z]+-[0-9A-Za-z]+:v\d+)\]\]/g, (m, ref) => {
+  return wikiInline(esc(text)).replace(/\[\[([A-Z]+-[0-9A-Za-z]+:v\d+)\]\]/g, (m, ref) => {
     let n = refs.indexOf(ref); if (n < 0) { refs.push(ref); n = refs.length - 1; }
     return `<sup class="cite"><a href="#/nugget/${encodeURIComponent(ref)}" title="${esc(ref)}">[${n + 1}]</a></sup>`;
   });
@@ -663,7 +671,9 @@ function wikiCite(text, refs) {
 function wikiBlock(b, refs) {
   const flags = (b.flags || []).map((f) => ` ${pill(f.flag, 'halt')}`).join('');
   if (b.kind === 'heading') { const h = Math.min(Math.max(b.level || 2, 1), 3); return `<h${h} class="wk-h">${esc(b.text)}</h${h}>`; }
-  if (b.kind === 'list') return `<${b.ordered ? 'ol' : 'ul'} class="wk-list">${(b.items || []).map((i) => `<li>${i.has_profile ? `<a href="#/wiki/${encodeURIComponent('process:' + i.child_key)}">${esc(i.text)}</a>` : esc(i.text)} ${wikiCite(`[[${i.ref}]]`, refs)}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
+  if (b.kind === 'list') return `<${b.ordered ? 'ol' : 'ul'} class="wk-list">${(b.items || []).map((i) => `<li>${i.has_profile ? `<a href="#/wiki/${encodeURIComponent('process:' + i.child_key)}">${wikiInline(esc(i.text))}</a>` : wikiInline(esc(i.text))}${i.ref ? ' ' + wikiCite(`[[${i.ref}]]`, refs) : ''}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
+  if (b.kind === 'quote') return `<blockquote class="quote">${wikiCite(b.text, refs)}</blockquote>`;
+  if (b.kind === 'table') { const rows = b.rows || []; return rows.length ? `<table class="wk-table"><tr>${rows[0].map((c) => `<th>${wikiCite(c, refs)}</th>`).join('')}</tr>${rows.slice(1).map((r) => `<tr>${r.map((c) => `<td>${wikiCite(c, refs)}</td>`).join('')}</tr>`).join('')}</table>` : ''; }
   const origin = b.origin === 'synthesized' ? ` <span class="pill warn" title="model prose; every sentence cites a governed statement">synthesized</span>` : '';
   return `<p class="wk-p">${wikiCite(b.text, refs)}${origin}${flags}${b.synthesis_note ? ` <span class="small muted">(${esc(b.synthesis_note)})</span>` : ''}</p>`;
 }
@@ -686,13 +696,16 @@ async function wikiView(qs) {
     <div class="card"><h3>Subjects <span class="muted">${tree.subjects.length}</span></h3>${tree.subjects.length ? `<ul class="wk-list">${tree.subjects.map(row).join('')}</ul>` : '<div class="empty">No subject pages yet.</div>'}</div>
   </div>
   <div class="card"><h3>By scope</h3><ul class="wk-list">${tree.scopes.filter((s) => s.assertions).map((s) => `<li><a href="#/wiki/${encodeURIComponent(s.key)}">${esc(s.title)}</a> ${scopePill(s.scope)} <span class="small muted">${s.assertions} statements</span></li>`).join('') || '<li class="muted">No scope has ACTIVE knowledge yet.</li>'}</ul></div>
+  <div class="card"><h3>New authored page</h3><p class="small muted">A page you write yourself, citing governed statements with <span class="mono">[[KN-001:v1]]</span>. It starts as a draft; facts still arrive through governance.</p>
+    <div class="row"><div><label>Slug</label><input id="wk-slug" placeholder="refund-handbook"></div><div><label>Title</label><input id="wk-title" placeholder="Refund handbook"></div><div><label>Scope</label><select id="wk-pscope"><option value="">—</option>${scopeOptions(scopes, '')}</select></div><div><label>Ceiling</label><select id="wk-ceiling"><option>ENTERPRISE</option><option>DOMAIN</option><option>INSTANCE</option><option>TEAM</option><option>PERSONAL</option></select></div></div>
+    <div class="actions"><button class="primary" data-act="wk-new-page">Create page and open the editor</button></div></div>
   ${tree.pages.length ? `<div class="card"><h3>Authored pages</h3><ul class="wk-list">${tree.pages.map((x) => `<li><a href="#/wiki/${encodeURIComponent(x.key)}">${esc(x.title)}</a> ${pill(x.ceiling)}</li>`).join('')}</ul></div>` : ''}`;
 }
 async function wikiArticleView(key, qs) {
   const p = new URLSearchParams(qs || '');
   const prose = p.get('prose') === 'llm' ? 'llm' : 'none';
   const k = decodeURIComponent(key);
-  const [a, ev] = await Promise.all([api(`/wiki/pages/${encodeURIComponent(k)}?prose=${prose}`), api(`/wiki/pages/${encodeURIComponent(k)}/evidence`)]);
+  const [a, ev, drafts] = await Promise.all([api(`/wiki/pages/${encodeURIComponent(k)}?prose=${prose}`), api(`/wiki/pages/${encodeURIComponent(k)}/evidence`), api(`/wiki/pages/${encodeURIComponent(k)}/drafts`)]);
   const refs = [];
   const body = a.blocks.map((b) => wikiBlock(b, refs)).join('');
   const byRef = Object.fromEntries(ev.items.map((i) => [i.ref, i]));
@@ -703,7 +716,8 @@ async function wikiArticleView(key, qs) {
     ${it.published_as.length ? `<div class="small muted">in graph: ${it.published_as.map(esc).join(', ')}</div>` : ''}</div>`; }).join('');
   return `<div class="crumbs"><a href="#/wiki">Wiki</a> / ${esc(a.kind)} / <span class="mono">${esc(k)}</span></div>
   <div class="wk-bar">${pill(a.kind)} ${pill(`ceiling ${a.ceiling}`)} ${stale} <span class="small muted">${a.refs.length} governed statements · ${a.sources.length} sources${a.published_at ? ` · published ${when(a.published_at)}` : ''}</span>
-    <span class="wk-tools">${prose === 'llm' ? `<a href="#/wiki/${encodeURIComponent(k)}">Show statements</a>` : `<a href="#/wiki/${encodeURIComponent(k)}?prose=llm" title="model prose; every sentence must cite a statement (Q20)">Connected prose</a>`}${a.kind === 'process' ? ` · <a href="#/subject/${encodeURIComponent(k.slice(8))}">Technical profile</a>` : ''}</span></div>
+    <span class="wk-tools">${prose === 'llm' ? `<a href="#/wiki/${encodeURIComponent(k)}">Show statements</a>` : `<a href="#/wiki/${encodeURIComponent(k)}?prose=llm" title="model prose; every sentence must cite a statement (Q20)">Connected prose</a>`}${a.kind === 'process' ? ` · <a href="#/subject/${encodeURIComponent(k.slice(8))}">Technical profile</a>` : ''} · <button data-act="wk-edit" data-key="${esc(k)}">Edit</button></span></div>
+  ${drafts.drafts.filter((d) => d.state !== 'CLOSED').length ? `<div class="card small"><b>Drafts on this page</b> ${drafts.drafts.filter((d) => d.state !== 'CLOSED').map((d) => `<div>${pill(d.state, d.state === 'SUBMITTED' ? 'warn' : '')} <a href="#/wiki/${encodeURIComponent(k)}/edit?draft=${d.id}">${d.id}</a> rev ${d.rev} · ${esc(d.editor)} · ${when(d.updated_at)}${d.note ? ` · ${esc(d.note)}` : ''}</div>`).join('')}</div>` : ''}
   <div class="wk"><article class="wk-article card">${body}
     ${a.not_known.length ? `<h2 class="wk-h">Not yet known</h2><ul class="wk-list">${a.not_known.map((n) => `<li><span class="mono">${esc(n.slot)}</span> <span class="small muted">${esc(n.level || '')} · ${esc(n.status || 'not evidenced')}</span></li>`).join('')}</ul>` : ''}
     ${a.pending.length ? `<h2 class="wk-h">Pending review <span class="muted">${a.pending.length}</span></h2><ul class="wk-list">${a.pending.map((x) => `<li><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a> ${pill(x.status)} <span class="small">${esc(x.statement || '')}</span></li>`).join('')}</ul>` : ''}
@@ -713,6 +727,32 @@ async function wikiArticleView(key, qs) {
 }
 // [/block plan-25]
 
+
+// [block plan-26] research-04 R5: the editor — a Markdown subset, Save with an expected revision, Preview, Diff, Submit, Cancel
+async function wikiEditView(key, qs) {
+  const p = new URLSearchParams(qs || '');
+  const k = decodeURIComponent(key);
+  let d;
+  if (p.get('draft')) d = await api(`/wiki/drafts/${encodeURIComponent(p.get('draft'))}`);
+  else { const r = await api(`/wiki/pages/${encodeURIComponent(k)}/drafts`, { method: 'POST', body: { by: who() } }); location.hash = `#/wiki/${encodeURIComponent(k)}/edit?draft=${r.draft.id}`; return ''; }
+  const dr = d.draft;
+  const others = (d.other_drafts || []);
+  const locked = dr.state !== 'DRAFT';
+  return `<div class="crumbs"><a href="#/wiki">Wiki</a> / <a href="#/wiki/${encodeURIComponent(k)}">${esc(k)}</a> / edit</div>
+  <h1>Edit <span class="mono small">${esc(dr.id)}</span> ${pill(dr.state, dr.state === 'SUBMITTED' ? 'warn' : dr.state === 'CLOSED' ? '' : 'ok')} <span class="small muted">rev ${dr.rev} · ${esc(dr.editor)}</span></h1>
+  ${others.length ? `<div class="card small"><b>Other drafts on this page:</b> ${others.map((o) => `${pill(o.state, o.state === 'SUBMITTED' ? 'warn' : '')} <a href="#/wiki/${encodeURIComponent(k)}/edit?draft=${o.id}">${o.id}</a> by ${esc(o.editor)}`).join(' · ')}${others.some((o) => o.state === 'SUBMITTED') ? ' — submitting this one is refused until that review is decided.' : ''}</div>` : ''}
+  <p class="small muted">Markdown subset: <span class="mono"># ## ###</span> headings · paragraphs · <span class="mono">- </span>/<span class="mono">1. </span> lists · <span class="mono">&gt; </span> quotes · <span class="mono">|</span> tables · <b>**bold**</b> · <i>*italics*</i> · <span class="mono">[text](https://…)</span> · <span class="mono">![alt](image:12)</span> · citations <span class="mono">[[KN-001:v1]]</span>. HTML is refused. The <span class="mono">&lt;!-- b3 --&gt;</span> lines are block ids — keep them with their block so the diff stays precise.</p>
+  <textarea id="wk-md" style="min-height:420px;font-family:ui-monospace,monospace" ${locked ? 'disabled' : ''}>${esc(d.markdown)}</textarea>
+  <div class="actions">${locked ? '' : `<button class="primary" data-act="wk-save" data-id="${dr.id}" data-rev="${dr.rev}">Save (rev ${dr.rev} → ${dr.rev + 1})</button> <button data-act="wk-preview" data-id="${dr.id}">Preview</button> <button data-act="wk-diff" data-id="${dr.id}">Diff</button> <button data-act="wk-submit" data-id="${dr.id}" data-key="${esc(k)}">Submit for review</button> <button class="danger" data-act="wk-close" data-id="${dr.id}" data-key="${esc(k)}">Cancel draft</button>`} <a href="#/wiki/${encodeURIComponent(k)}">Back to the article</a> <span id="wk-dirty" class="small muted"></span></div>
+  <div id="wk-out"></div>`;
+}
+function wikiDiffHtml(diff) {
+  if (!diff.length) return '<div class="empty">No changes against the current article.</div>';
+  const refs = [];
+  const side = (b) => b ? (b.kind === 'heading' ? `<b>${esc(b.text)}</b>` : b.kind === 'list' ? `<ul>${(b.items || []).map((i) => `<li>${wikiCite(typeof i === 'string' ? i : i.text + (i.ref ? ` [[${i.ref}]]` : ''), refs)}</li>`).join('')}</ul>` : wikiCite(b.text || '', refs)) : '<span class="muted">—</span>';
+  return `<table><tr><th>Block</th><th>Op</th><th>Before</th><th>After</th></tr>${diff.map((x) => `<tr><td class="mono small">${esc(x.block_id)}</td><td>${pill(x.op, x.op === 'delete' ? 'halt' : x.op === 'insert' ? 'ok' : 'warn')}</td><td class="small">${side(x.before)}</td><td class="small">${side(x.after)}</td></tr>`).join('')}</table>`;
+}
+// [/block plan-26]
 function bind(root) {
   root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => act(e.currentTarget).catch((err) => toast(err.message, true))));
   const q = $('#br-q'); if (q) q.addEventListener('keydown', (e) => { if (e.key === 'Enter') act($('[data-act="browse"]')); });
@@ -777,6 +817,13 @@ async function act(b) {
   if (a === 'outbox-run') { const r = await api(`/physical/outbox/run?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Outbox: ${r.processed.done} done · ${r.processed.retried} retried · ${r.processed.dead} dead`); render(); return; }   // plan-20
   // [/block plan-20]
   if (a === 'wk-search') { const q = $('#wk-q').value.trim(); const sc = $('#wk-scope').value; location.hash = `#/wiki?${sc ? `scope=${encodeURIComponent(sc)}&` : ''}${q ? `q=${encodeURIComponent(q)}` : ''}`; return; }   // plan-25
+  if (a === 'wk-edit') { location.hash = `#/wiki/${encodeURIComponent(b.dataset.key)}/edit`; return; }   // plan-26
+  if (a === 'wk-new-page') { const sc = $('#wk-pscope').value; const [st, sid] = (sc || '|').split('|'); const r = await api('/wiki/pages', { method: 'POST', body: { slug: $('#wk-slug').value.trim(), title: $('#wk-title').value.trim(), by: who(), scope_type: st || null, scope_id: sid || null, ceiling: $('#wk-ceiling').value } }); toast(`Page ${r.page.key} created`); location.hash = `#/wiki/${encodeURIComponent(r.page.key)}/edit?draft=${r.draft.id}`; return; }
+  if (a === 'wk-save') { try { const r = await api(`/wiki/drafts/${b.dataset.id}`, { method: 'PUT', body: { text: $('#wk-md').value, expected_rev: Number(b.dataset.rev), by: who() } }); toast(`Saved rev ${r.draft.rev}`); render(); } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-preview') { try { const r = await api(`/wiki/drafts/${b.dataset.id}/preview`, { method: 'POST', body: { text: $('#wk-md').value } }); const refs = []; $('#wk-out').innerHTML = `<div class="card wk-article"><h3>Preview <span class="muted small">(not saved)</span></h3>${r.blocks.map((x) => wikiBlock(x, refs)).join('')}</div>`; } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-diff') { try { const r = await api(`/wiki/drafts/${b.dataset.id}/diff`); $('#wk-out').innerHTML = `<div class="card"><h3>Diff against the current article <span class="muted small">rev ${r.rev}</span></h3>${wikiDiffHtml(r.diff)}</div>`; } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-submit') { try { const r = await api(`/wiki/drafts/${b.dataset.id}/submit`, { method: 'POST', body: { by: who() } }); toast(`Draft ${r.draft.id} submitted (${r.diff.length} change${r.diff.length === 1 ? '' : 's'})`); render(); } catch (e) { toast(e.message, true); } return; }
+  if (a === 'wk-close') { await api(`/wiki/drafts/${b.dataset.id}/close`, { method: 'POST', body: { by: who() } }); toast('Draft closed'); location.hash = `#/wiki/${encodeURIComponent(b.dataset.key)}`; return; }
   if (a === 'cancel-gap') { const reason = prompt('Reason for cancelling this gap request?') || ''; await api(`/runtime/requests/${b.dataset.id}/cancel?by=${encodeURIComponent(who())}&reason=${encodeURIComponent(reason)}`, { method: 'POST' }); toast('Gap request cancelled'); render(); return; }
   if (a === 'connect-m365') {
     const [st, sid] = $('#ms-scope').value.split('|');

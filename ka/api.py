@@ -767,6 +767,132 @@ def wiki_evidence(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[
 # [/block plan-25]
 
 
+# [block plan-26] research-04 R5: the wiki editor — drafts in a Markdown subset, an optimistic lock, authored pages
+class WikiPageIn(BaseModel):
+    slug: str
+    title: str
+    by: str
+    scope_type: ScopeType | None = None
+    scope_id: str | None = None
+    ceiling: Visibility = Visibility.ENTERPRISE
+
+
+class DraftStartIn(BaseModel):
+    by: str
+
+
+class DraftSaveIn(BaseModel):
+    text: str
+    expected_rev: int
+    by: str
+    note: str | None = None
+
+
+class DraftTextIn(BaseModel):
+    text: str
+
+
+class DraftActIn(BaseModel):
+    by: str
+    note: str | None = None
+
+
+def _wiki_edit_err(e: Exception):
+    from ka.wiki import DraftConflict, StaleDraft
+    from ka.wiki_markdown import MarkdownRefused
+    if isinstance(e, StaleDraft):
+        raise HTTPException(409, detail={"message": str(e), "rev": e.rev})
+    if isinstance(e, (DraftConflict, FileExistsError, PermissionError)):
+        raise HTTPException(409, str(e))
+    if isinstance(e, MarkdownRefused):
+        raise HTTPException(400, detail={"message": str(e), "line": e.line_no, "why": e.why})
+    if isinstance(e, KeyError):
+        raise HTTPException(404, str(e.args[0]) if e.args else "not found")
+    raise HTTPException(400, str(e))
+
+
+@router.post("/wiki/pages")
+def wiki_create_page(body: WikiPageIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    scope = _scope(body.scope_type.value, body.scope_id) if body.scope_type and body.scope_id else None
+    try:
+        pg, d = ka.wiki.create_page(slug=body.slug, title=body.title, scope=scope, ceiling=body.ceiling, by=body.by)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+    return {"page": pg.model_dump(mode="json"), "draft": d.model_dump(mode="json"), "markdown": ka.wiki.draft_markdown(d)}
+
+
+@router.get("/wiki/pages/{key}/drafts")
+def wiki_drafts(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        ka.wiki.page(key)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+    return {"drafts": [d.model_dump(mode="json", exclude={"blocks"}) for d in ka.wiki.drafts(key)]}
+
+
+@router.post("/wiki/pages/{key}/drafts")
+def wiki_start_draft(key: str, body: DraftStartIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        d = ka.wiki.start_draft(key, by=body.by)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+    return {"draft": d.model_dump(mode="json"), "markdown": ka.wiki.draft_markdown(d)}
+
+
+@router.get("/wiki/drafts/{draft_id}")
+def wiki_draft(draft_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    d = ka.repo.wiki_drafts.get(draft_id)
+    if d is None:
+        raise HTTPException(404, "draft not found")
+    others = [o.model_dump(mode="json", exclude={"blocks"}) for o in ka.wiki.drafts(d.page_key) if o.id != d.id and o.state != "CLOSED"]
+    return {"draft": d.model_dump(mode="json"), "markdown": ka.wiki.draft_markdown(d), "other_drafts": others}
+
+
+@router.put("/wiki/drafts/{draft_id}")
+def wiki_save_draft(draft_id: str, body: DraftSaveIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_drafts.get(draft_id) is None:
+        raise HTTPException(404, "draft not found")
+    try:
+        d = ka.wiki.save_draft(draft_id, text=body.text, expected_rev=body.expected_rev, by=body.by, note=body.note)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+    return {"draft": d.model_dump(mode="json"), "markdown": ka.wiki.draft_markdown(d)}
+
+
+@router.post("/wiki/drafts/{draft_id}/preview")
+def wiki_preview(draft_id: str, body: DraftTextIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        return {"blocks": ka.wiki.preview(body.text)}
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+
+
+@router.get("/wiki/drafts/{draft_id}/diff")
+def wiki_diff(draft_id: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_drafts.get(draft_id) is None:
+        raise HTTPException(404, "draft not found")
+    return ka.wiki.diff(draft_id)
+
+
+@router.post("/wiki/drafts/{draft_id}/submit")
+def wiki_submit(draft_id: str, body: DraftActIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_drafts.get(draft_id) is None:
+        raise HTTPException(404, "draft not found")
+    try:
+        d = ka.wiki.submit_draft(draft_id, by=body.by, note=body.note)
+    except Exception as e:  # noqa: BLE001
+        _wiki_edit_err(e)
+    return {"draft": d.model_dump(mode="json", exclude={"blocks"}), "diff": ka.wiki.diff(draft_id)["diff"]}
+
+
+@router.post("/wiki/drafts/{draft_id}/close")
+def wiki_close(draft_id: str, body: DraftActIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.wiki_drafts.get(draft_id) is None:
+        raise HTTPException(404, "draft not found")
+    return {"draft": ka.wiki.close_draft(draft_id, by=body.by).model_dump(mode="json", exclude={"blocks"})}
+# [/block plan-26]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"

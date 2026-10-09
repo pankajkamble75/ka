@@ -15,7 +15,9 @@ import re
 from typing import Any
 
 from ka.conflict import tokens
-from ka.model import KnowledgeNuggetVersion, Scope, WikiPage
+from ka.model import KnowledgeNuggetVersion, Scope, WikiDraft, WikiPage
+from ka.timeutil import now_iso
+from ka.wiki_markdown import block_diff, parse, to_markdown
 from ka.vocab import VISIBILITY_ORDER, NuggetStatus, ScopeType, Visibility
 
 KINDS = ("process", "subject", "scope", "page")
@@ -39,8 +41,9 @@ def _at_or_above(v: KnowledgeNuggetVersion, ceiling: Visibility) -> bool:
 
 
 class WikiService:
-    def __init__(self, repo, profiles, registry, lineage, provider):
+    def __init__(self, repo, profiles, registry, lineage, provider, bus=None, auditor=None):
         self.repo, self.profiles, self.registry, self.lineage, self.provider = repo, profiles, registry, lineage, provider
+        self.bus, self.auditor = bus, auditor
 
     # ---- pages ----------------------------------------------------------------------------------------------------
 
@@ -73,8 +76,10 @@ class WikiService:
             vs = self.repo.nuggets_by_subject(ident)
         elif kind == "scope":
             vs = self.repo.active_nuggets(Scope(scope_type=pg.scope_type, scope_id=pg.scope_id))
-        else:
+        else:                                                            # an authored page selects what its blocks cite (plan-26) plus pinned refs
             refs = set(pg.layout.get("pinned", []))
+            for b in pg.layout.get("blocks", []):
+                refs.update(REF_MARK.findall(b.get("text", "") + " " + " ".join(str(i) for i in b.get("items", [])) + " " + " ".join(" ".join(r) for r in b.get("rows", []))))
             vs = [v for r in refs if (v := self.repo.version(r)) is not None]
         return sorted((v for v in vs if v.status == NuggetStatus.ACTIVE and _at_or_above(v, ceiling)), key=lambda v: (v.created_at, v.ref))
 
@@ -105,6 +110,9 @@ class WikiService:
         selected = self.select(key)
         if not selected and kind != "page":
             raise KeyError(f"{key}: no governed knowledge yet (no ACTIVE version at or above {pg.ceiling.value})")
+        if kind == "page":
+            selected = self.select(key)
+            allowed_authored = {v.ref for v in selected}
         allowed = {v.ref for v in selected}
         by_ref = {v.ref: v for v in selected}
         blocks: list[dict[str, Any]] = []
@@ -180,9 +188,15 @@ class WikiService:
                     block("heading", kt.replace("_", " ").capitalize(), [], 3)
                     paragraph(vs)
         else:
-            block("heading", pg.title, [], 1)
             for b in pg.layout.get("blocks", []):
-                block(b.get("kind", "paragraph"), b.get("text", ""), [r for r in REF_MARK.findall(b.get("text", "")) if r in allowed], b.get("level", 2), {"origin": "authored"})
+                extra = {"origin": "authored"}
+                if b.get("items") is not None:
+                    extra["items"] = [{"text": REF_MARK.sub("", it).strip(), "ref": (REF_MARK.findall(it) or [None])[0]} if isinstance(it, str) else it for it in b["items"]]
+                    extra["ordered"] = b.get("ordered", False)
+                if b.get("rows") is not None:
+                    extra["rows"] = b["rows"]
+                nb = block(b.get("kind", "paragraph"), b.get("text", ""), [r for r in REF_MARK.findall(b.get("text", "") + " " + " ".join(str(i) for i in b.get("items", []))) if r in allowed_authored], b.get("level", 2), extra)
+                nb["id"] = b.get("id", nb["id"])
 
         if prose == "llm":
             self._synthesize(blocks, by_ref)
@@ -292,4 +306,100 @@ class WikiService:
             else:
                 dropped += 1
         return kept, dropped
+
+    # ---- editing (plan-26, research-04 R5): drafts in a Markdown subset, an optimistic lock, authored pages ----------------------------
+    SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
+
+    def _emit(self, name: str, **ids) -> None:
+        if self.bus is not None:
+            self.bus.emit(name, **ids)
+
+    def drafts(self, key: str) -> list[WikiDraft]:
+        return sorted(self.repo.wiki_drafts.where(lambda d: d.page_key == key), key=lambda d: d.created_at)
+
+    def start_draft(self, key: str, *, by: str) -> WikiDraft:
+        """A working copy of the page as the editor sees it: the article's blocks (with their ids) or an authored page's layout."""
+        pg = self.page(key)
+        if pg.kind == "page":
+            blocks = [dict(b) for b in pg.layout.get("blocks", [])]
+            digest = self.digest(key) if self.repo.wiki_pages.get(key) else None
+        else:
+            art = self.article(key)
+            blocks = [{k: b[k] for k in ("id", "kind", "text", "level", "refs") if k in b} | ({"items": b["items"], "ordered": b.get("ordered", True)} if b.get("items") else {}) for b in art["blocks"]]
+            digest = art["digest"]
+        d = WikiDraft(page_key=key, base_layout_rev=pg.layout_rev, base_digest=digest, blocks=blocks, editor=by or "console-user")
+        self.repo.wiki_drafts.put(d)
+        return d
+
+    def draft_markdown(self, draft: WikiDraft) -> str:
+        return to_markdown(draft.blocks)
+
+    def preview(self, text: str) -> list[dict[str, Any]]:
+        return parse(text)                                               # raises MarkdownRefused; writes nothing
+
+    def save_draft(self, draft_id: str, *, text: str, expected_rev: int, by: str, note: str | None = None) -> WikiDraft:
+        d = self.repo.wiki_drafts.require(draft_id)
+        if d.state != "DRAFT":
+            raise PermissionError(f"draft {draft_id} is {d.state}; only a DRAFT can be saved")
+        if expected_rev != d.rev:
+            raise StaleDraft(d.rev, f"draft {draft_id} is at rev {d.rev}, you expected {expected_rev}; reload before saving")
+        d.blocks = parse(text)
+        d.rev += 1
+        d.editor, d.note, d.updated_at = by or d.editor, note if note is not None else d.note, now_iso()
+        self.repo.wiki_drafts.put(d)
+        self._emit("wiki.draft.saved", draft_id=d.id, page_key=d.page_key, rev=d.rev)
+        return d
+
+    def base_blocks(self, draft: WikiDraft) -> list[dict[str, Any]]:
+        pg = self.page(draft.page_key)
+        if pg.kind == "page":
+            return [dict(b) for b in pg.layout.get("blocks", [])]
+        return [{k: b[k] for k in ("id", "kind", "text", "level", "refs") if k in b} | ({"items": b["items"], "ordered": b.get("ordered", True)} if b.get("items") else {}) for b in self.article(draft.page_key)["blocks"]]
+
+    def diff(self, draft_id: str) -> dict[str, Any]:
+        d = self.repo.wiki_drafts.require(draft_id)
+        base = self.base_blocks(d)
+        return {"draft_id": d.id, "page_key": d.page_key, "rev": d.rev, "diff": block_diff(base, d.blocks), "base_digest": d.base_digest, "current_digest": self.digest(d.page_key) if self.repo.wiki_pages.get(d.page_key) or d.page_key.split(":")[0] != "page" else None}
+
+    def submit_draft(self, draft_id: str, *, by: str, note: str | None = None) -> WikiDraft:
+        d = self.repo.wiki_drafts.require(draft_id)
+        if d.state != "DRAFT":
+            raise PermissionError(f"draft {draft_id} is {d.state}")
+        other = [o for o in self.drafts(d.page_key) if o.id != d.id and o.state == "SUBMITTED"]
+        if other:
+            raise DraftConflict(f"draft {other[0].id} by {other[0].editor} is already under review for this page; wait for its decision or close it")
+        d.state, d.updated_at = "SUBMITTED", now_iso()
+        d.note = note if note is not None else d.note
+        self.repo.wiki_drafts.put(d)
+        self._emit("wiki.draft.submitted", draft_id=d.id, page_key=d.page_key, by=by or d.editor)
+        if self.auditor is not None:
+            self.auditor.record(who=by or d.editor, what="wiki.draft.submitted", why=d.note or "", affected=[d.id, d.page_key])
+        return d
+
+    def close_draft(self, draft_id: str, *, by: str) -> WikiDraft:
+        d = self.repo.wiki_drafts.require(draft_id)
+        d.state, d.updated_at = "CLOSED", now_iso()
+        self.repo.wiki_drafts.put(d)
+        return d
+
+    def create_page(self, *, slug: str, title: str, scope: Scope | None, ceiling: Visibility, by: str) -> tuple[WikiPage, WikiDraft]:
+        if not self.SLUG.match(slug or ""):
+            raise ValueError("slug must be 2–61 characters of a–z, 0–9 and hyphens, starting with a letter or digit")
+        key = f"page:{slug}"
+        if self.repo.wiki_pages.get(key) is not None:
+            raise FileExistsError(f"page {key} already exists")
+        pg = WikiPage(key=key, kind="page", title=title.strip() or slug, ceiling=ceiling, layout={"blocks": [{"id": "n1", "kind": "heading", "text": title.strip() or slug, "level": 1, "refs": []}]},
+                      scope_type=scope.scope_type if scope else None, scope_id=scope.scope_id if scope else None, owner=by)
+        self.repo.wiki_pages.put(pg)
+        return pg, self.start_draft(key, by=by)
+
+
+class StaleDraft(ValueError):
+    def __init__(self, rev: int, msg: str):
+        super().__init__(msg)
+        self.rev = rev
+
+
+class DraftConflict(ValueError):
+    pass
 # [/block plan-25]

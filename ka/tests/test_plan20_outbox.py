@@ -63,7 +63,7 @@ def test_P2_backoff_increments_attempts_and_pushes_next_at(dp):
     ka, fake, store = dp
     fake.fail_next(1)
     with _cfg():
-        g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
+        ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
     op = ka.repo.dp_outbox.all()[0]
     fake.fail_next(1)
     with config.scoped(KA_DP_SERVICE_TOKEN=TOKEN, KA_DP_RETRIES=5, KA_DP_BACKOFF_BASE=60.0):
@@ -111,7 +111,7 @@ def test_P5_reconcile_requeues_a_pending_binding_with_a_spool_and_fails_one_with
     ka, fake, store = dp
     fake.fail_next(1)
     with _cfg():
-        g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
+        ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
     for o in ka.repo.dp_outbox.all():                                          # simulate: the op was lost
         (ka.repo.root / "dp_outbox" / f"{o.id}.json").unlink()
     ka.repo.dp_outbox._cache = None
@@ -133,7 +133,7 @@ def test_P6_routes_status_run_and_retry(dp):
     c = TestClient(create_app(ka))
     fake.fail_next(1)
     with _cfg():
-        g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
+        ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
         st = c.get(f"{PREFIX}/physical/outbox").json()
         assert st["by_state"] == {"pending": 1} and st["ops"][0]["kind"] == "upload_source"
         r = c.post(f"{PREFIX}/physical/outbox/run?by=ops").json()
@@ -208,7 +208,7 @@ def test_N4_no_bytes_in_the_spool_after_success_and_no_token_in_any_op(dp):
     ka, fake, store = dp
     fake.fail_next(1)
     with _cfg():
-        g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
+        ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
         ka.outbox.process_once()
     assert not list((ka.repo.root / "spool").glob("*"))
     assert TOKEN not in "".join(p.read_text() for p in (ka.repo.root / "dp_outbox").glob("*.json"))
@@ -218,7 +218,7 @@ def test_N5_a_double_enqueue_collapses_to_one_op_and_one_asset(dp):
     ka, fake, store = dp
     fake.fail_next(1)
     with _cfg():
-        g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
+        ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
         op = ka.repo.dp_outbox.all()[0]
         again = ka.outbox.enqueue("upload_source", op.idempotency_key, dict(op.payload))
         assert again.id == op.id and len(ka.repo.dp_outbox.all()) == 1

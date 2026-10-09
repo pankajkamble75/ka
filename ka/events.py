@@ -37,6 +37,9 @@ EVENT_NAMES = {
     # [block plan-22]
     "physical.derived.published",
     # [/block plan-22]
+    # [block plan-26]
+    "wiki.draft.saved", "wiki.draft.submitted",
+    # [/block plan-26]
 }
 
 Handler = Callable[[dict[str, Any]], None]

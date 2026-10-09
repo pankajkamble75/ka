@@ -89,7 +89,7 @@ class KnowledgeAcquisition:
         self.profiles = ProfileService(self.repo, self.grammar, self.lineage, self.registry)
         # [block plan-25] research-04: the Knowledge Wiki — articles computed on read (Q19)
         from ka.wiki import WikiService
-        self.wiki = WikiService(self.repo, self.profiles, self.registry, self.lineage, self.provider)
+        self.wiki = WikiService(self.repo, self.profiles, self.registry, self.lineage, self.provider, self.bus, self.auditor)
         # [/block plan-25]
         # [/block plan-06]
         # [block plan-08]

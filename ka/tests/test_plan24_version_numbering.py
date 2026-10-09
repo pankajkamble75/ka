@@ -53,7 +53,7 @@ def test_P1_changed_bytes_number_v2_then_v3_and_the_counter_follows(ka):
 
 def test_P2_a_lost_counter_write_never_yields_a_duplicate_on_ingest(ka):
     g1 = _ing(ka, A)
-    g2 = _ing(ka, B)
+    _ing(ka, B)
     _roll_back_counter(ka, g1.source.id, to=1)                        # disk says v1 although v2 exists
     g3 = _ing(ka, C)
     nums = sorted(v.version for v in ka.repo.source_versions.where(lambda v: v.source_id == g1.source.id))
@@ -89,7 +89,7 @@ def test_P4_repair_renumbers_the_later_duplicate_and_a_backfill_then_reports_no_
 
 
 def test_N1_repair_never_touches_a_source_whose_numbers_are_unique(ka):
-    g1 = _ing(ka, A)
+    _ing(ka, A)
     _ing(ka, B)
     files = {p: p.read_bytes() for p in (ka.repo.root / "source_versions").glob("*.json")} | {p: p.read_bytes() for p in (ka.repo.root / "sources").glob("*.json")}
     rep = repair_conflicts(ka, apply=True)

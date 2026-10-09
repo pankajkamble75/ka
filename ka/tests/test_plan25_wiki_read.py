@@ -185,4 +185,6 @@ def test_N5_tabs_one_to_six_and_the_existing_routes_are_unchanged():
     assert labels.findall(head) == labels.findall(now)
     routes_head = re.search(r"const routes = \[(.*?)\n\];", head, re.S).group(1).strip().splitlines()
     routes_now = re.search(r"const routes = \[(.*?)\n\];", now, re.S).group(1).strip().splitlines()
-    assert routes_now[:len(routes_head) - 1] == routes_head[:-1] and routes_now[-1] == routes_head[-1]   # only insertions before the redirect
+    pre_wiki = [r for r in routes_head if "wiki" not in r]
+    it = iter(routes_now)
+    assert all(any(r == x for x in it) for r in pre_wiki)                  # every pre-wiki route survives, in order; wiki routes may be added between

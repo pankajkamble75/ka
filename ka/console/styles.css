@@ -118,3 +118,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .wk-tools { margin-left: auto; font-size: var(--fs-13); }
 @media (max-width: 1000px) { .wk { grid-template-columns: 1fr; } .wk-side { position: static; max-height: none; } }
 /* [/block plan-25] */
+/* [block plan-26] */
+.wk-img { max-width: 100%; border-radius: 6px; display: block; margin: var(--s-8) 0; }
+.wk-table { margin: 0 0 var(--s-12); } .wk-table th, .wk-table td { font-size: var(--fs-13); }
+/* [/block plan-26] */

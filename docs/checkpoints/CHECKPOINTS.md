@@ -2,6 +2,35 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 23:10 UTC — plan-26: the wiki editor — a Markdown subset parsed into blocks, no HTML ever, an optimistic lock, authored pages (research-04 R5)
+
+**What changed** — `ka/wiki_markdown.py` (new): `parse` (headings, paragraphs, ordered/unordered lists, quotes, tables; bold, italics,
+`http(s)` links, `image:<n>` images, `[[ref]]` citations; block ids via the one allowed comment form; refusals name the line for any
+HTML tag, non-http(s) link, `javascript:`/`data:` URL, foreign comment, over-long line), `to_markdown` (round-trips with ids),
+`block_diff` (insert/update/delete/move by stable id). `ka/wiki.py`: `start_draft`, `draft_markdown`, `preview`, `save_draft` (expected
+rev → `StaleDraft` 409 with the current rev), `diff`, `submit_draft` (refused with `DraftConflict` while another draft is SUBMITTED;
+records nothing but state + emits `wiki.draft.submitted`), `close_draft`, `create_page` (authored `page:<slug>`); authored pages select
+what their blocks cite. `ka/api.py`: nine draft/page routes. Console: `#/wiki/:key/edit` (textarea, Save rev→rev+1, Preview, Diff,
+Submit, Cancel, other-drafts notice), inline-mark renderer applied after `esc`, quote/table blocks, Edit button and drafts list on the
+article, "New authored page" form. `ka/events.py`: two names. `test_plan26_wiki_editor.py` (13 cases + 6 parametrised refusals);
+`e2e/plan26_wiki_editor_flow.py`. Architecture §8a state.
+
+**Why** — research-04 §4 (R5); §8a "No HTML" and "edits are governance proposals". Editing changes no nugget, no article and no proposal
+(`test_N4`); the lock, not identity, prevents lost updates (R11).
+
+**Verification** — in-process 385 passed, 2 skipped (exit checked); ruff F clean (nine pre-existing unused-variable findings in plan-20/24
+tests cleared with safe-equivalent fixes); no protected code by diff. Recount 8/8 D, 7/7 P, 6/6 N; blocks in 5 files. Live flow 9/9 over
+real HTTP (Edit → Markdown with ids → Save rev 1 → Preview → Diff one update → stale save from elsewhere 409 → Submit → article
+unchanged → drafts listed); plan-25's flow re-run 9/9; screenshot verified. Product tests: PT9 PASS; PT3's "unchanged" half PASS (the
+candidate half is plan-27).
+
+**Findings** — plan-25's `test_N5` route gate assumed insertions only before the redirect; plan-26 inserts the edit route before the
+article route, so the gate now checks that every pre-wiki route survives in order (an explicit relaxation of a non-protected test). The
+back bar on a directly opened editor says "Back to 2 · Knowledge nuggets": pre-existing console behaviour (last visited tab, default
+nuggets), not a wiki defect.
+
+**Decisions and questions** — BUILT: the editing half of §8a. Plan `plan-26`; R5 → UPLOADED. No new question.
+
 ## 2026-10-09 22:05 UTC — plan-25: the read-only Knowledge Wiki — computed articles with citations, a visibility ceiling, staleness by digest, tab 7, projection cost measured (research-04 R2, R3, R4, R9, R13; builds Q17, Q19, Q20)
 
 **What changed** — `ka/wiki.py` (new): `WikiService` — deterministic page keys (`process:`, `subject:`, `scope:`, `page:`), `select` at the
