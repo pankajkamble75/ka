@@ -7,7 +7,7 @@ from typing import Any
 
 from ka import config
 from ka.data_platform import ConfigurationError, DataPlatformClient, DataPlatformError
-from ka.physical import PhysicalRef
+from ka.physical import ASSET_FAMILIES, PhysicalRef
 
 
 class DataPlatformPhysicalStore:
@@ -25,7 +25,7 @@ class DataPlatformPhysicalStore:
 
     def put(self, data, *, content_type, sha256, idempotency_key, owner, visibility, tenant_id, filename_hint=None):
         key = idempotency_key.rsplit(":", 1)[0] if idempotency_key.count(":") >= 4 else idempotency_key   # ka:<tenant>:<source>:<version>
-        upload_id = self.client.create_upload(asset_type="source_document", content_type=content_type, idempotency_key=key, owner=owner, visibility=visibility)
+        upload_id = self.client.create_upload(asset_type=ASSET_FAMILIES["source"], content_type=content_type, idempotency_key=key, owner=owner, visibility=visibility)
         self.client.upload_content(upload_id, data)
         d = self.client.commit(upload_id, sha256=sha256)
         return PhysicalRef(backend=self.name, asset_id=d["asset_id"], asset_version_id=d["asset_version_id"], sha256=d["sha256"],

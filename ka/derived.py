@@ -11,7 +11,7 @@ from typing import Any
 
 from ka import __version__, config
 from ka.model import DerivedArtefact, KnowledgeNuggetVersion, PendingOp
-from ka.physical import PhysicalRef
+from ka.physical import ASSET_FAMILIES, PhysicalRef
 from ka.timeutil import now_iso
 
 PUBLISH_ON = ("knowledge.candidate.created", "knowledge.approved", "knowledge.rejected", "knowledge.superseded")
@@ -51,7 +51,8 @@ def build_payload(repo, v: KnowledgeNuggetVersion) -> dict[str, Any]:
         "normalized_meaning": v.normalized_meaning, "knowledge_type": v.knowledge_type.value,
         "subject": v.subject.model_dump(mode="json") if v.subject else None, "predicate": v.predicate,
         "object": v.object.model_dump(mode="json") if v.object else None,
-        "binding": {"status": gb.status.value if gb and hasattr(gb.status, "value") else (gb.status if gb else None), "digest": gb.digest if gb else None},
+        "binding": ({"status": gb.binding_status.value, "digest": gb.digest, "grammar_version": gb.grammar_version, "process_type": gb.process_type,
+                     "edge": gb.edge, "method": gb.method} if gb else None),
         "status": v.status.value, "authority_type": v.authority_type.value, "authority_rank": v.authority_rank, "confidence": v.confidence,
         "effective_from": v.effective_from, "effective_to": v.effective_to, "scope": v.scope.key(), "visibility": v.visibility.value,
         "sources": sources, "evidence": evidence, "extraction_versions": ext_versions, "research_run_refs": list(v.research_run_refs),
@@ -77,9 +78,9 @@ class DerivedPublisher:
             return None
         tenant = config.get("KA_TENANT_ID")
         key = artefact_key(tenant, v)
-        existing = self.repo.derived_artefacts.where(lambda a: a.idempotency_key == key)
+        existing = self.repo.derived_artefacts.where(lambda a: a.idempotency_key == key and a.backend == self.physical.name)
         if existing:
-            return existing[0]                                            # immutable per key: a replay is a no-op
+            return existing[0]                 # immutable per key AND backend: a replay is a no-op; a backfill to DP re-publishes local copies
         payload = build_payload(self.repo, v)
         art = DerivedArtefact(canonical_id=v.canonical_id, version=v.version, status=v.status.value, ref=v.ref, idempotency_key=key,
                               backend=self.physical.name, event=event)
@@ -100,7 +101,7 @@ class DerivedPublisher:
         art = self.repo.derived_artefacts.require(p["artefact_id"])
         parent = PhysicalRef(backend=self.physical.name, asset_id=p["parent_asset_id"], asset_version_id=p["parent_asset_version_id"] or "", sha256="") if p.get("parent_asset_id") else None
         body = json.dumps(p["payload"], sort_keys=True, ensure_ascii=False).encode("utf-8")
-        ref = self.physical.put_derived("nugget_version", body, parent=parent, idempotency_key=op.idempotency_key,
+        ref = self.physical.put_derived(ASSET_FAMILIES["nugget"], body, parent=parent, idempotency_key=op.idempotency_key,
                                         provenance={"producer": "ka", "event": p.get("event"), "ka_version": __version__, "ref": p.get("ref")})
         art.state, art.dp_asset_id, art.dp_asset_version_id, art.sha256 = "available", ref.asset_id, ref.asset_version_id, ref.sha256
         art.parent_asset_id, art.locator, art.published_at = parent.asset_id if parent else None, ref.locator, now_iso()

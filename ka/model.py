@@ -503,6 +503,7 @@ class PendingOp(BaseModel):
     id: str = Field(default_factory=lambda: new_id("op"))
     kind: str                                          # upload_source | put_derived | ack_event
     idempotency_key: str
+    backend: str = "data_platform"                     # plan-23: one operation per (kind, key, backend) — a backfill re-sends local copies
     payload: dict[str, Any] = Field(default_factory=dict)
     state: str = "pending"                             # pending | done | dead
     attempts: int = 0

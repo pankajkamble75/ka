@@ -93,6 +93,11 @@ def select_physical_store(root: Path) -> tuple[PhysicalStore, str | None]:
     return LocalPhysicalStore(root), f"unknown KA_STORAGE_BACKEND {choice!r}; failing closed to local"
 
 
+# [block plan-23] research-03 R12: KA's three asset families on the Data Platform — documents, never rows
+ASSET_FAMILIES = {"source": "source_document", "text": "extracted_text", "nugget": "nugget_version"}
+# [/block plan-23]
+
+
 def binding_key(tenant_id: str, source_id: str, version: int) -> str:
     return f"ka:{tenant_id}:{source_id}:{version}"
 # [/block plan-18]

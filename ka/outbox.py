@@ -32,10 +32,11 @@ class Outbox:
     # ---- queue -----------------------------------------------------------------------------------------------
 
     def enqueue(self, kind: str, idempotency_key: str, payload: dict[str, Any], *, by: str = "ka.outbox") -> PendingOp:
-        live = self.repo.dp_outbox.where(lambda o: o.idempotency_key == idempotency_key and o.kind == kind and o.state in ("pending", "done"))
+        backend = getattr(self.physical, "name", "data_platform")
+        live = self.repo.dp_outbox.where(lambda o: o.idempotency_key == idempotency_key and o.kind == kind and o.backend == backend and o.state in ("pending", "done"))
         if live:
-            return live[0]                                           # one operation per key
-        op = PendingOp(kind=kind, idempotency_key=idempotency_key, payload=payload, by=by, next_at=now_iso())
+            return live[0]                                           # one operation per (kind, key, backend)
+        op = PendingOp(kind=kind, idempotency_key=idempotency_key, payload=payload, by=by, next_at=now_iso(), backend=backend)
         return self.repo.dp_outbox.put(op)
 
     def due(self, now: str | None = None) -> list[PendingOp]:

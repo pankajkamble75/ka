@@ -245,16 +245,12 @@ identity provider and tenant model remain a two-repo plan (Q4, provider not yet 
 than the mission's `permitted_visibility` unless the requester owns them. Access *enforcement* at the API edge (authn) is out of scope for
 plan-01 and tracked as a question.
 
-## 11. What is deliberately not here (§45)
-
-No vector index, no chat, no document browser as the primary view, no agent path that writes to the graph, no runtime answer endpoint.
-
 ## 11. Physical storage and the Data Platform (research-03) — `ka/physical.py`
 
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-22 derived artefacts and reads through DP; plan-23 completes this section.
+**State: ✅ built 2026-10-09 (plans 18–23).** plan-18 the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-22 derived artefacts and reads through DP; plan-23 asset families, this section, the backfill rehearsal. Still parked for the author: R8 connector ownership timing (Q15), R10 tenant/principal (Q16). DP search (research-03 §7) is later by the research's own word.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -291,4 +287,19 @@ No vector index, no chat, no document browser as the primary view, no agent path
 - **Reads through DP (R7, ✅ plan-22).** `reextract` (plan-18), `GET /sources/{id}/versions/{n}/content` ("view bytes") and the images
   side door (`POST /images` mirrors to DP on that backend; the local file still serves) read and write through the physical store. DP
   **search** is not built: the v1 contract has no search endpoint and research-03 §7 puts it later, under KA's own filters when it comes.
+- **Asset families (R12, ✅ plan-23).** KA's bytes are knowledge **documents** and live on the Data Platform as three `asset_type`s,
+  named once in `ka/physical.py::ASSET_FAMILIES`: `source_document` (every `SourceVersion`'s bytes; the store sends it), `extracted_text`
+  (DP's indexing output; KA records its id from `data.index.ready.v1`, it does not publish it) and `nugget_version` (plan-22's derived
+  artefacts). EOS's instance data — rows, snapshots, `realized_by` field maps (`data-layer.md` §3) — are other families on the same
+  platform. **KA never stores rows; EOS never reads KA documents as data.** The one shared thing is the lineage id vocabulary: a graph
+  node's `knowledge_lineage` and a DP asset's `provenance` (`ref`, `governance_decision_id`, `graph_change_refs`) join on the same ids.
+- **Backfill and rollback (R14, ✅ plan-23).** `tools/backfill_physical.py --storage <root> [--apply] [--publish-active]` binds every
+  legacy version to the configured backend with SHA-256 verification (`failed: sha mismatch` is never available), `failed` bindings for
+  byte-less versions, derived publication of ACTIVE nuggets through the outbox, idempotent by key; dry-run by default; refused on the local
+  backend. Rehearsed by `e2e/plan23_backfill_rehearsal.py` over a COPY of `ka_storage/` against the fake over HTTP. `KA_STORAGE_BACKEND=local`
+  stays in the code as the rollback and is removed only from configuration.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.
+
+## 12. What is deliberately not here (§45)
+
+No vector index, no chat, no document browser as the primary view, no agent path that writes to the graph, no runtime answer endpoint.

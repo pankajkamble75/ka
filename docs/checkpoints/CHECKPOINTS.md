@@ -2,6 +2,37 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 17:05 UTC — plan-23: asset families, the finished architecture section, the backfill rehearsal with local as rollback (research-03 R12, R13, R14)
+
+**What changed** — `tools/backfill_physical.py` (new): binds every legacy `SourceVersion` to the configured backend with SHA-256
+verification (`failed: sha mismatch` never available), `failed` bindings for byte-less versions with their note, `--publish-active`
+publishes every ACTIVE nugget version through the outbox and drains it, idempotent by (kind, key, backend), dry-run by default, refused on
+the local backend (exit 2), duplicate `(source, version)` reported as a conflict by id and left unbound. `ka/physical.py::ASSET_FAMILIES`
+used by the store (`source_document`) and the publisher (`nugget_version`). `ka/model.py::PendingOp.backend` + `ka/outbox.py` dedupe per
+backend (a backfill to DP re-sends copies first written locally); `ka/derived.py` dedupes artefacts per key AND backend, and the payload's
+grammar-binding fields now use the real `GrammarBinding` names (the rehearsal met live bindings; tests load no grammar). Architecture §11
+completed (asset families rule, state ✅ built, backfill/rollback), "§11 What is deliberately not here" renumbered §12 and moved last;
+index rows for the contract and Q1–Q16; `.env.example` rollback note; console legacy-count label. `test_plan23_backfill.py` (12 cases);
+`e2e/plan23_backfill_rehearsal.py`.
+
+**Why** — research-03 §10/§12: migration is one rehearsed script; the local backend is the rollback, removed only from configuration;
+KA's bytes are documents in three asset families beside EOS's data assets, joined only by lineage ids.
+
+**Verification** — in-process 347 passed, 2 skipped (exit checked); ruff F clean; no protected code by diff. Recount 6/6 D, 7/7 P, 5/5 N
+(P7, N5 added during implementation and the plan's totals renumbered). Rehearsal 14/14 over a COPY of the live `ka_storage/` against the
+fake over HTTP: 71 versions → 66 available, 4 failed with their block reasons (link-local, two 403s, one 429), 1 conflict, 51 ACTIVE
+nuggets published, outbox drained; a DP-backed server on the copy shows 70 bindings and 1 legacy version; the same copy then serves on
+the local backend (rollback); the live storage is byte-identical before and after (tree digest). Product tests: PT1–PT9 all PASS.
+
+**Follow-ups / findings** — **R15 opened** (research-03, mid-flight): two `SourceVersion`s share v5 on `SRC-d3a5c783` with different bytes;
+the binding key assumes uniqueness; `reextract` numbers by `src.content_version` on purpose (same bytes), so a refetch with changed bytes
+must have reused the number — to be fixed (plan-24), not papered over. The fake's commit events for derived assets land as `unmatched`
+on the inbound cursor (51 in the rehearsal) — harmless, noted. The research counted 69/4 on the morning of 2026-10-09; the storage held 71
+by the rehearsal.
+
+**Decisions and questions** — BUILT: R12, R13, R14 (architecture §11 now ✅ built for plans 18–23). Plan `plan-23`; R12–R14 → UPLOADED.
+Raised: R15 (a defect, not a question for the author).
+
 ## 2026-10-09 15:55 UTC — plan-22: nugget versions as immutable derived artefacts; bytes read through the Data Platform; images side door (research-03 R6, R7)
 
 **What changed** — `ka/derived.py` (new): `DerivedPublisher` subscribes in the service to `knowledge.candidate.created / approved /
