@@ -16,6 +16,21 @@ Written by `create-research-report`, `create-implementation-plan`, `implement`, 
 
 
 
+| research-03 | R1 — Decide: canonical KA is this repository; DP seams re-found here (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT1 |
+| research-03 | R2 — PhysicalStore port beneath _ingest; Local and DataPlatform stores; KA_STORAGE_BACKEND (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT1 |
+| research-03 | R3 — PhysicalBinding record (tenant, source, version) with status; available gates the version (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT1 |
+| research-03 | R4 — Pending-operations outbox dp_outbox.jsonl with retry, backoff, dead-letter, idempotency key (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT6 |
+| research-03 | R5 — Inbound DP events handled idempotently; bindings flip; revocation → re-review; deletion → revoked (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT7 |
+| research-03 | R6 — Nugget versions published to DP as immutable derived artefacts on knowledge.* events via a service subscriber (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT4 |
+| research-03 | R7 — Content read through DP for reextract/view; DP search optional under KA filters (MINOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT5 |
+| research-03 | R8 — Decide connector ownership timing: KA connectors stay until DP's registry exists; then a data_platform connector kind (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 none — a decision; PT1–PT9 unaffected |
+| research-03 | R9 — DP revocation/deletion reuse reopen_for_revocation and the plan-08 revocation path (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT7 |
+| research-03 | R10 — Decide: KA_TENANT_ID + service identity as DP principal until Q4; owner/visibility on bindings (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT3 |
+| research-03 | R11 — KA publishes the DP v1 subset it needs as fixtures + FakeDataPlatform (MAJOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT8 |
+| research-03 | R12 — Decide: two DP asset families (KA documents vs EOS instance data); shared lineage ids (MINOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 none — boundary statement; PT4 exercises the lineage ids |
+| research-03 | R13 — Architecture §11 Physical storage and the Data Platform; indexed (MINOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 none — documentation |
+| research-03 | R14 — Backfill rehearsal over 69 versions with SHA verification; local backend stays as rollback (MINOR) | — | OPEN | — | From research-03 (KA-Data-Platform-Integration-Specification); opened 2026-10-09. **Product-test check:** research-03 PT9 |
+
 ## Closed
 
 | Research | Point | Plan | State | SHA | Notes |
