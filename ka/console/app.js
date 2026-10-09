@@ -54,9 +54,11 @@ const routes = [
   [/^#\/source\/([^/]+)$/, sourceView],
   [/^#\/mission\/([^/]+)$/, missionView],
   [/^#\/change\/([^/]+)$/, changeView],
+  [/^#\/wiki(?:\?(.*))?$/, wikiView],                       // plan-25 (Q17)
+  [/^#\/wiki\/([^/?]+)(?:\?(.*))?$/, wikiArticleView],
   [/^#\/scope\/([A-Z_]+)\/([^/]+)(?:\/([a-z-]+))?$/, (t, i) => { location.hash = `#/browse?scope=${t}|${i}`; return ''; }],
 ];
-const TAB_LABELS = { '#/add': '1 · Add knowledge', '#/nuggets': '2 · Knowledge nuggets', '#/browse': '3 · Browse by scope', '#/processes': '4 · Processes', '#/dashboard': '5 · Dashboard', '#/images': '6 · Images' };
+const TAB_LABELS = { '#/add': '1 · Add knowledge', '#/nuggets': '2 · Knowledge nuggets', '#/browse': '3 · Browse by scope', '#/processes': '4 · Processes', '#/dashboard': '5 · Dashboard', '#/images': '6 · Images', '#/wiki': '7 · Wiki' };
 function tabOf(hash) { const base = (hash || '#/').split('?')[0]; return base === '#/' || base === '#' ? '#/dashboard' : (TAB_LABELS[base] ? base : null); }
 let lastTab = null;
 try { lastTab = sessionStorage.getItem('ka.lastTab'); } catch { /* private mode */ }
@@ -102,6 +104,7 @@ async function nav() {
     <a href="#/processes" class="${on('#/processes') || onD('#/processes')}">4 · Processes</a>
     <a href="#/dashboard" class="${on('#/dashboard') || onD('#/dashboard')}">5 · Dashboard</a>
     <a href="#/images" class="${on('#/images') || onD('#/images')}">6 · Images</a>
+    <a href="#/wiki" class="${on('#/wiki') || onD('#/wiki')}">7 · Wiki</a>
     <h4>You</h4><input id="who" value="${esc(who())}" title="Your name, recorded on decisions">
     <label>Access token</label><input id="tok" type="password" value="${esc(token())}" placeholder="KA_ACCESS_TOKEN" title="Required from non-loopback addresses">`;
   $('#who').addEventListener('change', (e) => { localStorage.setItem('ka.user', e.target.value); toast('Acting as ' + e.target.value); });
@@ -648,6 +651,68 @@ document.addEventListener('change', async (e) => {
 });
 
 /* ------------------------------------------------------------------ actions */
+
+// [block plan-25] research-04 (Q17, Q19, Q20): the Knowledge Wiki, read side — articles computed on read, every sentence cited
+function wikiCite(text, refs) {
+  // `[[KN-001:v1]]` → a numbered citation that opens the nugget; numbering follows first appearance in the article
+  return esc(text).replace(/\[\[([A-Z]+-[0-9A-Za-z]+:v\d+)\]\]/g, (m, ref) => {
+    let n = refs.indexOf(ref); if (n < 0) { refs.push(ref); n = refs.length - 1; }
+    return `<sup class="cite"><a href="#/nugget/${encodeURIComponent(ref)}" title="${esc(ref)}">[${n + 1}]</a></sup>`;
+  });
+}
+function wikiBlock(b, refs) {
+  const flags = (b.flags || []).map((f) => ` ${pill(f.flag, 'halt')}`).join('');
+  if (b.kind === 'heading') { const h = Math.min(Math.max(b.level || 2, 1), 3); return `<h${h} class="wk-h">${esc(b.text)}</h${h}>`; }
+  if (b.kind === 'list') return `<${b.ordered ? 'ol' : 'ul'} class="wk-list">${(b.items || []).map((i) => `<li>${i.has_profile ? `<a href="#/wiki/${encodeURIComponent('process:' + i.child_key)}">${esc(i.text)}</a>` : esc(i.text)} ${wikiCite(`[[${i.ref}]]`, refs)}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
+  const origin = b.origin === 'synthesized' ? ` <span class="pill warn" title="model prose; every sentence cites a governed statement">synthesized</span>` : '';
+  return `<p class="wk-p">${wikiCite(b.text, refs)}${origin}${flags}${b.synthesis_note ? ` <span class="small muted">(${esc(b.synthesis_note)})</span>` : ''}</p>`;
+}
+async function wikiView(qs) {
+  const p = new URLSearchParams(qs || '');
+  const q = p.get('q') || '';
+  const sel = p.get('scope') || '';
+  const [t, id] = (sel || '|').split('|');
+  const { scopes } = await api('/scopes');
+  const tree = await api(`/wiki/pages${t && id ? `?scope_type=${t}&scope_id=${encodeURIComponent(id)}` : ''}`);
+  const hits = q ? (await api(`/wiki/search?q=${encodeURIComponent(q)}`)).hits : null;
+  const row = (x) => `<li><a href="#/wiki/${encodeURIComponent(x.key)}">${esc(x.title)}</a> <span class="small muted">${x.assertions} statement${x.assertions === 1 ? '' : 's'}</span></li>`;
+  return `<div class="crumbs">7 · Wiki</div><h1>Knowledge Wiki</h1>
+  <p class="sub">Readable articles computed from governed knowledge — every sentence is an approved statement with its citation; nothing here is stored as a fact (Q19). Processes come from their profile; subjects and scopes are grouped from ACTIVE nuggets.</p>
+  <div class="filters"><label class="small">Scope</label> <select id="wk-scope"><option value="">All scopes</option>${scopeOptions(scopes, sel)}</select>
+    <input id="wk-q" placeholder="Search articles…" value="${esc(q)}" style="max-width:320px;display:inline-block"> <button data-act="wk-search">Search</button></div>
+  ${hits ? `<div class="card"><h3>Results for “${esc(q)}” <span class="muted">${hits.length}</span></h3>${hits.length ? `<ul class="wk-list">${hits.map((h) => `<li><a href="#/wiki/${encodeURIComponent(h.key)}">${esc(h.title)}</a> ${pill(h.kind)} <span class="small muted">${esc(h.snippet)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing matched at the pages\' visibility ceiling.</div>'}</div>` : ''}
+  <div class="grid2">
+    <div class="card"><h3>Processes <span class="muted">${tree.processes.length}</span></h3>${tree.processes.length ? `<ul class="wk-list">${tree.processes.map(row).join('')}</ul>` : '<div class="empty">No process has governed knowledge yet.</div>'}</div>
+    <div class="card"><h3>Subjects <span class="muted">${tree.subjects.length}</span></h3>${tree.subjects.length ? `<ul class="wk-list">${tree.subjects.map(row).join('')}</ul>` : '<div class="empty">No subject pages yet.</div>'}</div>
+  </div>
+  <div class="card"><h3>By scope</h3><ul class="wk-list">${tree.scopes.filter((s) => s.assertions).map((s) => `<li><a href="#/wiki/${encodeURIComponent(s.key)}">${esc(s.title)}</a> ${scopePill(s.scope)} <span class="small muted">${s.assertions} statements</span></li>`).join('') || '<li class="muted">No scope has ACTIVE knowledge yet.</li>'}</ul></div>
+  ${tree.pages.length ? `<div class="card"><h3>Authored pages</h3><ul class="wk-list">${tree.pages.map((x) => `<li><a href="#/wiki/${encodeURIComponent(x.key)}">${esc(x.title)}</a> ${pill(x.ceiling)}</li>`).join('')}</ul></div>` : ''}`;
+}
+async function wikiArticleView(key, qs) {
+  const p = new URLSearchParams(qs || '');
+  const prose = p.get('prose') === 'llm' ? 'llm' : 'none';
+  const k = decodeURIComponent(key);
+  const [a, ev] = await Promise.all([api(`/wiki/pages/${encodeURIComponent(k)}?prose=${prose}`), api(`/wiki/pages/${encodeURIComponent(k)}/evidence`)]);
+  const refs = [];
+  const body = a.blocks.map((b) => wikiBlock(b, refs)).join('');
+  const byRef = Object.fromEntries(ev.items.map((i) => [i.ref, i]));
+  const stale = a.published ? (a.stale ? pill('updated since publication', 'warn') : pill('published', 'ok')) : pill('never published', '');
+  const sidebar = refs.map((r, i) => { const it = byRef[r]; if (!it) return ''; return `<div class="wk-ev" id="cite-${i + 1}"><b>[${i + 1}]</b> <a href="#/nugget/${encodeURIComponent(r)}">${esc(r)}</a> ${pill(it.status)} ${pill(it.visibility)}${it.source_revoked ? ' ' + pill('source revoked', 'halt') : ''}
+    <div class="small">${esc(it.statement)}</div>
+    ${it.evidence.map((e) => `<div class="quote small"><a href="#/source/${esc(e.source_id)}">${esc(e.source_title || e.source_id)}</a>${e.span_id ? ` <span class="mono muted">${esc(e.span_id)} [${e.start}–${e.end}]</span>` : ''}${e.locator ? ` · ${esc(e.locator)}` : ''} — ${esc(e.excerpt)}</div>`).join('') || '<div class="small muted">no evidence span recorded</div>'}
+    ${it.published_as.length ? `<div class="small muted">in graph: ${it.published_as.map(esc).join(', ')}</div>` : ''}</div>`; }).join('');
+  return `<div class="crumbs"><a href="#/wiki">Wiki</a> / ${esc(a.kind)} / <span class="mono">${esc(k)}</span></div>
+  <div class="wk-bar">${pill(a.kind)} ${pill(`ceiling ${a.ceiling}`)} ${stale} <span class="small muted">${a.refs.length} governed statements · ${a.sources.length} sources${a.published_at ? ` · published ${when(a.published_at)}` : ''}</span>
+    <span class="wk-tools">${prose === 'llm' ? `<a href="#/wiki/${encodeURIComponent(k)}">Show statements</a>` : `<a href="#/wiki/${encodeURIComponent(k)}?prose=llm" title="model prose; every sentence must cite a statement (Q20)">Connected prose</a>`}${a.kind === 'process' ? ` · <a href="#/subject/${encodeURIComponent(k.slice(8))}">Technical profile</a>` : ''}</span></div>
+  <div class="wk"><article class="wk-article card">${body}
+    ${a.not_known.length ? `<h2 class="wk-h">Not yet known</h2><ul class="wk-list">${a.not_known.map((n) => `<li><span class="mono">${esc(n.slot)}</span> <span class="small muted">${esc(n.level || '')} · ${esc(n.status || 'not evidenced')}</span></li>`).join('')}</ul>` : ''}
+    ${a.pending.length ? `<h2 class="wk-h">Pending review <span class="muted">${a.pending.length}</span></h2><ul class="wk-list">${a.pending.map((x) => `<li><a href="#/nugget/${encodeURIComponent(x.ref)}">${esc(x.ref)}</a> ${pill(x.status)} <span class="small">${esc(x.statement || '')}</span></li>`).join('')}</ul>` : ''}
+    <h2 class="wk-h">Sources</h2><ul class="wk-list">${a.sources.map((s) => `<li><a href="#/source/${esc(s.id)}">${esc(s.title)}</a> <span class="small muted">${esc(s.source_type)} · ${esc(s.authority_type)}</span>${s.revoked_at ? ' ' + pill('revoked', 'halt') : ''}</li>`).join('') || '<li class="muted">—</li>'}</ul>
+  </article>
+  <aside class="wk-side card"><h3>Evidence</h3>${sidebar || '<div class="empty">No citations.</div>'}</aside></div>`;
+}
+// [/block plan-25]
+
 function bind(root) {
   root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => act(e.currentTarget).catch((err) => toast(err.message, true))));
   const q = $('#br-q'); if (q) q.addEventListener('keydown', (e) => { if (e.key === 'Enter') act($('[data-act="browse"]')); });
@@ -711,6 +776,7 @@ async function act(b) {
   // [block plan-20] research-03 R4: Run now on the Dashboard's outbox counts (the counts themselves render inside plan-18's physical-store line)
   if (a === 'outbox-run') { const r = await api(`/physical/outbox/run?by=${encodeURIComponent(who())}`, { method: 'POST' }); toast(`Outbox: ${r.processed.done} done · ${r.processed.retried} retried · ${r.processed.dead} dead`); render(); return; }   // plan-20
   // [/block plan-20]
+  if (a === 'wk-search') { const q = $('#wk-q').value.trim(); const sc = $('#wk-scope').value; location.hash = `#/wiki?${sc ? `scope=${encodeURIComponent(sc)}&` : ''}${q ? `q=${encodeURIComponent(q)}` : ''}`; return; }   // plan-25
   if (a === 'cancel-gap') { const reason = prompt('Reason for cancelling this gap request?') || ''; await api(`/runtime/requests/${b.dataset.id}/cancel?by=${encodeURIComponent(who())}&reason=${encodeURIComponent(reason)}`, { method: 'POST' }); toast('Gap request cancelled'); render(); return; }
   if (a === 'connect-m365') {
     const [st, sid] = $('#ms-scope').value.split('|');

@@ -730,6 +730,43 @@ def source_version_content(source_id: str, version: int, ka: KnowledgeAcquisitio
 # [/block plan-22]
 
 
+# [block plan-25] research-04 R2–R4, R9 (Q17, Q19, Q20): the Knowledge Wiki, read side — every article is computed on read
+def _wiki_err(e: Exception):
+    if isinstance(e, KeyError):
+        raise HTTPException(404, str(e.args[0]) if e.args else "not found")
+    raise HTTPException(400, str(e))
+
+
+@router.get("/wiki/pages")
+def wiki_pages(scope_type: str | None = None, scope_id: str | None = None, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    scope = _scope(scope_type, scope_id) if scope_type and scope_id else None
+    return ka.wiki.list_pages(scope)
+
+
+@router.get("/wiki/search")
+def wiki_search(q: str = "", limit: int = 20, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return {"query": q, "hits": ka.wiki.search(q, limit=max(1, min(limit, 100)))}
+
+
+@router.get("/wiki/pages/{key}")
+def wiki_page(key: str, prose: str = "none", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if prose not in ("none", "llm"):
+        raise HTTPException(400, "prose must be none or llm")
+    try:
+        return ka.wiki.article(key, prose=prose)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+
+
+@router.get("/wiki/pages/{key}/evidence")
+def wiki_evidence(key: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    try:
+        return ka.wiki.evidence(key)
+    except (KeyError, ValueError) as e:
+        _wiki_err(e)
+# [/block plan-25]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"

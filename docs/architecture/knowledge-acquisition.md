@@ -219,7 +219,7 @@ No new tab while Q8 is parked.
 
 **Owner:** [research-04](../research/research-04.md). Q&A: Q17–Q20 in [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, not built.**
+**State: read side ✅ built 2026-10-09 (plan-25: `ka/wiki.py`, routes `GET /wiki/pages`, `/wiki/pages/{key}`, `/wiki/pages/{key}/evidence`, `/wiki/search`, tab `7 · Wiki`); editing, reconciliation, review and publication ⏳ decided, plans 26–28.**
 
 - **The article is a projection, never a stored page (Q19).** A wiki article is computed on read from the ACTIVE versions selected by the
   page's key (process, subject, scope, or an authored page that pins refs) at the page's visibility ceiling, exactly as the process profile

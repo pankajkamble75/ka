@@ -87,6 +87,10 @@ class KnowledgeAcquisition:
         self.search = SearchService(self.repo)
         # [block plan-06]
         self.profiles = ProfileService(self.repo, self.grammar, self.lineage, self.registry)
+        # [block plan-25] research-04: the Knowledge Wiki — articles computed on read (Q19)
+        from ka.wiki import WikiService
+        self.wiki = WikiService(self.repo, self.profiles, self.registry, self.lineage, self.provider)
+        # [/block plan-25]
         # [/block plan-06]
         # [block plan-08]
         self.connectors = SyncService(self.repo, self.ingestion, self.governance, self.auditor, self.bus)

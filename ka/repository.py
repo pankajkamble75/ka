@@ -17,6 +17,10 @@ from ka.model import (
     Connection,
     Evidence,
     DerivedArtefact,
+    WikiDraft,
+    WikiEditProposal,
+    WikiPage,
+    WikiPublication,
     PendingOp,
     PhysicalBinding,
     GovernanceDecision,
@@ -120,6 +124,12 @@ class Repository:
         # [block plan-22]
         self.derived_artefacts = Collection(r, "derived_artefacts", DerivedArtefact)
         # [/block plan-22]
+        # [block plan-25]
+        self.wiki_pages = Collection(r, "wiki_pages", WikiPage, id_field="key")
+        self.wiki_drafts = Collection(r, "wiki_drafts", WikiDraft)
+        self.wiki_proposals = Collection(r, "wiki_proposals", WikiEditProposal)
+        self.wiki_publications = Collection(r, "wiki_publications", WikiPublication)
+        # [/block plan-25]
         # [block plan-03]
         self.bindings = Collection(r, "bindings", GrammarBinding)
         self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")

@@ -73,10 +73,24 @@ def main() -> int:
     v = repo.nuggets.all()[0]
     _, put = timed(lambda: repo.nuggets.put(v))
     _, get = timed(lambda: repo.nuggets.get(v.id))
+    # [block plan-25] research-04 R13: the wiki projection of the largest scope, and wiki search, at this size
+    from ka.lineage import LineageService
+    from ka.profile import ProfileService
+    from ka.grammar import GrammarRegistry
+    from ka.scope import ScopeRegistry
+    from ka.wiki import WikiService
+    from ka.llm import StubLLMProvider
+    reg = ScopeRegistry()
+    for i in range(20):
+        reg.register(Scope(scope_type=ScopeType.DOMAIN if i % 2 else ScopeType.INSTANCE, scope_id=f"scope-{i}"))
+    wiki = WikiService(repo, ProfileService(repo, GrammarRegistry.from_config(root), LineageService(repo), reg), reg, LineageService(repo), StubLLMProvider())
+    art, wiki_article = timed(lambda: wiki.article("scope:DOMAIN|scope-1"))
+    whits, wiki_search = timed(lambda: wiki.search("refund approval manager"))
+    # [/block plan-25]
     row = (f"| {a.n} | {fill_s:.1f} | {du:.1f} | {cold:.2f} | {by_status * 1000:.0f} | {active * 1000:.0f} | {search * 1000:.0f} "
-           f"| {put * 1000:.1f} | {get * 1000:.2f} | {len(hits)} |")
-    header = ("| N nuggets | fill s | size MB | cold load s | by_status ms | active(scope) ms | search ms | put ms | get ms | hits |\n"
-              "|---|---|---|---|---|---|---|---|---|---|")
+           f"| {put * 1000:.1f} | {get * 1000:.2f} | {len(hits)} | {wiki_article * 1000:.0f} ({len(art['refs'])} refs) | {wiki_search * 1000:.0f} |")
+    header = ("| N nuggets | fill s | size MB | cold load s | by_status ms | active(scope) ms | search ms | put ms | get ms | hits | wiki article ms | wiki search ms |\n"
+              "|---|---|---|---|---|---|---|---|---|---|---|---|")
     print(header)
     print(row)
     if a.out:

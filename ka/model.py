@@ -540,6 +540,66 @@ class DerivedArtefact(BaseModel):
 # [/block plan-22]
 
 
+# [block plan-25] research-04 R2 (Q19): the Knowledge Wiki stores only what a person authors — the article itself is computed on read
+class WikiPage(BaseModel):
+    """A page's identity and editorial layout. `key` is deterministic for derived pages (`process:<k>`, `subject:<k>`, `scope:<T>|<id>`)
+    and a slug for authored pages (`page:<slug>`). Facts are never stored here."""
+    key: str
+    kind: str                                          # process | subject | scope | page
+    title: str
+    ceiling: Visibility = Visibility.ENTERPRISE        # a page never shows a version narrower than its ceiling
+    layout: dict[str, Any] = Field(default_factory=dict)   # section order, pinned refs, prose-only blocks (authored pages)
+    layout_rev: int = 0
+    scope_type: ScopeType | None = None
+    scope_id: str | None = None
+    owner: str | None = None
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
+class WikiDraft(BaseModel):
+    """An editor's working copy of a page: blocks as edited, against the layout revision and the selection digest the editor saw."""
+    id: str = Field(default_factory=lambda: new_id("wiki_draft"))
+    page_key: str
+    base_layout_rev: int = 0
+    base_digest: str | None = None
+    rev: int = 0                                       # bumped on every save; `expected_rev` must match (optimistic lock)
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
+    editor: str = "console-user"
+    state: str = "DRAFT"                               # DRAFT | SUBMITTED | CLOSED
+    note: str | None = None
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
+class WikiEditProposal(BaseModel):
+    """What a submitted draft asks governance for: the block diff, each change's class, the candidate/revision refs it produced."""
+    id: str = Field(default_factory=lambda: new_id("wiki_proposal"))
+    page_key: str
+    draft_id: str
+    diff: list[dict[str, Any]] = Field(default_factory=list)      # {block_id, op: insert|update|delete|move, before, after}
+    operations: list[dict[str, Any]] = Field(default_factory=list)  # {block_id, cls, statement, target_ref, produced_ref, note}
+    produced_refs: list[str] = Field(default_factory=list)
+    decisions: list[dict[str, Any]] = Field(default_factory=list)
+    state: str = "SUBMITTED"                           # SUBMITTED | RESOLVED | PUBLISHED | REJECTED
+    submitted_by: str = "console-user"
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
+class WikiPublication(BaseModel):
+    """The record that a page was shown as published with this layout and this selection digest."""
+    id: str = Field(default_factory=lambda: new_id("wiki_publication"))
+    page_key: str
+    layout_rev: int
+    digest: str
+    manifest: list[str] = Field(default_factory=list)  # the refs in the selection at publication
+    by: str = "console-user"
+    proposal_id: str | None = None
+    created_at: str = Field(default_factory=now_iso)
+# [/block plan-25]
+
+
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
 
 

@@ -102,3 +102,19 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* plan-04 finding: wide tables (subject column) scroll instead of clipping */
 .main { overflow-x: auto; }
+
+/* [block plan-25] the Knowledge Wiki: a readable article canvas and its evidence sidebar */
+.wk { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s-16); align-items: start; }
+.wk-article { font-size: var(--fs-15); line-height: 1.65; max-width: 78ch; }
+.wk-article h1.wk-h { font-size: var(--fs-28); margin: 0 0 var(--s-12); }
+.wk-article h2.wk-h { font-size: var(--fs-18); margin: var(--s-24) 0 var(--s-8); border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
+.wk-article h3.wk-h { font-size: var(--fs-14); margin: var(--s-16) 0 var(--s-4); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.wk-p { margin: 0 0 var(--s-12); }
+.wk-list { margin: 0 0 var(--s-12); padding-left: 22px; }
+.cite a { font-size: var(--fs-12); font-weight: 600; margin-left: 2px; }
+.wk-side { position: sticky; top: var(--s-16); max-height: calc(100vh - 32px); overflow: auto; font-size: var(--fs-13); }
+.wk-ev { padding: var(--s-8) 0; border-bottom: 1px solid var(--rule); }
+.wk-bar { display: flex; flex-wrap: wrap; gap: var(--s-8); align-items: center; margin: var(--s-8) 0 var(--s-16); }
+.wk-tools { margin-left: auto; font-size: var(--fs-13); }
+@media (max-width: 1000px) { .wk { grid-template-columns: 1fr; } .wk-side { position: static; max-height: none; } }
+/* [/block plan-25] */

@@ -2,6 +2,34 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 22:05 UTC — plan-25: the read-only Knowledge Wiki — computed articles with citations, a visibility ceiling, staleness by digest, tab 7, projection cost measured (research-04 R2, R3, R4, R9, R13; builds Q17, Q19, Q20)
+
+**What changed** — `ka/wiki.py` (new): `WikiService` — deterministic page keys (`process:`, `subject:`, `scope:`, `page:`), `select` at the
+page's visibility ceiling (never PENDING/SUPERSEDED, never narrower than the ceiling), `article` (process pages from `ProcessProfile` in the
+note's section order with "Not yet known" and "Pending"; subject pages by knowledge type and predicate; scope pages by subject; every
+sentence a statement + `[[ref]]`), `evidence` (spans, offsets, source titles, graph usage), `digest`/`stale` against the last publication,
+`list_pages`, `search` at the ceiling, `_synthesize` + `verify` (Q20: sentence kept only if its trailing citations are allowed refs).
+`ka/model.py`: `WikiPage`, `WikiDraft`, `WikiEditProposal`, `WikiPublication` (+ collections, `WD/WP/WU` ids). `ka/api.py`: `GET /wiki/pages`,
+`/wiki/pages/{key}`, `/wiki/pages/{key}/evidence`, `/wiki/search`. Console: tab `7 · Wiki`, `#/wiki` (tree, search), `#/wiki/:key` (article,
+evidence sidebar, "Connected prose" switch, stale line); styles. `tools/bench_store.py`: wiki article/search timings; benchmark file with the
+10k and 100k rows and reading. Architecture §8a state (read side built); README tab list. `test_plan25_wiki_read.py` (13 cases);
+`e2e/plan25_wiki_flow.py`.
+
+**Why** — research-04 §1–§3, §9; Q17, Q19, Q20 answered 2026-10-09. Reading writes nothing; the article is never a second fact store.
+
+**Verification** — in-process 367 passed, 2 skipped (exit checked); ruff F clean; no protected code by diff. Recount 9/9 D, 8/8 P, 5/5 N;
+blocks in 8 files. Live flow 9/9 twice over real HTTP (tab present with tabs 1–6, index, search, article with `[1] [2]` citations, citation
+→ nugget page, evidence sidebar spans, prose switch, no JS errors); screenshot verified. Smoke over a copy of the live storage: 5 process
+pages, 2 scope pages, 28-ref process article in 40 ms. Product tests (research-04): PT1, PT2, PT8, PT12 PASS; the rest await plans 26–28.
+R13 measured: article 15 ms @10k / 177 ms @100k; wiki search 311 ms / 5.4 s.
+
+**Findings** — a note-sourced nugget is PERSONAL and governance narrows a revision to its sources' visibility (§10): the test fixture had
+to use ENTERPRISE uploads — the ceiling worked exactly as decided. `propose_revision` keeps the prior's subject (the pass-through works);
+an earlier suspicion of a defect was wrong and is not recorded as one. Live `coverage` is empty because no grammar is loaded, so
+"Not yet known" is empty on the live server until `KA_GRAMMAR_DIR` is set.
+
+**Decisions and questions** — BUILT: R10 (Q17), R12 (Q20) and the read side of Q19 (architecture §8a). Plan `plan-25`; R2, R3, R4, R9, R13 → UPLOADED.
+
 ## 2026-10-09 20:30 UTC — questions: Q17, Q18, Q19, Q20 answered (the Knowledge Wiki's decisions); architecture §8a opened
 
 **What changed** — `QUESTIONS-TRACKER.md`: Q18 ANSWERED (generalise plan-10's re-review with a `review_reason`; REJECT retires), Q19

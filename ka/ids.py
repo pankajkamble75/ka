@@ -24,6 +24,9 @@ PREFIXES = {
     "connection": "CON",
     "op": "OP",
     "derived": "DA",
+    "wiki_draft": "WD",
+    "wiki_proposal": "WP",
+    "wiki_publication": "WU",
 }
 
 
