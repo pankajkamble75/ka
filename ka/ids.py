@@ -23,6 +23,7 @@ PREFIXES = {
     "binding": "GB",
     "connection": "CON",
     "op": "OP",
+    "derived": "DA",
 }
 
 

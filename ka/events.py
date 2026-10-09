@@ -34,6 +34,9 @@ EVENT_NAMES = {
     # [block plan-21]
     "physical.event.received", "physical.binding.revoked",
     # [/block plan-21]
+    # [block plan-22]
+    "physical.derived.published",
+    # [/block plan-22]
 }
 
 Handler = Callable[[dict[str, Any]], None]

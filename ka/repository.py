@@ -16,6 +16,7 @@ from ka.model import (
     AuditRecord,
     Connection,
     Evidence,
+    DerivedArtefact,
     PendingOp,
     PhysicalBinding,
     GovernanceDecision,
@@ -116,6 +117,9 @@ class Repository:
         # [block plan-20]
         self.dp_outbox = Collection(r, "dp_outbox", PendingOp)
         # [/block plan-20]
+        # [block plan-22]
+        self.derived_artefacts = Collection(r, "derived_artefacts", DerivedArtefact)
+        # [/block plan-22]
         # [block plan-03]
         self.bindings = Collection(r, "bindings", GrammarBinding)
         self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")

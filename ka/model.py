@@ -515,6 +515,30 @@ class PendingOp(BaseModel):
 # [/block plan-20]
 
 
+# [block plan-22]
+class DerivedArtefact(BaseModel):
+    """A nugget version's immutable physical copy — one per (canonical_id, version, status) (research-03 R6)."""
+    id: str = Field(default_factory=lambda: new_id("derived"))
+    kind: str = "nugget_version"
+    canonical_id: str
+    version: int
+    status: str
+    ref: str
+    idempotency_key: str
+    backend: str = "local"
+    state: str = "pending"                             # pending | available | failed
+    event: str | None = None
+    op_id: str | None = None
+    dp_asset_id: str | None = None
+    dp_asset_version_id: str | None = None
+    parent_asset_id: str | None = None
+    sha256: str | None = None
+    locator: str | None = None
+    created_at: str = Field(default_factory=now_iso)
+    published_at: str | None = None
+# [/block plan-22]
+
+
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
 
 

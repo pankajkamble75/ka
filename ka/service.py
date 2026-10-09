@@ -99,6 +99,10 @@ class KnowledgeAcquisition:
         if auto_propose_graph_changes:
             self.bus.subscribe("knowledge.approved", self._on_approved)
         self.inbound.connectors = self.connectors                            # plan-21: the one revocation rule lives on the sync service
+        # [block plan-22] research-03 R6: nugget versions become derived artefacts on knowledge events — a subscriber, never governance
+        from ka.derived import DerivedPublisher
+        self.derived = DerivedPublisher(self.repo, self.bus, self.auditor, self.outbox, self.physical)
+        # [/block plan-22]
         # [block plan-10] research-02 R2: a rejected re-review retires its prior version's graph elements through a proposal;
         # the needs-attention row below points at the re-review candidates
         self.governance.on_retire = lambda prior, by: self.graph_change.propose_retirement(prior, by=by)
@@ -264,6 +268,43 @@ class KnowledgeAcquisition:
     # ---- dashboards (§29, §30, §32) -------------------------------------------------------------------
 
     # [block plan-18]
+    def version_bytes(self, source_id: str, version: int) -> tuple[bytes, str]:
+        """plan-22 (research-03 R7): the bytes of one source version through the physical store — local or Data Platform.
+        Raises KeyError when unknown, ValueError (with the binding reason) when not available."""
+        from pathlib import Path
+        from ka.physical import PhysicalRef
+        src = self.repo.sources.require(source_id)
+        vers = [v for v in self.repo.source_versions.where(lambda v: v.source_id == src.id) if v.version == version]
+        if not vers:
+            raise KeyError(f"version {version} of {source_id} not found")
+        ver = vers[0]
+        b = self.repo.binding_for_version(ver.id)
+        if b is not None and b.status != "available":
+            raise ValueError(f"version {version} is not available ({b.status}: {b.reason or 'no reason recorded'})")
+        if b is not None and b.backend == self.physical.name:
+            data = self.physical.get(PhysicalRef(backend=b.backend, asset_id=b.dp_asset_id or "", asset_version_id=b.dp_asset_version_id or "1", sha256=b.sha256, locator=b.locator))
+        elif ver.stored_path and Path(ver.stored_path).exists():
+            data = Path(ver.stored_path).read_bytes()
+        else:
+            raise ValueError(f"version {version} has no stored bytes")
+        return data, ver.media_type
+
+    def mirror_image(self, row: dict[str, Any], data: bytes) -> dict[str, Any]:
+        """plan-22 (research-03 R7): the images side door — on the Data Platform backend a saved image is also put to DP; a failure
+        leaves the local image and records why. Images are not knowledge, so no outbox operation."""
+        if self.physical.name != "data_platform":
+            return row
+        from ka import images
+        try:
+            ref = self.physical.put(data, content_type=row["mime"], sha256=row["sha256"], owner="console", visibility="PERSONAL",
+                                    tenant_id=config.get("KA_TENANT_ID"), idempotency_key=f"ka:{config.get('KA_TENANT_ID')}:image:{row['sha256']}",
+                                    filename_hint=row.get("name"))
+            row["dp_asset_id"], row["dp_asset_version_id"] = ref.asset_id, ref.asset_version_id
+        except Exception as e:  # noqa: BLE001 — the local image stands
+            row["dp_error"] = f"{type(e).__name__}: {e}"[:200]
+        images.update_row(self.repo.root, row["number"], **{k: row[k] for k in ("dp_asset_id", "dp_asset_version_id", "dp_error") if k in row})
+        return row
+
     def physical_status(self) -> dict[str, Any]:
         from collections import Counter
         bs = self.repo.physical_bindings.all()
@@ -360,6 +401,7 @@ class KnowledgeAcquisition:
             "graph_changes": [p.model_dump(mode="json", include={"id", "status", "affected_element_ids", "created_at", "applied_at"})
                               for p in self.repo.proposals.where(lambda p: v.ref in p.knowledge_change_ids)],
             "inherited_value": inherited_value, "used_by_descendants": used_by_descendants,
+            "derived": self.derived.for_ref(v.ref) if hasattr(self, "derived") else [],          # plan-22
             "audit": [a.model_dump(mode="json") for a in self.auditor.for_object(v.ref)],
             # plan-03 (block is the wiring in __init__)
             "assertion": {"subject": v.subject.model_dump() if v.subject else None, "predicate": v.predicate,

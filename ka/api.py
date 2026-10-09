@@ -710,6 +710,26 @@ def inbound_poll(by: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -
 # [/block plan-21]
 
 
+# [block plan-22] research-03 R6/R7: derived artefacts; bytes through the physical store
+@router.get("/nugget/{ref}/derived")
+def nugget_derived(ref: str, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.version(ref) is None:
+        raise HTTPException(404, "nugget version not found")
+    return {"derived": ka.derived.for_ref(ref)}
+
+
+@router.get("/sources/{source_id}/versions/{version}/content")
+def source_version_content(source_id: str, version: int, ka: KnowledgeAcquisition = Depends(get_ka)) -> Response:
+    try:
+        data, mime = ka.version_bytes(source_id, version)
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return Response(content=data, media_type=mime, headers={"Cache-Control": "private, no-store"})
+# [/block plan-22]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"
@@ -951,9 +971,14 @@ def list_images(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
 @router.post("/images")
 def save_image(body: ImageIn, ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     try:
-        return {"image": images.save(ka.repo.root, data_b64=body.data, name=body.name, caption=body.caption)}
+        row = images.save(ka.repo.root, data_b64=body.data, name=body.name, caption=body.caption)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    # [block plan-22] research-03 R7: the images side door mirrors to the Data Platform on that backend
+    import base64 as _b64
+    row = ka.mirror_image(row, _b64.b64decode(body.data))
+    # [/block plan-22]
+    return {"image": row}
 
 
 @router.get("/images/{number}")

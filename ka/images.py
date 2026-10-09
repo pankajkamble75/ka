@@ -94,6 +94,20 @@ def read(root: Path, number: int) -> tuple[bytes, str]:
     return path.read_bytes(), row["mime"]
 
 
+# [block plan-22]
+def update_row(root: Path, number: int, **fields: Any) -> dict[str, Any]:
+    """Record Data Platform ids (or the failure) on an image's index row."""
+    with _LOCK:
+        rows = _index(root)
+        for r in rows:
+            if r["number"] == number:
+                r.update(fields)
+                _write_index(root, rows)
+                return r
+    raise ValueError(f"image {number} not found")
+# [/block plan-22]
+
+
 def update(root: Path, number: int, caption: str) -> dict[str, Any]:
     if len(caption) > 2000:
         raise ValueError("Caption up to 2000 characters.")

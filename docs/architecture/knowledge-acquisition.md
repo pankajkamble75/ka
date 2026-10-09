@@ -254,7 +254,7 @@ No vector index, no chat, no document browser as the primary view, no agent path
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-23 completes this section.
+**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-21 inbound events and the one revocation rule; plan-22 derived artefacts and reads through DP; plan-23 completes this section.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -282,4 +282,13 @@ No vector index, no chat, no document browser as the primary view, no agent path
   deleted connector file also takes: `Source.revoked_at`, derived nuggets flagged, every ACTIVE nugget returned to review (Q4, plan-10),
   `source.revoked`, audit; `index.ready` records the derived text asset; unknown types and unknown assets are recorded and ignored; a
   failed poll leaves the cursor where it was. Routes `GET /physical/inbound`, `POST /physical/inbound/poll`.
+- **Nugget versions as derived artefacts (R6, ✅ plan-22).** `ka/derived.py`: a service subscriber on `knowledge.candidate.created /
+  approved / rejected / superseded` builds the §6 payload (interpretation, status, authority, confidence, effective dates, evidence spans,
+  source and DP asset ids, extraction versions, governance decision and graph-change ids, scope, visibility) and queues `put_derived`
+  under `ka:<tenant>:nugget:<canonical>:<version>:<status>` — one immutable artefact per governed status, never an overwrite, never
+  inside governance. `DerivedArtefact` records it; the nugget page lists them. Local backend: written synchronously under
+  `<storage>/derived/nugget_version/`; DP backend: delivered by the outbox worker with the source asset as parent.
+- **Reads through DP (R7, ✅ plan-22).** `reextract` (plan-18), `GET /sources/{id}/versions/{n}/content` ("view bytes") and the images
+  side door (`POST /images` mirrors to DP on that backend; the local file still serves) read and write through the physical store. DP
+  **search** is not built: the v1 contract has no search endpoint and research-03 §7 puts it later, under KA's own filters when it comes.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.

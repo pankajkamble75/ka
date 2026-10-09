@@ -2,6 +2,35 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 15:55 UTC — plan-22: nugget versions as immutable derived artefacts; bytes read through the Data Platform; images side door (research-03 R6, R7)
+
+**What changed** — `ka/derived.py` (new): `DerivedPublisher` subscribes in the service to `knowledge.candidate.created / approved /
+rejected / superseded`, builds the research-03 §6 payload (`build_payload`: interpretation, binding digest, status, authority, confidence,
+effective dates, scope, visibility, evidence spans with DP ids, sources with DP asset/version ids and extraction versions, research runs,
+governance decision id, graph-change refs, supersedes chain) and queues `put_derived` on the plan-20 outbox under
+`ka:<tenant>:nugget:<canonical>:<version>:<status>` — one immutable artefact per governed status; local backend runs the outbox
+synchronously (derived JSON under `<storage>/derived/nugget_version/`), DP backend delivers via the worker with the source asset as parent.
+`DerivedArtefact` model + `derived_artefacts` collection; `DA` id prefix; `physical.derived.published` event. `ka/service.py`:
+`version_bytes` (through the physical store, 409 when not available), `mirror_image` (DP backend only; failure recorded on the row),
+`nugget_detail["derived"]`. `ka/images.py`: `update_row`. `ka/api.py`: `GET /nugget/{ref}/derived`, `GET /sources/{id}/versions/{n}/content`,
+`POST /images` mirrors. Console: "Physical copies" card on the nugget page; "view bytes" link on each version card. Architecture §11.
+`test_plan22_derived.py` (12 cases); `e2e/plan22_derived_flow.py`.
+
+**Why** — research-03 §6/§7: DP holds the durable copy and the index; KA's JSON stays the domain repository; publication is a subscriber,
+never governance (protected, untouched — `test_N3` pins that `ka/governance.py` names nothing of this).
+
+**Verification** — in-process 335 passed, 2 skipped (exit checked); ruff F clean; no protected code by diff. Recount 8/8 D, 7/7 P, 5/5 N;
+blocks in 7 files. Live flow 8/8 over real HTTP: CANDIDATE and ACTIVE artefacts delivered by the worker; the fake's payload names the
+source asset version, the evidence span and the governance decision id; the derived asset's parent is the source asset; view bytes serves
+the pasted text through DP; the nugget page shows both copies with asset ids (screenshot verified). Product tests: PT1–PT8 PASS (PT4,
+PT5 turn green here); PT9 awaits plan-23.
+
+**Follow-ups / findings** — `ka/images.py` and `ka/ids.py` were touched beyond the declared blocks (reported, blocks added). DP search is
+NOT built: no v1 endpoint; research-03 §7 says later — stated in architecture §11. `TypeError` inside an outbox handler is treated as
+retryable (generic exception path) — it dead-letters after the budget rather than at once; acceptable, noted.
+
+**Decisions and questions** — BUILT: R6, R7 (architecture §11). Plan `plan-22`; R6, R7 → UPLOADED. No new question.
+
 ## 2026-10-09 15:05 UTC — plan-21: inbound Data Platform events and the one revocation rule (research-03 R5, R9)
 
 **What changed** — `ka/data_platform/inbound.py` (new): `InboundEvents` polls `GET /v1/events?after=` with a durable cursor
