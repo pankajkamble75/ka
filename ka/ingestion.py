@@ -33,6 +33,8 @@ class IngestionService:
         self.repo, self.bus, self.auditor = repo, bus, auditor
         self.blob_dir = repo.root / "blobs"
         self.physical: PhysicalStore = physical or LocalPhysicalStore(repo.root)      # plan-18: the port beneath the funnel
+        self.outbox = None                                                             # plan-20: set by the service when the backend is data_platform
+        self._pending_op = None
 
     # ---- public entry points: Upload / Paste / Write / Link / Connect ----------------------------
 
@@ -195,13 +197,31 @@ class IngestionService:
                 if ref.backend == "local":
                     ver.stored_path = ref.locator
             except Exception as e:  # noqa: BLE001 — a failed physical write never yields an available version
-                binding.status, binding.reason = "failed", f"{type(e).__name__}: {e}"
+                # [block plan-20] research-03 R4: a RETRYABLE Data Platform failure spools the bytes and queues the upload; the version is pending
+                retryable = getattr(e, "retryable", None)
+                if retryable is None:
+                    retryable = not isinstance(e, (ValueError, TypeError))     # a transport failure is retryable; a bad request is not
+                if retryable and self.physical.name == "data_platform" and self.outbox is not None:
+                    spool = self.repo.root / "spool" / f"{ver.id}.bin"
+                    spool.parent.mkdir(parents=True, exist_ok=True)
+                    spool.write_bytes(data)
+                    binding.status, binding.reason = "pending", f"{getattr(e, 'code', type(e).__name__)}: queued for retry"
+                    self._pending_op = (key, {"binding_id": binding.id, "source_version_id": ver.id, "spool_path": str(spool),
+                                              "content_type": extraction.media_type, "filename_hint": filename})
+                else:
+                    binding.status, binding.reason = "failed", f"{getattr(e, 'code', type(e).__name__)}: {e}"
+                # [/block plan-20]
         else:
             binding.status, binding.reason = "failed", extraction.note or "no bytes (blocked or empty)"
         binding.last_synced_at = _now_iso()
         self.repo.source_versions.put(ver)
-        self.repo.put_binding(binding)
+        stored_binding = self.repo.put_binding(binding)
         # [/block plan-18]
+        pend = getattr(self, "_pending_op", None)
+        if pend is not None:                                                 # plan-20: enqueue after the binding exists
+            self._pending_op = None
+            pend[1]["binding_id"] = stored_binding.id
+            self.outbox.enqueue("upload_source", pend[0], pend[1], by=owner or "ka.outbox")
         src.checksum = checksum
         src.current_version_id = ver.id
         src.extraction_status = extraction.status

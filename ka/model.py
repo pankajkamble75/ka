@@ -497,6 +497,24 @@ class PhysicalBinding(BaseModel):
 # [/block plan-18]
 
 
+# [block plan-20]
+class PendingOp(BaseModel):
+    """One operation KA owes the Data Platform, durable until done or dead (research-03 R4)."""
+    id: str = Field(default_factory=lambda: new_id("op"))
+    kind: str                                          # upload_source | put_derived | ack_event
+    idempotency_key: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    state: str = "pending"                             # pending | done | dead
+    attempts: int = 0
+    next_at: str = Field(default_factory=now_iso)
+    last_error: str | None = None
+    last_code: str | None = None
+    by: str = "ka.outbox"
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+# [/block plan-20]
+
+
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
 
 

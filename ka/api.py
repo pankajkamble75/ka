@@ -673,6 +673,29 @@ def physical_status(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any
 # [/block plan-18]
 
 
+# [block plan-20] research-03 R4: the pending-operations outbox
+@router.get("/physical/outbox")
+def outbox_status(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    return ka.outbox.status() | {"ops": [o.model_dump(mode="json") for o in sorted(ka.repo.dp_outbox.all(), key=lambda o: o.created_at, reverse=True)[:50]]}
+
+
+@router.post("/physical/outbox/run")
+def outbox_run(by: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    rec = ka.outbox.reconcile()
+    return {"processed": ka.outbox.process_once(by=by), "reconciled": rec, "status": ka.outbox.status()}
+
+
+@router.post("/physical/outbox/{op_id}/retry")
+def outbox_retry(op_id: str, by: str = "user", ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    if ka.repo.dp_outbox.get(op_id) is None:
+        raise HTTPException(404, "operation not found")
+    try:
+        return {"op": ka.outbox.retry(op_id, by=by).model_dump(mode="json")}
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+# [/block plan-20]
+
+
 # [block plan-08] managed connectors (research-01 R10; providers beyond the local folder are Q6)
 class ConnectorIn(BaseModel):
     kind: str = "local_folder"

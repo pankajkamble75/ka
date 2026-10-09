@@ -28,6 +28,9 @@ EVENT_NAMES = {
     # [block plan-12]
     "graph.instance.repinned",
     # [/block plan-12]
+    # [block plan-20]
+    "physical.binding.available", "physical.outbox.dead",
+    # [/block plan-20]
 }
 
 Handler = Callable[[dict[str, Any]], None]

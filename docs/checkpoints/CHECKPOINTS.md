@@ -2,6 +2,31 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 14:10 UTC — plan-20: the pending-operations outbox — retry with backoff, dead-letter, reconcile by idempotency key (research-03 R4)
+
+**What changed** — `ka/outbox.py` (new): `Outbox` (`enqueue` one op per key, `due`, `process_once`, backoff `KA_DP_BACKOFF_BASE`·2ⁿ, dead-letter
+after `KA_DP_RETRIES`, non-retryable 401/403/404/409/413/422 → dead at once and the binding `failed`, `retry`, `status`, `reconcile`) with the
+`upload_source` handler (spool → upload/content/commit under `ka:<tenant>:<source>:<version>` → binding `available`, spool deleted, event
+`physical.binding.available`), and `OutboxWorker` (daemon thread, DP backend only, reconciles on start). `ka/model.py`: `PendingOp`;
+`ka/repository.py`: `dp_outbox`; `ka/ids.py`: `OP` prefix (one line, undeclared — finding). `ka/ingestion.py`: a RETRYABLE Data Platform
+failure spools the bytes to `<storage>/spool/` and queues the upload; the binding is `pending`, never available; a non-retryable failure
+stays `failed`. `ka/service.py`: outbox + worker wiring (`start_workers` flag for tests), `physical_status` carries outbox counts and the
+worker state. `ka/api.py`: `GET /physical/outbox`, `POST /physical/outbox/run`, `POST /physical/outbox/{id}/retry`. Console: outbox counts
+and Run now on the Dashboard's physical line. `ka/events.py`: two names. `ka/config.py`: two settings. `.env.example`; architecture §11.
+`test_plan20_outbox.py` (12 cases); `e2e/plan20_outbox_flow.py`. plan-19's N3 (its own test) updated: DP down now yields `pending`+queued
+rather than `failed`, which is this plan's decided behaviour.
+
+**Why** — research-03 §4: no cross-service transaction; a crash or outage between upload and commit must never lose bytes or duplicate
+assets. The replay of a committed upload returns the same ids (contract row 3), so reconciliation is a replay.
+
+**Verification** — in-process 311 passed, 2 skipped (exit checked); ruff F clean; no protected code. Verify recount 8/8 D, 7/7 P, 5/5 N; blocks
+8 files found (the Dashboard counts render inside plan-18's line; the Run-now action carries the plan-20 block). Live flow 8/8 over real
+HTTP: the fake fails twice, the pasted version shows `pending`, the worker (2 s interval) makes it `available` by itself, the Dashboard shows
+outbox 0 pending · 1 done · worker on, exactly one asset version in the fake; screenshots verified. Product tests (research-03): PT1, PT2,
+PT3, PT6, PT8 PASS; PT5 physical half; PT4, PT7, PT9 awaiting plans 22, 21, 23.
+
+**Decisions and questions** — BUILT: R4 (architecture §11). Plan `plan-20`; R4 → UPLOADED.
+
 ## 2026-10-09 12:40 UTC — plan-19: the Data Platform contract as fixtures, a wire-level fake, and the HTTP physical store (research-03 R11 + R2's DP half)
 
 **What changed** — `ka/data_platform/__init__.py`: `DataPlatformError` (envelope: code, message, correlation_id, retryable), `DataPlatformClient`

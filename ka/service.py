@@ -40,7 +40,7 @@ from ka.vocab import NuggetStatus, ScopeType
 class KnowledgeAcquisition:
     def __init__(self, storage_root: Path | None = None, *, provider: LLMProvider | None = None,
                  adapter: GraphAdapter | None = None, registry: ScopeRegistry | None = None,
-                 auto_propose_graph_changes: bool = True, auto_approve_low_impact: bool = False):
+                 auto_propose_graph_changes: bool = True, auto_approve_low_impact: bool = False, start_workers: bool = True):
         self.repo = Repository(storage_root)
         self.bus = EventBus(sink=self.repo.append_event)
         self.auditor = Auditor(self.repo)
@@ -54,6 +54,14 @@ class KnowledgeAcquisition:
         self.physical, self.physical_note = select_physical_store(self.repo.root)
         self.ingestion = IngestionService(self.repo, self.bus, self.auditor, physical=self.physical)
         # [/block plan-18]
+        # [block plan-20] research-03 R4: the pending-operations outbox; its worker runs only on the data_platform backend
+        from ka.outbox import Outbox, OutboxWorker
+        self.outbox = Outbox(self.repo, self.bus, self.auditor, self.physical)
+        self.ingestion.outbox = self.outbox
+        self.outbox_worker = OutboxWorker(self.outbox)
+        if self.physical.name == "data_platform" and start_workers:
+            self.outbox_worker.start()
+        # [/block plan-20]
         # [block plan-03]
         self.grammar = GrammarRegistry.from_config(self.repo.root)
         self.subjects = SubjectRegistry(self.repo)
@@ -252,9 +260,11 @@ class KnowledgeAcquisition:
     def physical_status(self) -> dict[str, Any]:
         from collections import Counter
         bs = self.repo.physical_bindings.all()
+        outbox = self.outbox.status() if hasattr(self, "outbox") else {}     # plan-20
         legacy = sum(1 for v in self.repo.source_versions.all() if self.repo.binding_for_version(v.id) is None)
         return {"backend": self.physical.name, "requested": (config.get("KA_STORAGE_BACKEND") or "local"), "tenant_id": config.get("KA_TENANT_ID"),
-                "note": self.physical_note, "bindings": len(bs), "by_status": dict(Counter(b.status for b in bs)), "legacy_versions_without_binding": legacy}
+                "note": self.physical_note, "bindings": len(bs), "by_status": dict(Counter(b.status for b in bs)), "legacy_versions_without_binding": legacy,
+                "outbox": outbox, "worker_running": bool(getattr(getattr(self, "outbox_worker", None), "thread", None))}
     # [/block plan-18]
 
     def needs_attention(self) -> dict[str, list[dict[str, Any]]]:

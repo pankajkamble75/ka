@@ -192,13 +192,18 @@ def test_N2_idempotency_replay_and_conflict(dp):
     assert ei.value.status == 409 and ei.value.code == "idempotency_conflict"
 
 
-def test_N3_dp_down_yields_a_failed_retryable_binding_and_nothing_raises(dp):
+def test_N3_dp_down_yields_a_not_available_binding_and_nothing_raises(dp):
+    """plan-19 pinned `failed`; plan-20 (research-03 R4) made a RETRYABLE failure `pending` with the upload queued on the outbox. Either way the
+    version is NOT available and extraction still ran from the bytes in hand."""
     ka, fake, store = dp
     fake.fail_next(3)
     with config.scoped(KA_DP_SERVICE_TOKEN=TOKEN):
         g = ka.ingestion.upload(filename="policy.md", data=POLICY, owner="ops", scope=D)
     b = ka.repo.binding_for_version(g.version.id)
-    assert b.status == "failed" and "unavailable" in (b.reason or "") and g.source.extraction_status.value == "EXTRACTED"   # extraction still ran from the bytes in hand
+    assert b.status in {"failed", "pending"} and "unavailable" in (b.reason or "") and not ka.repo.version_available(g.version.id)
+    assert g.source.extraction_status.value == "EXTRACTED"   # extraction still ran from the bytes in hand
+    if ka.ingestion.outbox is not None:
+        assert b.status == "pending" and ka.repo.dp_outbox.all()
 
 
 def test_N4_denied_read_is_a_policy_denied_error(dp):

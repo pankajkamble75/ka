@@ -22,6 +22,7 @@ PREFIXES = {
     "request": "KAR",
     "binding": "GB",
     "connection": "CON",
+    "op": "OP",
 }
 
 

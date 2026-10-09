@@ -254,7 +254,7 @@ No vector index, no chat, no document browser as the primary view, no agent path
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-23 completes this section.
+**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-20 the outbox; plan-23 completes this section.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -270,4 +270,10 @@ No vector index, no chat, no document browser as the primary view, no agent path
   DataPlatformClient` talks to it (or to the real DP) with the service token read from `KA_DP_SERVICE_TOKEN` at call time;
   `ka/data_platform/store.py::DataPlatformPhysicalStore` is the port's HTTP implementation. A failed upload yields a `failed` binding —
   retry is plan-20's outbox.
+- **The outbox (R4, ✅ plan-20).** `ka/outbox.py`: operations KA owes DP are `PendingOp`s under `<storage>/dp_outbox/`; a RETRYABLE DP
+  failure at ingestion spools the bytes to `<storage>/spool/` and queues `upload_source` with the key `ka:<tenant>:<source>:<version>`; the
+  version is `pending`, never available. `OutboxWorker` (DP backend only) retries with backoff (`KA_DP_BACKOFF_BASE`·2ⁿ), dead-letters
+  after `KA_DP_RETRIES` (`physical.outbox.dead`), and reconciles pending bindings on start. A replay of a committed upload returns the
+  same asset ids, so a crash between content and commit never duplicates. Non-retryable errors (401/403/409/413/422) fail the binding at once.
+  Routes `GET /physical/outbox`, `POST /physical/outbox/run`, `POST /physical/outbox/{id}/retry`; the Dashboard's physical line shows the counts.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.

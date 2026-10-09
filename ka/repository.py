@@ -16,6 +16,7 @@ from ka.model import (
     AuditRecord,
     Connection,
     Evidence,
+    PendingOp,
     PhysicalBinding,
     GovernanceDecision,
     GrammarBinding,
@@ -112,6 +113,9 @@ class Repository:
         # [block plan-18]
         self.physical_bindings = Collection(r, "physical_bindings", PhysicalBinding)
         # [/block plan-18]
+        # [block plan-20]
+        self.dp_outbox = Collection(r, "dp_outbox", PendingOp)
+        # [/block plan-20]
         # [block plan-03]
         self.bindings = Collection(r, "bindings", GrammarBinding)
         self.subjects = Collection(r, "subjects", SubjectRecord, id_field="canonical_key")

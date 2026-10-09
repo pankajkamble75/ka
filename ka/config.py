@@ -107,6 +107,10 @@ declare("KA_DP_SERVICE_TOKEN", str, "", "ka.data_platform", "Service token KA pr
 declare("KA_DP_TIMEOUT", float, 20.0, "ka.data_platform", "Per-call timeout in seconds for Data Platform requests.")
 declare("KA_DP_RETRIES", int, 3, "ka.data_platform", "Attempts the plan-20 outbox makes before dead-lettering a Data Platform operation.")
 # [/block plan-19]
+# [block plan-20]
+declare("KA_DP_OUTBOX_INTERVAL", float, 15.0, "ka.outbox", "Seconds between outbox worker runs when the backend is data_platform.")
+declare("KA_DP_BACKOFF_BASE", float, 5.0, "ka.outbox", "First retry delay in seconds; doubles per attempt.")
+# [/block plan-20]
 
 _overrides: dict[str, Any] = {}
 
