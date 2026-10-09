@@ -99,6 +99,11 @@ does not create a second ACTIVE version. It auto-resolves as Keep Existing: the 
 reference and evidence are attached to the existing nugget so the second document still counts. Refusing or allowing were
 considered and declined (reasoning in `docs/questions/knowledge-acquisition.md`, Q11 ledger). Same scope only: the same statement approved in sibling instances is repeated instance knowledge for promotion (§25), not a duplicate. Lives in `ka/governance.py::decide` (the duplicate branch) and `attach_provenance`; characterization 48d4685.
 
+- **Human retirement (Q18 ⏳ decided 2026-10-09, not built).** A person retires an ACTIVE nugget the way a revoked source does (plan-10):
+  a same-statement revision carrying a `review_reason` — `source revoked` or `retirement requested by <person>: <why>` — and REJECT on it
+  retires the prior version and proposes the graph retirement through the separate graph-change route. One mechanism, two reasons; no
+  second retirement path. Deleting prose in the Knowledge Wiki never retires anything (research-04 §5).
+
 ## 5. Compilation, impact, publication (§19–§22, §26, §39, §40) — plan-05
 
 `knowledge.approved` → `GraphChangeService.propose_for(v)`:
@@ -209,6 +214,33 @@ or not, from EOS's slot grammar, and nothing is ever filled in. It is a query, n
 · Processes · Dashboard, plus Images) at `#/processes`, rendering this view; detail pages opened from it return to it; Browse by scope's
 Processes mode stays. The note's five-page layout is declined.
 No new tab while Q8 is parked.
+
+## 8a. The Knowledge Wiki (research-04) — readable articles from governed knowledge
+
+**Owner:** [research-04](../research/research-04.md). Q&A: Q17–Q20 in [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
+
+**State: ⏳ decided 2026-10-09, not built.**
+
+- **The article is a projection, never a stored page (Q19).** A wiki article is computed on read from the ACTIVE versions selected by the
+  page's key (process, subject, scope, or an authored page that pins refs) at the page's visibility ceiling, exactly as the process profile
+  is (§8). Every sentence is a governed statement with its `ref` as citation; nothing in a projected section is written by the projector.
+  What is stored is what a person authors — `WikiPage` (key, layout, ceiling), `WikiDraft`, `WikiEditProposal` — and a `WikiPublication`
+  digest of what was shown when someone published. Staleness is `digest(now) != digest(published)`; there is no stored knowledge
+  mapping, no re-projection job, and no second fact store (spec §45).
+- **Edits are governance proposals.** A draft's changed blocks go through the existing extractor (FEEDBACK channel, the page's scope, Q10
+  tiers) and `ConflictDetector`; the result is candidates through `ingest_candidate` and revisions through `propose_revision` — the one
+  pipeline. Deleting prose retires nothing; retirement is Q18's review reason. Graph proposals stay separate (Q3, Invariant 2).
+- **Visibility ceiling by construction.** A page selects only versions at or above its ceiling in `VISIBILITY_ORDER`; PERSONAL or TEAM
+  nuggets never enter wider pages; wiki search inherits the ceiling. Per-caller filtering arrives with Q4; the wiki carries no identity of
+  its own (Q1).
+- **No HTML.** Drafts are block lists with an inline Markdown subset parsed server-side; the console renders through `esc` only.
+- **Where it sits (Q17).** A seventh top-level tab, `7 · Wiki`: `#/wiki` (tree by scope → process / subject), `#/wiki/:key` (article +
+  evidence sidebar), `#/wiki/:key/edit`, `#/wiki/:key/review/:proposal`. Tabs 1–6 and every existing route stay unchanged (Q8's rule;
+  gated by research-04 R14); §12's "no document browser as the primary view" stands — the primary view remains Add → Nuggets → Browse.
+  "Original Source" is the existing source page.
+- **Model prose (Q20).** Off by default: articles are deterministic. A per-article switch enables model-written prose; when on, every
+  output sentence must cite a nugget from the section's input or a verifier drops it; the text is labelled synthesized and is never
+  evidence or a typed assertion (Q10).
 
 ## 9. Events and audit (§38, §41)
 

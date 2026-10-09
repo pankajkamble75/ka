@@ -207,17 +207,59 @@ when a live tenant sync is wanted.
 
 </details>
 
-## ❓ Open
+<details><summary>Q18 — Human retirement of an ACTIVE nugget (research-04 R7; beside Q4) — ANSWERED 2026-10-09</summary>
 
-### Q17 — Console shape for the Knowledge Wiki (research-04 R10; beside Q8)
-**Scenario.** research-04 proposes readable articles computed from governed nuggets. Q8's rule is that a kind of knowledge earns a
-top-level tab and nothing else moves. **Decision required.** A seventh tab "7 · Wiki" (`#/wiki`), or a mode inside Browse by scope.
-**Recommendation:** the seventh tab. **Cost.** none.
-
-### Q18 — Human retirement of an ACTIVE nugget (research-04 R7; beside Q4 and the plan-10 re-review)
 **Scenario.** Governance has no path for a person to say an ACTIVE nugget is no longer true; plan-10's revoked-source re-review is the
 closest mechanism (a same-statement revision; REJECT retires the prior and proposes the graph retirement). **Decision required.**
-Generalise it with a `review_reason` ("retirement requested by …") under the protected-code protocol, or leave retirement to reviewers
-rejecting ordinary revisions. **Recommendation:** generalise. **Cost.** one protected-code phase.
+Generalise it, or leave retirement to reviewers rejecting ordinary revisions. **Options.** (a) generalise with a `review_reason`;
+(b) leave as is. **Cost.** one protected-code phase.
+
+**Answer (2026-10-09, the author):** generalise plan-10's re-review. A revision carries a stated `review_reason` — "source revoked"
+(today's case, unchanged) or "retirement requested by <person>: <why>" (new) — and REJECT on such a revision retires the prior version
+and proposes the graph retirement exactly as plan-10 does. One mechanism, two reasons; never a second path. ⏳ decided, not built —
+touches `ka/governance.py` (protected) under the seven-step protocol; the revoked-source covering tests stay unmodified.
+
+</details>
+
+<details><summary>Q19 — Stored page or computed projection (research-04 R1; beside the plan-06 profile decision) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** The author's note stores a PUBLISHED wiki revision with blocks and a nugget-version manifest. research-04 argues the
+published article must be computed from ACTIVE nuggets on read, as the process profile is ("a query, never a stored object"), with only
+layout, drafts, proposals and a publication digest stored. **Options.** (a) computed projection; (b) stored published revision.
+**Cost.** none; it removes the re-projection and staleness machinery the note needed.
+
+**Answer (2026-10-09, the author):** computed projection. The article is `render(select(ACTIVE versions at the page's visibility
+ceiling, grouped by the page's key), layout)` on every read; what is stored is what a person authors — `WikiPage` layout, `WikiDraft`,
+`WikiEditProposal` — and a `WikiPublication` digest recording what was shown when someone published. Staleness is a digest comparison;
+there is no stored knowledge mapping and no re-projection job. ⏳ decided, not built.
+
+</details>
+
+<details><summary>Q17 — Console shape for the Knowledge Wiki (research-04 R10; beside Q8) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** research-04 proposes readable articles computed from governed nuggets. Q8's rule is that a kind of knowledge earns a
+top-level tab and nothing else moves. **Options.** (a) a seventh tab "7 · Wiki"; (b) a mode inside Browse by scope. **Cost.** none.
+
+**Answer (2026-10-09, the author):** the seventh tab. `7 · Wiki` with `#/wiki` (tree by scope → process / subject), `#/wiki/:key`
+(the article with its evidence sidebar), `#/wiki/:key/edit` (the block editor) and `#/wiki/:key/review/:proposal`. Tabs 1–6 and every
+existing route are unchanged (research-04 R14 gates it); "Original Source" is a link to the existing source page, not a second renderer.
+⏳ decided, not built.
+
+</details>
+
+<details><summary>Q20 — LLM prose assistance in wiki articles (research-04 R12; beside Q10) — ANSWERED 2026-10-09</summary>
+
+**Scenario.** Articles can be deterministic (statements grouped under headings) or rewritten into connected prose by the model, with
+every output sentence required to cite an input nugget. **Options.** (a) off by default + verifier; (b) on by default + verifier;
+(c) never. **Cost.** model calls per page when on.
+
+**Answer (2026-10-09, the author):** off by default. Articles are deterministic — each sentence a governed statement with its
+citation. A per-article switch turns on model prose; when on, a verifier drops any output sentence that cites no nugget from the
+section's input or cites one outside it, the text is labelled "synthesized", and it is never evidence or a typed assertion (Q10).
+⏳ decided, not built.
+
+</details>
+
+## ❓ Open
 
 

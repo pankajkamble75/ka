@@ -2,6 +2,21 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 20:30 UTC — questions: Q17, Q18, Q19, Q20 answered (the Knowledge Wiki's decisions); architecture §8a opened
+
+**What changed** — `QUESTIONS-TRACKER.md`: Q18 ANSWERED (generalise plan-10's re-review with a `review_reason`; REJECT retires), Q19
+ANSWERED (the article is a computed projection; only authored artefacts and a publication digest are stored), Q17 ANSWERED (seventh tab
+`7 · Wiki`), Q20 ANSWERED (model prose off by default; sentence-level citation verifier when on). `docs/questions/knowledge-acquisition.md`:
+the four Q&A moved from `❓ Open` into `<details>` ledgers; the open block is empty. `docs/architecture/knowledge-acquisition.md`: new
+§8a "The Knowledge Wiki" (projection rule, edits as proposals, visibility ceiling, no HTML, where it sits, model prose) and the human
+retirement rule under §4 — all ⏳ decided, not built. `RESEARCH-TRACKER.md`: research-04 R1, R7, R10, R11, R12 DECIDED (R11 by constraint
+of Q1/Q4). No code changed.
+
+**Verification** — set table research-04 rendered after commit; registry 0 OPEN; suite not re-run (docs only).
+
+**Decisions and questions** — ANSWERED: Q17, Q18, Q19, Q20 → §4, §8a. Unlocked: research-04's 8 build rows and 1 investigate row are
+plan-able; `ship docs/research/research-04.md` can run the set without parking anything.
+
 ## 2026-10-09 19:55 UTC — research-04: the Knowledge Wiki (from the author's KA-Human-Knowledge-Wiki note)
 
 **What changed** — `docs/research/research-04.md` (verdict: Aligned with corrections; R1–R14; PT1–PT12 adopting the note's twelve acceptance
