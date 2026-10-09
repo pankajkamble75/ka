@@ -104,9 +104,9 @@ def test_N1_a_blocked_link_gets_a_failed_binding_and_no_blob(ka, monkeypatch):
 
 
 def test_N2_unavailable_backends_fail_closed_to_local_with_a_note(tmp_path):
-    with config.scoped(KA_STORAGE_BACKEND="data_platform"):
+    with config.scoped(KA_STORAGE_BACKEND="data_platform", KA_DP_BASE_URL=""):
         st, note = select_physical_store(tmp_path)
-    assert isinstance(st, LocalPhysicalStore) and "plan-19" in note
+    assert isinstance(st, LocalPhysicalStore) and "KA_DP_BASE_URL unset" in note      # plan-19 supplied the store; without a URL it still fails closed
     with config.scoped(KA_STORAGE_BACKEND="s3-magic"):
         st, note = select_physical_store(tmp_path)
     assert isinstance(st, LocalPhysicalStore) and "failing closed" in note

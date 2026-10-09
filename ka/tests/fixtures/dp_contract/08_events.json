@@ -1,0 +1,21 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/v1/events?after=0&limit=200"
+ },
+ "response": {
+  "status": 200,
+  "json_keys": [
+   "events",
+   "next_after"
+  ],
+  "event_types": [
+   "data.asset.committed.v1",
+   "data.asset.quarantined.v1",
+   "data.asset.access_revoked.v1",
+   "data.asset.deleted.v1",
+   "data.index.ready.v1",
+   "data.ingestion.completed.v1"
+  ]
+ }
+}

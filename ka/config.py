@@ -101,6 +101,12 @@ declare("KA_RESEARCH_MAX_SOURCES", int, 3, "ka.research", "Never-extracted sourc
 declare("KA_STORAGE_BACKEND", str, "local", "ka.physical", "local | data_platform. Where source bytes and derived artefacts live; data_platform needs plan-19's HTTP store.")
 declare("KA_TENANT_ID", str, "default", "ka.physical", "Tenant recorded on every physical binding (research-03 R10 interim until Q4/Q16).")
 # [/block plan-18]
+# [block plan-19]
+declare("KA_DP_BASE_URL", str, "", "ka.data_platform", "Data Platform v1 base URL (e.g. https://dp.example/). Empty: the data_platform backend fails closed to local.")
+declare("KA_DP_SERVICE_TOKEN", str, "", "ka.data_platform", "Service token KA presents to the Data Platform; read at call time, never stored or logged.")
+declare("KA_DP_TIMEOUT", float, 20.0, "ka.data_platform", "Per-call timeout in seconds for Data Platform requests.")
+declare("KA_DP_RETRIES", int, 3, "ka.data_platform", "Attempts the plan-20 outbox makes before dead-lettering a Data Platform operation.")
+# [/block plan-19]
 
 _overrides: dict[str, Any] = {}
 

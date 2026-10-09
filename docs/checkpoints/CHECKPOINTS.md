@@ -2,6 +2,31 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-09 12:40 UTC — plan-19: the Data Platform contract as fixtures, a wire-level fake, and the HTTP physical store (research-03 R11 + R2's DP half)
+
+**What changed** — `ka/data_platform/__init__.py`: `DataPlatformError` (envelope: code, message, correlation_id, retryable), `DataPlatformClient`
+(uploads → content → commit, content read with `X-KA-Owner`, exists, derived assets, events; the service token read from `KA_DP_SERVICE_TOKEN`
+at call time; plain HTTP, no cloud SDK). `ka/data_platform/fake.py`: `FakeDataPlatform` — the subset at the wire level: 201/204/200 happy path,
+409 `idempotency_conflict` on a reused key with different bytes (replay returns the same ids), 422 `checksum_mismatch`, 403 `policy_denied`
+(tenant mismatch or PERSONAL not owned), 401, 503/429 via `fail_next`, events for committed/revoked/deleted/quarantined; `as_http()` for
+unit tests, `serve()` for a real local HTTP server. `ka/data_platform/store.py`: `DataPlatformPhysicalStore` (the port's HTTP
+implementation; `from_config` fails closed when `KA_DP_BASE_URL` is unset). `ka/physical.py`: `data_platform` now selects it. Four
+settings. Ten fixtures under `ka/tests/fixtures/dp_contract/` + `docs/contracts/data-platform-v1-ka-subset.md` — the deliverable for the
+Data Platform team. `test_plan19_data_platform.py` (14 cases); `e2e/plan19_dp_flow.py`; `.env.example`; architecture §11.
+plan-18's N2 assertion updated to the new fail-closed wording ("KA_DP_BASE_URL unset") — plan-18's own test, superseded by this plan.
+
+**Why** — research-03 §11: the Data Platform API does not exist; publishing the subset KA needs as executable fixtures and a fake that
+serves them is what unblocks both repositories, and the HTTP store is what makes `KA_STORAGE_BACKEND=data_platform` real.
+
+**Verification** — in-process 299 passed, 2 skipped (exit checked); ruff F clean; no protected code. Verify recount 7/7 D, 8/8 P, 6/6 N;
+blocks 5/5 files (the plan's B6 console row declared no change). Live flow 7/7: the fake served on 127.0.0.1:8099, a second KA server on
+8012 with the DP backend, a paste through the console → binding `available` with DP ids, bytes in the fake, nothing under blobs/, the
+version card reads `bytes · data_platform · available`; screenshot verified. Product tests (research-03): PT1, PT2, PT3, PT8 PASS; PT5's
+physical half PASS (nugget half plan-22); PT4, PT6, PT7, PT9 awaiting plans 20–23.
+
+**Decisions and questions** — BUILT: R11, R2's DP half (architecture §11). Open: Q15, Q16 unchanged; the research's open question "who
+publishes DP v1 first" now has KA's side done — the fixtures exist for DP to adopt. Plan `plan-19`; R11 → UPLOADED.
+
 ## 2026-10-09 11:20 UTC — plan-18: the PhysicalStore port beneath ingestion, the local store, the binding record (research-03 R2, R3)
 
 **What changed** — `ka/physical.py` (new): `PhysicalRef`, the `PhysicalStore` protocol (`put` / `get` / `put_derived` / `exists`),

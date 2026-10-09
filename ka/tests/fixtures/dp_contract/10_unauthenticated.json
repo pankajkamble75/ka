@@ -1,0 +1,16 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads",
+  "headers": {
+   "Authorization": "(missing or wrong)"
+  }
+ },
+ "response": {
+  "status": 401,
+  "envelope": {
+   "code": "unauthenticated",
+   "retryable": false
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads",
+  "headers": {
+   "Idempotency-Key": "ka:default:SRC-1:1"
+  },
+  "json": {
+   "asset_type": "source_document",
+   "tenant_id": "default",
+   "content_type": "text/markdown",
+   "owner": "ops",
+   "visibility": "ENTERPRISE"
+  },
+  "then_content_b64": "ZGlmZmVyZW50IGJ5dGVzCg=="
+ },
+ "response": {
+  "status": 409,
+  "envelope": {
+   "code": "idempotency_conflict",
+   "retryable": false
+  }
+ }
+}

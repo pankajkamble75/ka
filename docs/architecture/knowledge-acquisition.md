@@ -254,7 +254,7 @@ No vector index, no chat, no document browser as the primary view, no agent path
 **Owner:** [research-03](../research/research-03.md). Q&A: Q15 (connector ownership timing), Q16 (tenant interim) in
 [`../questions/knowledge-acquisition.md`](../questions/knowledge-acquisition.md).
 
-**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-23 completes this section.
+**State: ⏳ decided 2026-10-09, being built (plans 18–23).** plan-18 built the port and the binding; plan-19 the contract, the fake and the HTTP store; plan-23 completes this section.
 
 - **The port (R2, ✅ plan-18).** Every byte KA keeps goes through `PhysicalStore.put`, is read back through `get`, and derived artefacts
   go through `put_derived` (`ka/physical.py`). `LocalPhysicalStore` writes `<storage>/blobs/<version-id>.<ext>` exactly as ingestion did
@@ -264,4 +264,10 @@ No vector index, no chat, no document browser as the primary view, no agent path
   ids, sha256, owner, visibility and `status` — says where a `SourceVersion`'s bytes are; a version is usable only when its binding is
   `available` (`Repository.version_available`). A failed physical write or a blocked link yields a `failed` binding and never an
   available version. `SourceVersion` is unchanged; `stored_path` stays for the local backend and for versions ingested before plan-18.
+- **The contract and the HTTP store (R11, R2's DP half, ✅ plan-19).** `docs/contracts/data-platform-v1-ka-subset.md` and the ten executable
+  fixtures under `ka/tests/fixtures/dp_contract/` are the DP v1 subset KA needs; `ka/data_platform/fake.py::FakeDataPlatform` implements it at
+  the wire level (idempotency 409, checksum 422, ACL 403, outage 503, events) and can serve over real HTTP; `ka/data_platform/__init__.py::
+  DataPlatformClient` talks to it (or to the real DP) with the service token read from `KA_DP_SERVICE_TOKEN` at call time;
+  `ka/data_platform/store.py::DataPlatformPhysicalStore` is the port's HTTP implementation. A failed upload yields a `failed` binding —
+  retry is plan-20's outbox.
 - **Tenant (R10 interim, Q16).** `KA_TENANT_ID` (default `default`) until Q4 names the identity provider and tenant model.

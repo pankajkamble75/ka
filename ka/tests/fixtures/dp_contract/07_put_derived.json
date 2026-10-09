@@ -1,0 +1,29 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/derived",
+  "headers": {
+   "Idempotency-Key": "KN-001:v1:ACTIVE"
+  },
+  "json": {
+   "asset_type": "nugget_version",
+   "tenant_id": "default",
+   "parent_asset_id": "{asset_id}",
+   "parent_asset_version_id": "{asset_version_id}",
+   "provenance": {
+    "nugget_ref": "KN-001:v1",
+    "governance_decision_id": "GD-1"
+   },
+   "payload_b64": "eyJyZWYiOiJLTi0wMDE6djEifQ=="
+  }
+ },
+ "response": {
+  "status": 200,
+  "json_keys": [
+   "asset_id",
+   "asset_version_id",
+   "sha256",
+   "state"
+  ]
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads",
+  "headers": {
+   "Idempotency-Key": "ka:default:SRC-1:1",
+   "X-KA-Tenant": "default",
+   "Authorization": "Bearer <service-token>"
+  },
+  "json": {
+   "asset_type": "source_document",
+   "tenant_id": "default",
+   "content_type": "text/markdown",
+   "owner": "ops",
+   "visibility": "ENTERPRISE"
+  }
+ },
+ "response": {
+  "status": 201,
+  "json_keys": [
+   "upload_id"
+  ]
+ }
+}

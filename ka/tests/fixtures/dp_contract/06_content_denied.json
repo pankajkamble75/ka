@@ -1,0 +1,17 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/v1/assets/{asset_id}/versions/{asset_version_id}/content",
+  "headers": {
+   "X-KA-Owner": "someone-else"
+  },
+  "precondition": "asset visibility PERSONAL owned by ops"
+ },
+ "response": {
+  "status": 403,
+  "envelope": {
+   "code": "policy_denied",
+   "retryable": false
+  }
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads/{upload_id}/commit",
+  "json": {
+   "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+ },
+ "response": {
+  "status": 422,
+  "envelope": {
+   "code": "checksum_mismatch",
+   "retryable": false
+  }
+ }
+}

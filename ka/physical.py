@@ -86,10 +86,10 @@ def select_physical_store(root: Path) -> tuple[PhysicalStore, str | None]:
         return LocalPhysicalStore(root), None
     if choice == "data_platform":
         try:
-            from ka.data_platform import DataPlatformPhysicalStore  # plan-19 supplies it
+            from ka.data_platform.store import DataPlatformPhysicalStore  # plan-19
             return DataPlatformPhysicalStore.from_config(root), None
-        except ImportError:
-            return LocalPhysicalStore(root), "data_platform backend requested; the HTTP store arrives with plan-19 — using local"
+        except ImportError as e:                                           # ConfigurationError is an ImportError: fail closed, say why
+            return LocalPhysicalStore(root), f"data_platform backend requested but {e}; failing closed to local"
     return LocalPhysicalStore(root), f"unknown KA_STORAGE_BACKEND {choice!r}; failing closed to local"
 
 

@@ -1,0 +1,14 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads",
+  "precondition": "DP unavailable"
+ },
+ "response": {
+  "status": 503,
+  "envelope": {
+   "code": "unavailable",
+   "retryable": true
+  }
+ }
+}

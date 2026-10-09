@@ -1,0 +1,22 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/v1/assets/uploads/{upload_id}/commit",
+  "json": {
+   "sha256": "81c44010900e0b8c3d03016ae23982a29ea9e002dc3a212344ec22d866373a55"
+  }
+ },
+ "response": {
+  "status": 200,
+  "json_keys": [
+   "asset_id",
+   "asset_version_id",
+   "sha256",
+   "state"
+  ],
+  "json_values": {
+   "sha256": "81c44010900e0b8c3d03016ae23982a29ea9e002dc3a212344ec22d866373a55",
+   "state": "available"
+  }
+ }
+}

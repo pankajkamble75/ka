@@ -1,0 +1,13 @@
+{
+ "request": {
+  "method": "PUT",
+  "path": "/v1/assets/uploads/{upload_id}/content",
+  "headers": {
+   "Content-Type": "application/octet-stream"
+  },
+  "body_b64": "TWVyY2hhbnQgQSByZWZ1bmRzIGFib3ZlICQ1MDAgcmVxdWlyZSBtYW5hZ2VyIGFwcHJvdmFsLgo="
+ },
+ "response": {
+  "status": 204
+ }
+}
