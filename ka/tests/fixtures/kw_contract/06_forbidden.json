@@ -43,7 +43,8 @@
  },
  "expect": {
   "status": 403,
-  "envelope_status": "error",
-  "error_code": "FORBIDDEN"
+  "envelope_status": "FORBIDDEN",
+  "error_status": "FORBIDDEN",
+  "error_class": "forbidden"
  }
 }

@@ -1,6 +1,6 @@
 # Knowledge Worker v1 — the KA intake contract (KA's side, published for Knowledge Worker to implement)
 
-**Status:** PROPOSED v1, 2026-10-10. Written by KA (`pankajkamble75/ka`, research-05 R7, plan-31) at the Knowledge Worker session's request;
+**Status:** PROPOSED v1, 2026-10-10; envelope aligned to KW v1 exactly (KW session, same day). Written by KA (`pankajkamble75/ka`, research-05 R7, plan-31) at the Knowledge Worker session's request;
 that session accepted the shape the same day and implements it in `pankajkamble75/knowledge-worker` (service on `http://127.0.0.1:8101`).
 Conventions follow KW's `docs/contracts/agentx-knowledge-worker-v1.md` §2–§5 (headers, auth, envelope, statuses).
 **Executable fixtures:** `ka/tests/fixtures/kw_contract/*.json` (request → expected response, run against `ka/knowledge_worker/fake.py`).
@@ -18,7 +18,7 @@ proposals**, every node and edge carrying `props.knowledge_lineage`, and learns 
 | Base | `{KW}/v1` (KA setting `KA_KW_URL`, e.g. `http://127.0.0.1:8101`) |
 | Auth | `Authorization: Bearer <token>` — KW mints KA its own token (client id `ka`, stored hashed in `KW_SERVICE_TOKENS`) with scopes `graph-changes:propose` (intake) and `graphs:read` (grammar, versions). KA setting `KA_KW_TOKEN`. |
 | Headers | `X-Correlation-ID` (KA sends the AgentX correlation id or KA's proposal id), `Content-Type: application/json` |
-| Envelope | `{contract_version: "1", correlation_id, status: "ok" \| "error", result, error: {status, code, message, retryable, detail}, provenance}` |
+| Envelope | KW v1's, exactly as AgentX uses it: `{contract_version: "knowledge-worker/v1", correlation_id, status, result, error, provenance}`. `status` is `"OK"` on success, otherwise KW's typed status in caps. `error` = `{status: <typed status>, code: <AgentX ErrorClass>, message, retryable, detail}` |
 
 ## 3. Submit a change — `POST /v1/graph-changes` (scope `graph-changes:propose`)
 
@@ -42,7 +42,7 @@ proposals**, every node and edge carrying `props.knowledge_lineage`, and learns 
   refuse an op without it (`INVALID_REQUEST`).
 - **KW decides.** It may apply at once (its HOTL policy) or hold for its own approval.
 
-Result (`200`, `status: "ok"`):
+Result (`200`, `status: "OK"`):
 
 ```json
 {"proposal_id": "prop-1a2b3c", "status": "applied", "applied_digest": "<new instance digest>", "new_version": null,
@@ -52,16 +52,17 @@ Result (`200`, `status: "ok"`):
 `status` is `awaiting_approval | applied | refused`. A repeat with the same `idempotency_key` **and the same body** returns the existing
 proposal (no second change); the same key with a different body is `CONFLICT`.
 
-Errors (`status: "error"`):
+Errors (envelope `status` = `error.status` = the typed status; `error.code` = the AgentX ErrorClass, which KA passes straight to the AgentX
+operation):
 
-| HTTP | `error.code` | when |
-|---|---|---|
-| 409 | `STALE_BASE` | `base_digest` / `base_version` is not the current one |
-| 422 | `INVALID_REQUEST` | malformed body, unknown op, missing `knowledge_lineage`, grammar violation (`detail.findings`) |
-| 404 | `UNKNOWN_INSTANCE` | target instance or substructure does not exist |
-| 403 | `FORBIDDEN` | token lacks `graph-changes:propose` |
-| 409 | `CONFLICT` | same `idempotency_key`, different body |
-| 503 | `UNAVAILABLE` | KW cannot take changes now (`retryable: true`) |
+| HTTP | `error.status` | `error.code` | when |
+|---|---|---|---|
+| 409 | `STALE_BASE` | `stale_version` | `base_digest` / `base_version` is not the current one |
+| 422 | `INVALID_REQUEST` | `schema_invalid` | malformed body, unknown op, missing `knowledge_lineage`, grammar violation (`detail.findings`) |
+| 404 | `UNKNOWN_INSTANCE` | `not_found` | target instance or substructure does not exist |
+| 403 | `FORBIDDEN` | `forbidden` | token lacks `graph-changes:propose` |
+| 409 | `CONFLICT` | `conflict` | same `idempotency_key`, different body |
+| 503 | `DEPENDENCY_UNAVAILABLE` | `unavailable` | KW cannot take changes now (`retryable: true`) |
 
 ## 4. Outcome — `GET /v1/graph-changes/{proposal_id}` (scope `graph-changes:propose`)
 

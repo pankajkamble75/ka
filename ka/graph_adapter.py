@@ -663,7 +663,7 @@ class KnowledgeWorkerHTTPAdapter(InMemoryGraphAdapter):
             return self.client.propose(target=self.kw_target(scope, base_version), ops=ops, reason=reason, actor=actor, knowledge_refs=refs,
                                        idempotency_key=key, correlation_id=graph_change_id or gcp)
         except KnowledgeWorkerError as e:
-            raise PublishRefused(e.code, e.message, [e.detail] if e.detail else []) from None
+            raise PublishRefused(e.code, e.message, [{"error_class": e.error_class, "detail": e.detail}]) from None
 
     def publish(self, scope, changes, *, actor, reason, base_version, rollback=False):
         import time as _t

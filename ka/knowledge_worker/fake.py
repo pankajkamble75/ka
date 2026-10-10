@@ -16,9 +16,20 @@ from typing import Any, Optional
 GRAPH_CHANGE = re.compile(r"^/v1/graph-changes/([^/]+)$")
 
 
+CONTRACT = "knowledge-worker/v1"
+# KW's typed status → AgentX ErrorClass (KW session, 2026-10-10: error.status is KW's typed status, error.code is the AgentX class)
+ERROR_CLASS = {"STALE_BASE": "stale_version", "CONFLICT": "conflict", "INVALID_REQUEST": "schema_invalid", "UNKNOWN_INSTANCE": "not_found",
+               "NOT_FOUND": "not_found", "FORBIDDEN": "forbidden", "UNAUTHORIZED": "unauthorized", "DEPENDENCY_UNAVAILABLE": "unavailable"}
+
+
 def _env(result: Any = None, *, correlation_id: str = "", error: Optional[dict] = None) -> dict[str, Any]:
-    return {"contract_version": "1", "correlation_id": correlation_id, "status": "error" if error else "ok", "result": result, "error": error,
-            "provenance": {"service": "knowledge-worker-fake"}}
+    """KW v1's envelope: status "OK", or the typed error status in caps; error {status (typed), code (AgentX class), message, retryable, detail}."""
+    if error:
+        typed = error["status"]
+        error = {"status": typed, "code": ERROR_CLASS.get(typed, "internal"), "message": error["message"],
+                 "retryable": error.get("retryable", typed == "DEPENDENCY_UNAVAILABLE"), "detail": error.get("detail")}
+    return {"contract_version": CONTRACT, "correlation_id": correlation_id, "status": error["status"] if error else "OK", "result": result,
+            "error": error, "provenance": {"service": "knowledge-worker-fake"}}
 
 
 class FakeKnowledgeWorker:
@@ -76,7 +87,7 @@ class FakeKnowledgeWorker:
         cid = h.get("x-correlation-id", "")
         auth = h.get("authorization", "")
         if auth != f"Bearer {self.token}":
-            return 401, _env(correlation_id=cid, error={"status": 401, "code": "UNAUTHORIZED", "message": "bad token", "retryable": False})
+            return 401, _env(correlation_id=cid, error={"status": "UNAUTHORIZED", "message": "bad token"})
         path = path.split("?", 1)[0]
         if method == "GET" and path == "/healthz":
             return 200, {"status": "ok", "service_id": "knowledge-worker", "version": "fake"}
@@ -94,20 +105,20 @@ class FakeKnowledgeWorker:
                               "instances": {k: {"graph_digest": self._digest(v), "pins": {}} for k, v in self.instances.items()},
                               "library": {"patterns": [], "data_objects": []}, "import": {}}, correlation_id=cid)
         if "graph-changes:propose" not in self.scopes:
-            return 403, _env(correlation_id=cid, error={"status": 403, "code": "FORBIDDEN", "message": "graph-changes:propose required", "retryable": False})
+            return 403, _env(correlation_id=cid, error={"status": "FORBIDDEN", "message": "graph-changes:propose required"})
         m = GRAPH_CHANGE.match(path)
         if method == "GET" and m:
             p = self.proposals.get(m.group(1))
             if p is None:
-                return 404, _env(correlation_id=cid, error={"status": 404, "code": "NOT_FOUND", "message": "no proposal", "retryable": False})
+                return 404, _env(correlation_id=cid, error={"status": "NOT_FOUND", "message": "no proposal"})
             return 200, _env(dict(p["result"]), correlation_id=cid)
         if method == "POST" and path == "/v1/graph-changes":
             return self._propose(json.loads(body or b"{}"), cid)
-        return 404, _env(correlation_id=cid, error={"status": 404, "code": "NOT_FOUND", "message": f"{method} {path}", "retryable": False})
+        return 404, _env(correlation_id=cid, error={"status": "NOT_FOUND", "message": f"{method} {path}"})
 
     def _propose(self, req: dict[str, Any], cid: str) -> tuple[int, dict[str, Any]]:
         self.requests.append(req)
-        err = lambda s, code, msg, **kw: (s, _env(correlation_id=cid, error={"status": s, "code": code, "message": msg, "retryable": False, **kw}))  # noqa: E731
+        err = lambda s, typed, msg, **kw: (s, _env(correlation_id=cid, error={"status": typed, "message": msg, **kw}))  # noqa: E731
         t, ops, key = req.get("target") or {}, req.get("ops"), req.get("idempotency_key")
         if not isinstance(ops, list) or not key or t.get("kind") not in ("instance", "substructure") or not t.get("id"):
             return err(422, "INVALID_REQUEST", "target {kind, id}, ops[] and idempotency_key are required")

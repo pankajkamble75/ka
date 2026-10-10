@@ -53,11 +53,12 @@ def test_P1_every_contract_fixture_holds_against_the_fake(name):
     e = fx["expect"]
     assert status == e["status"]
     if "envelope_status" in e:
-        assert data["contract_version"] == "1" and data["status"] == e["envelope_status"] and data["correlation_id"] == "c1"
+        assert data["contract_version"] == "knowledge-worker/v1" and data["status"] == e["envelope_status"] and data["correlation_id"] == "c1"
     if "result_status" in e:
         assert data["result"]["status"] == e["result_status"]
-    if "error_code" in e:
-        assert data["error"]["code"] == e["error_code"] and set(data["error"]) >= {"status", "code", "message", "retryable"}
+    if "error_status" in e:                                         # KW v1: error.status is the typed status, error.code the AgentX class
+        assert data["error"]["status"] == e["error_status"] and data["error"]["code"] == e["error_class"]
+        assert set(data["error"]) >= {"status", "code", "message", "retryable", "detail"}
     if "new_version" in e:
         assert data["result"]["new_version"] == e["new_version"]
     for k in e.get("keys", []):
@@ -178,7 +179,7 @@ def test_N1_stale_base_fails_the_operation_and_leaves_the_proposal_approved(tmp_
     ka.repo.proposals.put(p)
     c = _client(ka)
     st = _poll(c, _invoke(c, "knowledge.publish", {"proposal_id": p.id})["operation_id"])
-    assert st["status"] == "failed" and st["error"]["code"] == "conflict" and st["error"]["details"]["kw_code"] == "STALE_BASE"
+    assert st["status"] == "failed" and st["error"]["code"] == "stale_version" and st["error"]["details"]["kw_code"] == "STALE_BASE"
     assert ka.repo.proposals.require(p.id).status == ProposalStatus.APPROVED
     set_ka(None)
 
@@ -200,7 +201,7 @@ def test_N3_kw_unreachable_and_grammar_url_unreachable(tmp_path):
     from ka.knowledge_worker.client import KnowledgeWorkerError
     with pytest.raises(KnowledgeWorkerError) as e:
         client.get("prop-x")
-    assert e.value.code == "UNAVAILABLE" and e.value.retryable
+    assert e.value.code == "DEPENDENCY_UNAVAILABLE" and e.value.error_class == "unavailable" and e.value.retryable
     with config.scoped(KA_GRAMMAR_URL="http://127.0.0.1:9/v1/graph-model"):
         reg = GrammarRegistry.from_config(tmp_path)
     assert not reg.loaded and reg.load_error

@@ -250,9 +250,10 @@ def _await_kw(ka, ctx, pid: str, by: str) -> None:
     scope = ka.adapter.scope_for_graph(p.affected_graph_ids[0]) if p.affected_graph_ids else ka.repo.require_version(p.knowledge_change_ids[0]).scope
     try:
         res = ka.adapter.submit(scope, p.changes, actor=by, reason=p.reason, base_version=p.eos_base_version, graph_change_id=pid)
-    except PublishRefused as e:
-        raise AgentXError("unavailable" if e.code in ("UNAVAILABLE",) else ("forbidden" if e.code == "FORBIDDEN" else "conflict"),
-                          f"Knowledge Worker refused the change: {e}", details={"kw_code": e.code}) from None
+    except PublishRefused as e:                                     # KW sends its AgentX ErrorClass in error.code; KA passes it through
+        cls = (e.findings[0] or {}).get("error_class") if e.findings and isinstance(e.findings[0], dict) else None
+        raise AgentXError(cls or "conflict", f"Knowledge Worker refused the change: {e}", details={"kw_code": e.code},
+                          retryable=e.code == "DEPENDENCY_UNAVAILABLE") from None
     ctx.progress(0.3, "awaiting Knowledge Worker", kw_proposal_id=res.get("proposal_id"))
     while res.get("status") == "awaiting_approval":
         if ctx.cancelled():
@@ -262,7 +263,7 @@ def _await_kw(ka, ctx, pid: str, by: str) -> None:
             res = ka.adapter.client.get(res["proposal_id"])
         except KnowledgeWorkerError as e:
             if not e.retryable:
-                raise AgentXError("conflict", f"Knowledge Worker: {e}", details={"kw_code": e.code}) from None
+                raise AgentXError(e.error_class or "conflict", f"Knowledge Worker: {e}", details={"kw_code": e.code}) from None
     if res.get("status") != "applied":
         raise AgentXError("conflict", f"Knowledge Worker proposal {res.get('proposal_id')} is {res.get('status')}",
                           details={"kw_proposal_id": res.get("proposal_id"), "kw_status": res.get("status")})

@@ -45,7 +45,7 @@
  },
  "expect": {
   "status": 200,
-  "envelope_status": "ok",
+  "envelope_status": "OK",
   "result_status": "applied"
  }
 }

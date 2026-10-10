@@ -62,4 +62,6 @@ def test_N2c_PT10_pre_wiki_test_files_are_byte_identical_to_the_last_pre_wiki_co
     tracked = subprocess.run(["git", "status", "--short", "--", "ka/tests"], cwd=ROOT, capture_output=True, text=True).stdout.split("\n")
     # only files that existed before the wiki can be "pre-wiki files modified": new untracked files (`??`) are not (plan-31's fixtures)
     dirty = {l.split()[-1] for l in tracked if l.strip() and not l.startswith("??") and not re.search(r"plan(2[5-9]|[3-9][0-9])", l)}
+    # a file that did not exist at BASE is not a pre-wiki file, whatever its name (the plan-31 Knowledge Worker fixtures)
+    dirty = {p for p in dirty if subprocess.run(["git", "cat-file", "-e", f"{BASE}:{p}"], cwd=ROOT, capture_output=True).returncode == 0}
     assert not dirty, f"pre-wiki test files modified in the working tree: {sorted(dirty)}"

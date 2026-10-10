@@ -38,7 +38,8 @@
  },
  "expect": {
   "status": 404,
-  "envelope_status": "error",
-  "error_code": "UNKNOWN_INSTANCE"
+  "envelope_status": "UNKNOWN_INSTANCE",
+  "error_status": "UNKNOWN_INSTANCE",
+  "error_class": "not_found"
  }
 }

@@ -41,7 +41,8 @@
  },
  "expect": {
   "status": 409,
-  "envelope_status": "error",
-  "error_code": "STALE_BASE"
+  "envelope_status": "STALE_BASE",
+  "error_status": "STALE_BASE",
+  "error_class": "stale_version"
  }
 }

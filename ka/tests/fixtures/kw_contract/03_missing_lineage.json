@@ -31,7 +31,8 @@
  },
  "expect": {
   "status": 422,
-  "envelope_status": "error",
-  "error_code": "INVALID_REQUEST"
+  "envelope_status": "INVALID_REQUEST",
+  "error_status": "INVALID_REQUEST",
+  "error_class": "schema_invalid"
  }
 }

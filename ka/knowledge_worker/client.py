@@ -14,9 +14,12 @@ Transport = Callable[[str, str, dict[str, str], Optional[bytes]], tuple[int, byt
 
 
 class KnowledgeWorkerError(RuntimeError):
-    def __init__(self, status: int, code: str, message: str, *, retryable: bool = False, detail: Any = None):
+    """`code` is KW's typed status (STALE_BASE, CONFLICT, …); `error_class` is the AgentX ErrorClass KW sends in `error.code`."""
+
+    def __init__(self, status: int, code: str, message: str, *, retryable: bool = False, detail: Any = None, error_class: str | None = None):
         super().__init__(f"{status} {code}: {message}")
         self.status, self.code, self.message, self.retryable, self.detail = status, code, message, retryable, detail
+        self.error_class = error_class
 
 
 def _urllib(method: str, url: str, headers: dict[str, str], body: Optional[bytes]) -> tuple[int, bytes]:
@@ -46,7 +49,8 @@ class KnowledgeWorkerClient:
         try:
             status, raw = self.http(method, self.base_url + path, headers, json.dumps(body).encode() if body is not None else None)
         except (urllib.error.URLError, OSError, TimeoutError) as e:
-            raise KnowledgeWorkerError(503, "UNAVAILABLE", f"{type(e).__name__}: {e}", retryable=True) from None
+            raise KnowledgeWorkerError(503, "DEPENDENCY_UNAVAILABLE", f"{type(e).__name__}: {e}", retryable=True,
+                                       error_class="unavailable") from None
         try:
             data = json.loads(raw or b"{}")
         except ValueError:
@@ -56,10 +60,11 @@ class KnowledgeWorkerClient:
                 err = data.get("error") if isinstance(data, dict) else None
                 raise KnowledgeWorkerError(status, (err or {}).get("code", "ERROR"), (err or {}).get("message", f"HTTP {status}"))
             return data
-        if status >= 300 or data.get("status") == "error":
+        if status >= 300 or data.get("status") != "OK":                    # KW v1: "OK", else the typed error status in caps
             err = data.get("error") or {}
-            raise KnowledgeWorkerError(status, err.get("code") or "ERROR", err.get("message") or f"HTTP {status}",
-                                       retryable=bool(err.get("retryable", status >= 500)), detail=err.get("detail"))
+            typed = err.get("status") if isinstance(err.get("status"), str) else (data.get("status") or "ERROR")
+            raise KnowledgeWorkerError(status, typed, err.get("message") or f"HTTP {status}", retryable=bool(err.get("retryable", status >= 500)),
+                                       detail=err.get("detail"), error_class=err.get("code"))
         return data.get("result") or {}
 
     def propose(self, *, target: dict[str, Any], ops: list[dict[str, Any]], reason: str, actor: str, knowledge_refs: list[dict[str, Any]],

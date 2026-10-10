@@ -2,6 +2,22 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 20:00 UTC — Knowledge Worker contract: KW v1's envelope exactly
+
+**What changed** — at the Knowledge Worker session's request, KA's intake contract now uses KW v1's envelope as AgentX does. The fields
+are `contract_version: "knowledge-worker/v1"` and `status` `"OK"` or the typed error status in caps. `error` is `{status: typed (STALE_BASE,
+CONFLICT, INVALID_REQUEST, UNKNOWN_INSTANCE, FORBIDDEN, DEPENDENCY_UNAVAILABLE), code: AgentX ErrorClass, message, retryable, detail}`;
+503 is `DEPENDENCY_UNAVAILABLE`. Files:
+`docs/contracts/knowledge-worker-v1-ka.md` §2–§3 (error table with both columns), `ka/knowledge_worker/fake.py`, `ka/knowledge_worker/client.py`
+(`KnowledgeWorkerError.code` = typed status, `.error_class` = AgentX class), `ka/graph_adapter.py` (the KW adapter carries the class),
+`ka/agentx/governance_caps.py` (a refusal passes KW's AgentX class through, so `STALE_BASE` reaches AgentX as `stale_version`, not
+`conflict`). Fixtures 01–07 now check `envelope.status` and `error.status`/`error.code`. Plan-31 tests N1/N3 follow the contract. Plan-28's
+working-tree gate now counts only files that existed at its base, matching its committed-file half.
+
+**Verification** — 487 passed, 2 skipped (exit checked); ruff F clean; plan-31 flow 7/7; two-process flow 11/11.
+
+**Decisions and questions** — none; a contract correction from the peer that implements it.
+
 ## 2026-10-10 19:30 UTC — research-05 follow-up from the peers: publish timeout for AgentX, Knowledge Worker's real graph-versions shape
 
 **What changed** — `ka/agentx/governance_caps.py`: `knowledge.publish` declares `timeout.operation_s = 604800` (was the 600 s default).
