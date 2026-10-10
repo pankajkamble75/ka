@@ -239,8 +239,9 @@ async def _read_capped(request: Request, file: UploadFile) -> bytes:
 
 @router.get("/healthz")
 def healthz(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
+    from ka.agentx.router import health_payload          # plan-29 (research-05 R2): AgentX's Health keys, added beside the old ones
     return {"ok": True, "version": __version__, "provider": getattr(ka.provider, "name", "?"),
-            "adapter": type(ka.adapter).__name__, "storage": str(ka.repo.root)}
+            "adapter": type(ka.adapter).__name__, "storage": str(ka.repo.root), **{k: v for k, v in health_payload(ka).items() if k != "version"}}
 
 
 # ---- scopes (§27, §28)
@@ -1300,6 +1301,26 @@ def create_app(ka: KnowledgeAcquisition | None = None) -> FastAPI:
     app = FastAPI(title="Enterprise OS — Knowledge Acquisition", version=__version__,
                   description="Acquire · Govern · Know · Compile · (Graph) · Operate · Observe/Correct")
     app.include_router(router)
+    # [block plan-29] research-05 R2, R3, R10: the AgentX services contract under {PREFIX}/v1, with AgentX's error envelope
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse as _JSON
+
+    from ka.agentx.contract import AgentXError
+    from ka.agentx.router import agentx_error_handler, build_router
+    app.include_router(build_router(get_ka), prefix=PREFIX)
+    app.add_exception_handler(AgentXError, agentx_error_handler)
+    _default_validation = app.exception_handlers.get(RequestValidationError)
+
+    async def _validation(request, exc):
+        if request.url.path.startswith(PREFIX + "/v1"):
+            return _JSON(AgentXError("schema_invalid", "the request does not match the contract",
+                                     details={"errors": [{k: e.get(k) for k in ("loc", "msg", "type")} for e in exc.errors()]}).envelope(), status_code=400)
+        if _default_validation is not None:
+            return await _default_validation(request, exc)
+        from fastapi.exception_handlers import request_validation_exception_handler
+        return await request_validation_exception_handler(request, exc)
+    app.add_exception_handler(RequestValidationError, _validation)
+    # [/block plan-29]
 
     @app.get("/", include_in_schema=False)
     def root() -> HTMLResponse:

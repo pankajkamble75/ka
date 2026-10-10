@@ -1,0 +1,43 @@
+{
+ "$id": "Health.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "checks": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "service_id": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "status": {
+   "default": "ok",
+   "enum": [
+    "ok",
+    "degraded",
+    "down"
+   ],
+   "type": "string"
+  },
+  "version": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  }
+ },
+ "type": "object"
+}

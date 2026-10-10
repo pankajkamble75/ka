@@ -602,6 +602,34 @@ class WikiPublication(BaseModel):
 # [/block plan-25]
 
 
+# [block plan-29]
+class Operation(BaseModel):
+    """One AgentX invocation (research-05 R3): AgentX's `OperationState` plus what KA needs to keep it durable, idempotent and auditable."""
+    id: str = Field(default_factory=lambda: new_id("operation"))
+    capability_id: str
+    capability_version: str = "1.0.0"
+    status: str = "accepted"                           # accepted | running | awaiting_input | succeeded | failed | cancelled | timed_out
+    progress: float = 0.0
+    message: str | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
+    interaction: dict[str, Any] | None = None
+    references: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str | None = None
+    request_hash: str = ""
+    request_id: str | None = None
+    correlation_id: str | None = None
+    caller_service: str = "agentx"
+    user: str | None = None
+    permissions: list[str] = Field(default_factory=list)
+    callback_url: str | None = None
+    cancel_requested: bool = False
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+# [/block plan-29]
+
+
 # ---------------------------------------------------------------- connectors (research-01 R10 — plan-08)
 
 

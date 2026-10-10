@@ -1,0 +1,33 @@
+{
+ "$id": "HumanInteraction.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "properties": {
+  "interaction_id": {
+   "type": "string"
+  },
+  "prompt": {
+   "default": "",
+   "type": "string"
+  },
+  "required_permission": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "ui_schema": {
+   "additionalProperties": true,
+   "type": "object"
+  }
+ },
+ "required": [
+  "interaction_id",
+  "ui_schema"
+ ],
+ "type": "object"
+}

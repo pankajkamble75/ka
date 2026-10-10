@@ -1,0 +1,167 @@
+{
+ "$defs": {
+  "Discovery": {
+   "additionalProperties": true,
+   "properties": {
+    "category": {
+     "default": "general",
+     "type": "string"
+    },
+    "examples": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "keywords": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "processes": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "tags": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    }
+   },
+   "type": "object"
+  },
+  "Invocation": {
+   "properties": {
+    "endpoint": {
+     "default": "/v1/capabilities/{capability_id}/invoke",
+     "type": "string"
+    },
+    "mode": {
+     "default": "sync",
+     "enum": [
+      "sync",
+      "async"
+     ],
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "RetryPolicy": {
+   "properties": {
+    "backoff_s": {
+     "default": 0.5,
+     "maximum": 60,
+     "minimum": 0,
+     "type": "number"
+    },
+    "max_attempts": {
+     "default": 3,
+     "maximum": 10,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "type": "object"
+  },
+  "TimeoutPolicy": {
+   "properties": {
+    "operation_s": {
+     "default": 300.0,
+     "exclusiveMinimum": 0,
+     "maximum": 604800,
+     "type": "number"
+    },
+    "request_s": {
+     "default": 30.0,
+     "exclusiveMinimum": 0,
+     "maximum": 600,
+     "type": "number"
+    }
+   },
+   "type": "object"
+  }
+ },
+ "$id": "CapabilityDescriptor.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "deprecated": {
+   "default": false,
+   "type": "boolean"
+  },
+  "description": {
+   "default": "",
+   "type": "string"
+  },
+  "discovery": {
+   "$ref": "#/$defs/Discovery"
+  },
+  "health_endpoint": {
+   "default": "/healthz",
+   "type": "string"
+  },
+  "id": {
+   "type": "string"
+  },
+  "idempotent": {
+   "default": true,
+   "type": "boolean"
+  },
+  "input_schema": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "invocation": {
+   "$ref": "#/$defs/Invocation"
+  },
+  "output_schema": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "permissions": {
+   "items": {
+    "type": "string"
+   },
+   "type": "array"
+  },
+  "requires_approval": {
+   "default": false,
+   "type": "boolean"
+  },
+  "retry": {
+   "$ref": "#/$defs/RetryPolicy"
+  },
+  "timeout": {
+   "$ref": "#/$defs/TimeoutPolicy"
+  },
+  "title": {
+   "type": "string"
+  },
+  "ui_schema": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "version": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "version",
+  "title"
+ ],
+ "type": "object"
+}

@@ -162,3 +162,9 @@ class AuthorityPolicy:
 
     def set_rank(self, scope_type: ScopeType, scope_id: str, authority: AuthorityType, rank: int) -> None:
         self._overrides.setdefault(f"{scope_type.value}:{scope_id}", {})[authority] = rank
+
+# [block plan-29] research-05 R2, R10: the AgentX services contract (PROPOSED v1)
+declare("KA_SERVICE_ID", str, "knowledge-acquisition", "ka.agentx", "The service id KA reports to AgentX (healthz, capabilities).")
+declare("KA_AGENTX_TOKEN", str, "", "ka.agentx", "Bearer token AgentX presents on /v1 (AgentX keeps it as AGENTX_KNOWLEDGE_ACQUISITION_TOKEN). "
+        "Set → required on every /v1 call, also from loopback; unset → the console's access policy applies to /v1.")
+# [/block plan-29]

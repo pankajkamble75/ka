@@ -1,0 +1,93 @@
+{
+ "$id": "OperationState.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "capability_id": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "error": {
+   "anyOf": [
+    {
+     "$ref": "ErrorInfo.schema.json"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "interaction": {
+   "anyOf": [
+    {
+     "$ref": "HumanInteraction.schema.json"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "message": {
+   "default": "",
+   "type": "string"
+  },
+  "operation_id": {
+   "type": "string"
+  },
+  "progress": {
+   "anyOf": [
+    {
+     "maximum": 1,
+     "minimum": 0,
+     "type": "number"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "references": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "result": {
+   "anyOf": [
+    {
+     "additionalProperties": true,
+     "type": "object"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "status": {
+   "enum": [
+    "accepted",
+    "running",
+    "awaiting_input",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "timed_out"
+   ],
+   "type": "string"
+  }
+ },
+ "required": [
+  "operation_id",
+  "status"
+ ],
+ "type": "object"
+}

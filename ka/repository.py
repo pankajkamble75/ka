@@ -17,6 +17,7 @@ from ka.model import (
     Connection,
     Evidence,
     DerivedArtefact,
+    Operation,
     WikiDraft,
     WikiEditProposal,
     WikiPage,
@@ -124,6 +125,9 @@ class Repository:
         # [block plan-22]
         self.derived_artefacts = Collection(r, "derived_artefacts", DerivedArtefact)
         # [/block plan-22]
+        # [block plan-29]
+        self.operations = Collection(r, "operations", Operation)
+        # [/block plan-29]
         # [block plan-25]
         self.wiki_pages = Collection(r, "wiki_pages", WikiPage, id_field="key")
         self.wiki_drafts = Collection(r, "wiki_drafts", WikiDraft)

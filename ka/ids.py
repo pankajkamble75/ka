@@ -25,6 +25,7 @@ PREFIXES = {
     "op": "OP",
     "derived": "DA",
     "wiki_draft": "WD",
+    "operation": "AXO",
     "wiki_proposal": "WP",
     "wiki_publication": "WU",
 }

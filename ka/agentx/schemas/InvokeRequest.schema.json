@@ -1,0 +1,78 @@
+{
+ "$defs": {
+  "Caller": {
+   "properties": {
+    "permissions": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "service_id": {
+     "type": "string"
+    },
+    "user": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    }
+   },
+   "required": [
+    "service_id"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "InvokeRequest.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "properties": {
+  "callback_url": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "caller": {
+   "$ref": "#/$defs/Caller"
+  },
+  "capability_version": {
+   "type": "string"
+  },
+  "correlation_id": {
+   "type": "string"
+  },
+  "idempotency_key": {
+   "type": "string"
+  },
+  "input": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "request_id": {
+   "type": "string"
+  },
+  "schema_version": {
+   "default": "1",
+   "type": "string"
+  }
+ },
+ "required": [
+  "request_id",
+  "idempotency_key",
+  "correlation_id",
+  "capability_version",
+  "caller"
+ ],
+ "type": "object"
+}

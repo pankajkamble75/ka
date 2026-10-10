@@ -1,0 +1,17 @@
+{
+ "$id": "OperationEvent.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "properties": {
+  "operation": {
+   "$ref": "OperationState.schema.json"
+  },
+  "service_id": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "service_id",
+  "operation"
+ ],
+ "type": "object"
+}

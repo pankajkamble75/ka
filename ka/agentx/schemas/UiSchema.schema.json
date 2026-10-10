@@ -1,0 +1,362 @@
+{
+ "$defs": {
+  "Action": {
+   "additionalProperties": false,
+   "properties": {
+    "capability": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "confirm": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "id": {
+     "type": "string"
+    },
+    "kind": {
+     "default": "submit",
+     "enum": [
+      "submit",
+      "approve",
+      "reject",
+      "invoke"
+     ],
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    },
+    "style": {
+     "default": "default",
+     "enum": [
+      "primary",
+      "danger",
+      "default"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "label"
+   ],
+   "type": "object"
+  },
+  "Binding": {
+   "additionalProperties": false,
+   "properties": {
+    "path": {
+     "default": "",
+     "type": "string"
+    },
+    "source": {
+     "default": "result",
+     "enum": [
+      "result",
+      "input",
+      "operation",
+      "interaction"
+     ],
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "Column": {
+   "additionalProperties": false,
+   "properties": {
+    "format": {
+     "default": "text",
+     "enum": [
+      "text",
+      "number",
+      "currency",
+      "date",
+      "datetime",
+      "boolean",
+      "status"
+     ],
+     "type": "string"
+    },
+    "key": {
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "key",
+    "label"
+   ],
+   "type": "object"
+  },
+  "FieldSpec": {
+   "additionalProperties": false,
+   "properties": {
+    "binding": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "default": {
+     "default": null
+    },
+    "help": {
+     "default": "",
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    },
+    "max": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "max_length": {
+     "anyOf": [
+      {
+       "maximum": 100000,
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "min": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "name": {
+     "type": "string"
+    },
+    "options": {
+     "items": {
+      "$ref": "#/$defs/Option"
+     },
+     "maxItems": 500,
+     "type": "array"
+    },
+    "pattern": {
+     "anyOf": [
+      {
+       "maxLength": 200,
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "placeholder": {
+     "default": "",
+     "type": "string"
+    },
+    "required": {
+     "default": false,
+     "type": "boolean"
+    },
+    "sensitive": {
+     "default": false,
+     "type": "boolean"
+    },
+    "type": {
+     "default": "text",
+     "enum": [
+      "text",
+      "textarea",
+      "number",
+      "integer",
+      "boolean",
+      "select",
+      "multiselect",
+      "date",
+      "datetime",
+      "email",
+      "currency",
+      "readonly"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "label"
+   ],
+   "type": "object"
+  },
+  "Form": {
+   "additionalProperties": false,
+   "properties": {
+    "description": {
+     "default": "",
+     "type": "string"
+    },
+    "fields": {
+     "items": {
+      "$ref": "#/$defs/FieldSpec"
+     },
+     "maxItems": 200,
+     "minItems": 1,
+     "type": "array"
+    },
+    "id": {
+     "type": "string"
+    },
+    "submit": {
+     "default": "submit",
+     "type": "string"
+    },
+    "title": {
+     "default": "",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "fields"
+   ],
+   "type": "object"
+  },
+  "Option": {
+   "additionalProperties": false,
+   "properties": {
+    "label": {
+     "type": "string"
+    },
+    "value": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "type": "number"
+      },
+      {
+       "type": "boolean"
+      }
+     ]
+    }
+   },
+   "required": [
+    "value",
+    "label"
+   ],
+   "type": "object"
+  },
+  "View": {
+   "additionalProperties": false,
+   "properties": {
+    "binding": {
+     "$ref": "#/$defs/Binding"
+    },
+    "columns": {
+     "items": {
+      "$ref": "#/$defs/Column"
+     },
+     "maxItems": 50,
+     "type": "array"
+    },
+    "id": {
+     "type": "string"
+    },
+    "title": {
+     "default": "",
+     "type": "string"
+    },
+    "type": {
+     "default": "detail",
+     "enum": [
+      "table",
+      "detail",
+      "list",
+      "metric"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "UiSchema.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "properties": {
+  "actions": {
+   "items": {
+    "$ref": "#/$defs/Action"
+   },
+   "maxItems": 20,
+   "type": "array"
+  },
+  "forms": {
+   "items": {
+    "$ref": "#/$defs/Form"
+   },
+   "maxItems": 20,
+   "type": "array"
+  },
+  "title": {
+   "default": "",
+   "type": "string"
+  },
+  "version": {
+   "const": "1",
+   "default": "1",
+   "type": "string"
+  },
+  "views": {
+   "items": {
+    "$ref": "#/$defs/View"
+   },
+   "maxItems": 20,
+   "type": "array"
+  }
+ },
+ "type": "object"
+}

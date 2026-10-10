@@ -1,0 +1,42 @@
+{
+ "$id": "ErrorInfo.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": true,
+ "properties": {
+  "code": {
+   "enum": [
+    "unavailable",
+    "timeout",
+    "bad_request",
+    "schema_invalid",
+    "unauthorized",
+    "forbidden",
+    "not_found",
+    "conflict",
+    "stale_version",
+    "rate_limited",
+    "internal",
+    "protocol",
+    "unsupported",
+    "cancelled"
+   ],
+   "type": "string"
+  },
+  "details": {
+   "additionalProperties": true,
+   "type": "object"
+  },
+  "message": {
+   "type": "string"
+  },
+  "retryable": {
+   "default": false,
+   "type": "boolean"
+  }
+ },
+ "required": [
+  "code",
+  "message"
+ ],
+ "type": "object"
+}

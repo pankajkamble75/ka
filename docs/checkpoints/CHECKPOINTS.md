@@ -2,6 +2,32 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 14:10 UTC — plan-29: the AgentX contract core — capabilities, one invoke endpoint, durable operations, AgentX's envelope (research-05 R2, R3, R10)
+
+**What changed** — `ka/agentx/` (new package): `contract.py` (AgentX PROPOSED v1 models: `InvokeRequest`, `Caller`, `OperationState`,
+`Interaction`, `AgentXError` with AgentX's error classes and HTTP mapping); `operations.py` (`Operations`: idempotent start — same key + same
+input returns the operation, different input → `conflict`; sync inline / async on a bounded thread pool; progress; cancel rules; failures →
+AgentX envelope); `capabilities.py` (descriptors in AgentX's exact key set with pydantic-generated JSON Schema 2020-12; handlers
+`knowledge.acquire` (text/note/link/research/gap; candidates + refusals; `mapped_into` always empty — Invariant 2), `knowledge.search`
+(governed nuggets + computed articles), `knowledge.read` (nugget/canonical id/wiki key + provenance chain), `knowledge.revise`
+(`propose_revision` or `request_retirement`)); `router.py` (`/v1` under KA's prefix: capabilities, invoke, operations, cancel; aliases
+`/v1/acquisitions`, `/v1/knowledge/search` GET + Knowledge Worker's POST shape, `/v1/knowledge/{id}`, `…/revisions`; `KA_AGENTX_TOKEN`
+auth); `conformance.py` + `schemas/` (AgentX's ten schemas, vendored from its session's message, with a provenance README). `ka/model.py`
+`Operation` (+ collection, `AXO` ids); `ka/config.py` `KA_SERVICE_ID`, `KA_AGENTX_TOKEN`; `ka/events.py` `knowledge.acquisition.completed`;
+`ka/api.py` mounts the router, adds AgentX's health keys to `/healthz` (old keys kept) and returns AgentX's envelope for `/v1` validation errors.
+`pyproject.toml` dev extra gains `jsonschema`. `ka/tests/test_plan29_agentx_core.py` (14 cases), `e2e/plan29_agentx_flow.py`. plan-28's
+regression gate pattern widened from plans 25–28 to every later plan (it counted the new plan-29 test as a pre-wiki change).
+
+**Why** — research-05 §1–§5: KA adopts AgentX's contract (its session, 2026-10-10) instead of publishing a competing one.
+
+**Verification** — 428 passed, 2 skipped (exit checked); ruff F clean on the new files; no protected code. Recount 9/9 D, 9/9 P, 6/6 N. Live flow
+10/10 over real HTTP with the AgentX bearer: health and every descriptor/state validated against AgentX's schemas, 401 on a wrong bearer,
+acquire → 202 → succeeded with candidates, idempotent replay, search and read with provenance, Knowledge Worker's search shape. The
+conformance check found one real mismatch (`message: null`; AgentX requires a string) — fixed. Product tests: PT2, PT3 PASS.
+
+**Decisions and questions** — BUILT: research-05 R2 (core), R3, R10. Coordination: AgentX adopted KA's capability schemas and added
+`required_permission` to interactions (plan-30 sets it); Data Platform dropped its planned events feed (neither consumer needs it).
+
 ## 2026-10-10 12:40 UTC — research-05: KA as an independent service behind AgentX (from the author's AgentX integration requirements)
 
 **What changed** — `docs/user-research/notes/AgentX-Integration-Technical-Requirements.md` (copied from `pankajkamble75/knowledge-acquisition`
