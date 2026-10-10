@@ -10,3 +10,4 @@
 | `../research/research-03.md` | Data Platform as KA's physical store: the real seams in this repository, the contract KA needs from DP, what must not move; R1–R14. |
 | `../contracts/data-platform-v1-ka-subset.md` | The DP v1 subset KA needs (ten calls, six events, error envelope), mirrored by executable fixtures and `FakeDataPlatform`; owned by §11 of `knowledge-acquisition.md`. |
 | `../research/research-04.md` | The Knowledge Wiki: readable articles computed from governed nuggets, edits as governance proposals, visibility ceiling, no wiki-only identity; R1–R14. |
+| `../research/research-05.md` | KA as an independent service behind AgentX: adopt AgentX PROPOSED v1 (capabilities, invoke, operations, interactions), Knowledge Worker over HTTP, real Data Platform; R1–R12. |

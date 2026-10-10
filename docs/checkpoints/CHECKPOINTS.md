@@ -2,6 +2,18 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 12:40 UTC — research-05: KA as an independent service behind AgentX (from the author's AgentX integration requirements)
+
+**What changed** — `docs/user-research/notes/AgentX-Integration-Technical-Requirements.md` (copied from `pankajkamble75/knowledge-acquisition`
+5cab618a); `docs/research/research-05.md` (Aligned with corrections; R1–R12; PT1–PT9); 12 OPEN tracker rows; index row. No code.
+
+**Why** — the author asked for KA to register with AgentX as an independent service and confirmed (2026-10-10) that the active KA is this
+repository, not `knowledge-acquisition`. Coordinated with three peer sessions the same day: AgentX (its PROPOSED v1 contract is adopted, not a
+competing one), Data Platform (its real `/v1` differs from KA's fake — R9), Knowledge Worker (now a separate service on 8101 with no KA intake —
+KA publishes the intake contract, R7).
+
+**Decisions and questions** — DECIDED: R1 (author). No new question for the author.
+
 ## 2026-10-10 UTC — Q7 built in Enterprise OS (research-230, plan-1033); live test data cleaned
 
 **What changed** — `docs/questions/knowledge-acquisition.md` and `docs/architecture/knowledge-acquisition.md`: Q7 ✅ built in Enterprise OS by
