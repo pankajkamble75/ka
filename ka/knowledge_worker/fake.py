@@ -18,7 +18,7 @@ GRAPH_CHANGE = re.compile(r"^/v1/graph-changes/([^/]+)$")
 
 CONTRACT = "knowledge-worker/v1"
 # KW's typed status → AgentX ErrorClass (KW session, 2026-10-10: error.status is KW's typed status, error.code is the AgentX class)
-ERROR_CLASS = {"STALE_BASE": "stale_version", "CONFLICT": "conflict", "INVALID_REQUEST": "schema_invalid", "UNKNOWN_INSTANCE": "not_found",
+ERROR_CLASS = {"STALE_BASE": "stale_version", "CONFLICT": "conflict", "INVALID_REQUEST": "schema_invalid", "UNKNOWN_INSTANCE": "not_found", "UNKNOWN_DOMAIN": "not_found",
                "NOT_FOUND": "not_found", "FORBIDDEN": "forbidden", "UNAUTHORIZED": "unauthorized", "DEPENDENCY_UNAVAILABLE": "unavailable"}
 
 
@@ -135,7 +135,7 @@ class FakeKnowledgeWorker:
                 return 200, _env(dict(self.proposals[pid]["result"]), correlation_id=cid)
             store = self.instances if t["kind"] == "instance" else self.substructures
             if t["id"] not in store:
-                return err(404, "UNKNOWN_INSTANCE", f"no {t['kind']} {t['id']!r}")
+                return err(404, "UNKNOWN_INSTANCE" if t["kind"] == "instance" else "UNKNOWN_DOMAIN", f"no {t['kind']} {t['id']!r}")
             g = store[t["id"]]
             if t["kind"] == "instance" and t.get("base_digest") and t["base_digest"] != self._digest(g):
                 return err(409, "STALE_BASE", "base_digest is not the current instance digest")

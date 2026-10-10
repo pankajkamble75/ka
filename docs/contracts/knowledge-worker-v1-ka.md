@@ -1,6 +1,8 @@
 # Knowledge Worker v1 — the KA intake contract (KA's side, published for Knowledge Worker to implement)
 
-**Status:** PROPOSED v1, 2026-10-10; envelope aligned to KW v1 exactly (KW session, same day). Written by KA (`pankajkamble75/ka`, research-05 R7, plan-31) at the Knowledge Worker session's request;
+**Status:** v1, 2026-10-10; envelope aligned to KW v1 exactly; **implemented by Knowledge Worker** at `pankajkamble75/knowledge-worker`
+`064bdf4` (`service/graph_changes.py`, live on `127.0.0.1:8101`). In DEV, `KW_HOTL_MODE=auto` applies a valid change at once and commits it
+to KW's pushed `graphs/dev` branch; `KW_HOTL_MODE=human` holds it for a person. Written by KA (`pankajkamble75/ka`, research-05 R7, plan-31) at the Knowledge Worker session's request;
 that session accepted the shape the same day and implements it in `pankajkamble75/knowledge-worker` (service on `http://127.0.0.1:8101`).
 Conventions follow KW's `docs/contracts/agentx-knowledge-worker-v1.md` §2–§5 (headers, auth, envelope, statuses).
 **Executable fixtures:** `ka/tests/fixtures/kw_contract/*.json` (request → expected response, run against `ka/knowledge_worker/fake.py`).
@@ -59,7 +61,8 @@ operation):
 |---|---|---|---|
 | 409 | `STALE_BASE` | `stale_version` | `base_digest` / `base_version` is not the current one |
 | 422 | `INVALID_REQUEST` | `schema_invalid` | malformed body, unknown op, missing `knowledge_lineage`, grammar violation (`detail.findings`) |
-| 404 | `UNKNOWN_INSTANCE` | `not_found` | target instance or substructure does not exist |
+| 404 | `UNKNOWN_INSTANCE` | `not_found` | target instance does not exist |
+| 404 | `UNKNOWN_DOMAIN` | `not_found` | target substructure (domain) does not exist |
 | 403 | `FORBIDDEN` | `forbidden` | token lacks `graph-changes:propose` |
 | 409 | `CONFLICT` | `conflict` | same `idempotency_key`, different body |
 | 503 | `DEPENDENCY_UNAVAILABLE` | `unavailable` | KW cannot take changes now (`retryable: true`) |
