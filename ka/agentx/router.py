@@ -188,6 +188,15 @@ def build_router(get_ka) -> APIRouter:
             req.caller = Caller(**caller)
         return invoke(ka, "knowledge.revise", req, idempotency_key)[1]
 
+    # [block plan-33] research-05 R6: the note's event vocabulary over KA's one event log, replayable by `after`
+    @router.get("/events")
+    def v1_events_route(after: int = 0, limit: int = 200, ka=Depends(get_ka)) -> dict[str, Any]:
+        from ka.agentx.events import v1_events
+        if after < 0 or not 0 < limit <= 1000:
+            raise AgentXError("schema_invalid", "after must be ≥ 0 and 0 < limit ≤ 1000")
+        return v1_events(ka, after=after, limit=limit)
+    # [/block plan-33]
+
     router.ka_ops = ops                                              # tests and plan-30 reach the store through the router
     router.ka_caps = caps
     return router

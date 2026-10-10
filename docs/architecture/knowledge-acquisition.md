@@ -350,3 +350,33 @@ plan-01 and tracked as a question.
 ## 12. What is deliberately not here (§45)
 
 No vector index, no chat, no document browser as the primary view, no agent path that writes to the graph, no runtime answer endpoint.
+
+## 13. KA as a service (research-05) — `ka/agentx/`, `ka/knowledge_worker/`, `ka/data_platform/v1.py`
+
+✅ built 2026-10-10 (plans 29–33). KA runs as an independent service with no Enterprise OS checkout. Three peers reach it, or are reached by
+it, over HTTP. Guide: [`docs/integration/README.md`](../integration/README.md). Inventory and ownership:
+[`source-inventory.md`](../integration/source-inventory.md).
+
+- **AgentX (orchestrator).** KA adopts AgentX's services contract, PROPOSED v1. It does not publish a competing contract; the schemas are
+  vendored in `ka/agentx/schemas/` and every payload is checked against them in tests. AgentX pulls `GET /v1/capabilities` (seven
+  descriptors) and invokes `POST /v1/capabilities/{id}/invoke`. It gets an `OperationState`, a durable `Operation` with ids `AXO-…`,
+  idempotent by key and body hash, and polls `GET /v1/operations/{id}`. Optional push registration and `OperationEvent` callbacks ride the
+  plan-20 outbox (`ka/agentx/registration.py`). Errors use AgentX's envelope and error classes.
+- **Human approval stays a person's.** `knowledge.review` and `knowledge.resolve_conflict` return `awaiting_input` with a UiSchema and
+  `required_permission: knowledge.review`. `POST /v1/operations/{id}/input` calls `GovernanceService.decide(by=submitted_by)`. That is the one
+  pipeline (§4); an agent id or an anonymous caller is refused. A decision taken in KA's console completes the waiting operation on its next
+  poll. `knowledge.publish` is `requires_approval`. **Interim identity (Q1/Q4):** AgentX is a trusted service asserting the user; KA checks
+  the asserted permissions and refuses agents.
+- **Knowledge Worker.** Graph changes go through `POST /v1/graph-changes` (`docs/contracts/knowledge-worker-v1-ka.md`) with lineage on
+  every op and idempotency key `ka:<proposal id>`. KA's shadow graph is its read model. An AgentX publication stays `running` until KW reports
+  `applied`; only then does KA's protected `graph_change.apply` run, as an idempotent replay. The grammar comes from KW's
+  `GET /v1/graph-model` (`KA_GRAMMAR_URL`), and KW's digests are the snapshot identity. `KA_GRAPH_MODE` picks `kw`, `memory` or the
+  deprecated `eos-local` import.
+- **Data Platform.** The real `/v1` (`docs/contracts/data-platform-v1-real.md`): stage, put, commit with `Idempotency-Key`, knowledge
+  bindings, `nugget` derived assets with the source as parent. Visibility without its tag is narrowed to PERSONAL. There is no inbound event
+  feed on this API.
+- **Events.** `GET /v1/events?after=` is a read of the one event log (§9), not a second log. It is KA's events under the note's names,
+  with KA's stable `event_id`, `schema_version: ka.v1`, `seq` for replay and provenance naming the source event (`ka/agentx/events.py`).
+  Consumers de-duplicate by `event_id`.
+- **Unchanged.** Governance, versioning, provenance, the wiki and the protected code are untouched by this section's work, except
+  `ka/graph_adapter.py`, which gained a new class and changed no existing method.

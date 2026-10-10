@@ -2,6 +2,32 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 19:00 UTC — plan-33: KA as a service — source inventory, the /v1/events view, service docs and OpenAPI, the two-process run (research-05 R1, R6, R11, R12) — research-05 complete
+
+**What changed** — `docs/integration/` (new): `source-inventory.md` (R1: the active KA is this repository, the author's decision of
+2026-10-10; routes, stores, wiki, nugget lifecycle, connectors, settings; ownership and dependency map), `README.md` (R11: start-up, the
+service settings, the `/v1` calls, a curl walk-through, failure handling), `openapi-v1.json` (generated). `ka/agentx/events.py` (new) and
+`GET /v1/events?after=&limit=` in `ka/agentx/router.py` (R6: a read of the one event log under the note's names, KA's stable `event_id`,
+`schema_version: ka.v1`, `seq`, provenance). `tools/export_openapi.py` (new). `docs/architecture/knowledge-acquisition.md` §13 "KA as a
+service" (✅ built, plans 29–33) and four index rows (the ka-subset DP contract marked superseded). `README.md`: service section.
+`ka/tests/test_plan33_service.py` (12 cases), `e2e/plan33_two_process_flow.py` (R12).
+
+**Why** — the last four points of research-05: the requirements note asks for an inventory, durable events in its vocabulary, service
+documentation and proof that KA starts and works with AgentX and Knowledge Worker over HTTP with no Enterprise OS checkout.
+
+**Verification** — 485 passed, 2 skipped (exit checked; the three EOS-checkout suites are excluded as in every run this session); ruff F
+clean; no protected file touched. Two-process run 11/11: KA with no EOS root, graph mode kw, grammar from the fake KW; seven capabilities
+pushed to the fake AgentX with KA's token; a wrong token refused; acquire 202 → succeeded with a callback delivered; review awaiting_input
+with a form; an answer without a named person refused (403); alice's APPROVE went through `decide` and the nugget is ACTIVE; publish
+succeeded after KW applied, lineage on every op; the event feed carries the note's events and replays by `after` with the same ids.
+Product tests: PT7 GREEN here; PT1–PT9 all GREEN across plans 29–33.
+
+**Follow-ups / risks** — the live KA service (port 8011) still runs with `KA_ENTERPRISE_OS_ROOT` (legacy eos-local) and local storage;
+switching it to Knowledge Worker needs KW's intake and KA's KW token (KW session told 2026-10-10), and to the Data Platform needs a running DP
+on 8100. AgentX still has to add KA's base URL and token on its side.
+
+**Decisions and questions** — BUILT: research-05 R1, R6, R11, R12 (set complete, 12 of 12). Architecture §13 written as ✅ built. None raised.
+
 ## 2026-10-10 18:10 UTC — plan-32: the real Data Platform /v1 — client and store for the actual API, knowledge bindings, a faithful double, inbound polling off (research-05 R9)
 
 **What changed** — `ka/data_platform/v1.py` (new): `DataPlatformV1Client` (stage with the real body, `PUT content_url`, `POST commit_url`

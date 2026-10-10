@@ -114,6 +114,19 @@ Register a folder under `KA_CONNECTOR_ROOTS` as a connection on the Add knowledg
 
 The console's fourth tab, Processes, lists process subjects composed from governed knowledge and opens a profile per process (the plan-06 view); Browse by scope keeps its Processes mode. Tabs: 1 Add knowledge · 2 Knowledge nuggets · 3 Browse by scope · 4 Processes · 5 Dashboard · 6 Images · 7 Wiki (plans 25–28: articles computed from governed knowledge with every sentence cited; a Markdown-subset editor whose submissions become governance proposals; review and publication as a recorded digest).
 
+## KA as an independent service (AgentX, Knowledge Worker, Data Platform)
+
+KA runs with no Enterprise OS checkout and registers seven capabilities with AgentX: `knowledge.acquire`, `.search`, `.read`, `.revise`,
+`.review`, `.resolve_conflict` and `.publish`. They are served at `GET /api/knowledge-acquisition/v1/capabilities`, with operations,
+human-input interactions, tasks and a replayable event feed beside them. Graph changes go to Knowledge Worker over HTTP, and KA reports a
+publication done only when Knowledge Worker has applied it. Bytes go to the Data Platform's real `/v1`. Governance, versions, provenance and
+the wiki work as before: every decision is still `decide`, and still made by a named person.
+
+- Settings, examples and failure handling: [`docs/integration/README.md`](docs/integration/README.md)
+- Inventory and ownership map: [`docs/integration/source-inventory.md`](docs/integration/source-inventory.md)
+- OpenAPI: [`docs/integration/openapi-v1.json`](docs/integration/openapi-v1.json) (`.venv/bin/python tools/export_openapi.py` regenerates it)
+- Design: [`docs/architecture/knowledge-acquisition.md`](docs/architecture/knowledge-acquisition.md) §13
+
 ## Running as a service (VPS)
 
 `deploy/enterprise-os-ka.service` is the systemd unit installed on the VPS as `/etc/systemd/system/enterprise-os-ka.service`. It starts
