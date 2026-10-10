@@ -47,7 +47,8 @@ def test_N2b_PT10_tabs_one_to_six_and_the_pre_wiki_console_routes_are_verbatim()
 
 
 def test_N2c_PT10_pre_wiki_test_files_are_byte_identical_to_the_last_pre_wiki_commit():
-    out = subprocess.run(["git", "diff", "--name-only", BASE, "HEAD", "--", "ka/tests"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    # files ADDED after BASE are not pre-wiki files (plan-31/32 fixtures); every file that existed at BASE must stay byte-identical
+    out = subprocess.run(["git", "diff", "--name-only", "--diff-filter=a", BASE, "HEAD", "--", "ka/tests"], cwd=ROOT, capture_output=True, text=True).stdout.split()
     changed = {p for p in out if not re.search(r"plan(2[5-9]|[3-9][0-9])", p)} - ALLOWED_CHANGED
     assert not changed, f"pre-wiki test files changed since {BASE}: {sorted(changed)}"
     for path in ALLOWED_CHANGED:

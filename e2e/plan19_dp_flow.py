@@ -31,7 +31,7 @@ def main() -> int:
     srv = fake.serve("127.0.0.1", 8099)
     store = Path(tempfile.mkdtemp(prefix="ka-dp-flow-"))
     env = {**os.environ, "KA_STORAGE_ROOT": str(store), "KA_BACKEND_PORT": "8012", "KA_LLM_PROVIDER": "stub", "KA_ACCESS_POLICY": "open",
-           "KA_STORAGE_BACKEND": "data_platform", "KA_DP_BASE_URL": "http://127.0.0.1:8099", "KA_DP_SERVICE_TOKEN": "flow-token", "KA_RESEARCH_INTERNET": "0",
+           "KA_STORAGE_BACKEND": "data_platform", "KA_DP_API": "ka-subset", "KA_DP_BASE_URL": "http://127.0.0.1:8099", "KA_DP_SERVICE_TOKEN": "flow-token", "KA_RESEARCH_INTERNET": "0",
            "KA_SEARCH_PROVIDER": "none", "ANTHROPIC_API_KEY": ""}
     proc = subprocess.Popen(["/root/ka/.venv/bin/python", "-m", "ka", "serve"], cwd="/root/ka", env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     results = []

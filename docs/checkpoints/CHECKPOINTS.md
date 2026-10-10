@@ -2,6 +2,32 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 18:10 UTC — plan-32: the real Data Platform /v1 — client and store for the actual API, knowledge bindings, a faithful double, inbound polling off (research-05 R9)
+
+**What changed** — `ka/data_platform/v1.py` (new): `DataPlatformV1Client` (stage with the real body, `PUT content_url`, `POST commit_url`
+with the required `Idempotency-Key`, `POST /v1/knowledge-bindings`, reads at `/v1/assets/{id}/versions/{n|latest}[/content]`,
+`POST /v1/derived-assets`; Bearer or `X-Principal-Id`/`X-Tenant-Id`/`X-Scopes`) and `DataPlatformV1Store` (the plan-18 port, a subclass of
+the plan-19 store; KA visibility → DP scope, narrowed to PERSONAL when the scope's tag is missing). `ka/data_platform/fake_v1.py` (new):
+faithful double of the real shapes and codes. `ka/data_platform/store.py`: `KA_DP_API` (`v1` default, `ka-subset` superseded).
+`ka/service.py`: inbound polling only on `ka-subset` (the real DP has no events feed). `ka/config.py`: `KA_DP_API`, `KA_DP_AUTH_MODE`,
+`KA_DP_PRINCIPAL`. `docs/contracts/data-platform-v1-real.md` (new); `data-platform-v1-ka-subset.md` marked superseded. The plans 19–23
+flows pin `KA_DP_API=ka-subset` (they run against KA's old fake). Tests (11) and `e2e/plan32_dp_real_flow.py`.
+**Fix to plan-31's upload:** plan-28's regression gate compared every file under `ka/tests` changed since its base commit, so plan-31's
+eight committed Knowledge Worker fixtures turned `main` red on that one test after `7427778` (the plan-31 run saw them untracked). The gate
+now excludes files ADDED after its base (`--diff-filter=a`); every file that existed at the base must still be byte-identical.
+
+**Verification** — 473 passed, 2 skipped (exit checked); ruff F clean; no protected file touched. Live, against the REAL Data Platform
+service (`/root/dataplatform/start-dataplatform.sh`, port 8110, a fresh data root under /tmp, loopback headers, stopped at the end) 8/8:
+bytes committed and bound, read back from the DP, the approved nugget version is a `nugget` derived asset whose parent is the source's asset
+version. The plans 19–23 browser flows were NOT re-run (no Playwright in this environment); their unit tests (74) pass unmodified and
+plan-32 N4 checks the `ka-subset` selection. Product test PT9 PASS.
+
+**Follow-ups / risks** — the DP has no idempotency on derived assets (a lost 201 then a retry makes a second version); ingestion does not
+pass the domain/instance/team tag, so DOMAIN/INSTANCE/TEAM sources are stored PERSONAL on the DP (narrowed, recorded); the live KA service
+still uses the local backend.
+
+**Decisions and questions** — BUILT: research-05 R9. None raised.
+
 ## 2026-10-10 16:40 UTC — plan-31: Knowledge Worker over HTTP — KA's intake contract, a wire-level fake, the HTTP adapter, publication confirmed by KW, grammar over HTTP (research-05 R7, R8)
 
 **What changed** — `docs/contracts/knowledge-worker-v1-ka.md` (KA's side of the intake, accepted by the Knowledge Worker session the same day:

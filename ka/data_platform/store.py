@@ -21,6 +21,11 @@ class DataPlatformPhysicalStore:
         base = (config.get("KA_DP_BASE_URL") or "").strip()
         if not base:
             raise ConfigurationError("KA_DP_BASE_URL unset")
+        # [block plan-32] research-05 R9: the real API by default; the ka-subset contract only when asked for
+        if (config.get("KA_DP_API") or "v1").lower() != "ka-subset":
+            from ka.data_platform.v1 import DataPlatformV1Store
+            return DataPlatformV1Store.from_config(root)
+        # [/block plan-32]
         return cls(DataPlatformClient(base))
 
     def put(self, data, *, content_type, sha256, idempotency_key, owner, visibility, tenant_id, filename_hint=None):

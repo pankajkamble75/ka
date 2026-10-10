@@ -50,7 +50,7 @@ def main() -> int:
     shutil.copytree(LIVE, copy, ignore=shutil.ignore_patterns("search_usage.json"))
     fake = FakeDataPlatform(token="flow-token")
     srv = fake.serve("127.0.0.1", 8095)
-    env = {**os.environ, "KA_STORAGE_BACKEND": "data_platform", "KA_DP_BASE_URL": "http://127.0.0.1:8095", "KA_DP_SERVICE_TOKEN": "flow-token",
+    env = {**os.environ, "KA_STORAGE_BACKEND": "data_platform", "KA_DP_API": "ka-subset", "KA_DP_BASE_URL": "http://127.0.0.1:8095", "KA_DP_SERVICE_TOKEN": "flow-token",
            "KA_LLM_PROVIDER": "stub", "KA_ACCESS_POLICY": "open", "KA_RESEARCH_INTERNET": "0", "KA_SEARCH_PROVIDER": "none", "ANTHROPIC_API_KEY": "",
            "KA_DP_RETRIES": "3", "KA_DP_BACKOFF_BASE": "0", "KA_DP_OUTBOX_INTERVAL": "2"}
     results = []

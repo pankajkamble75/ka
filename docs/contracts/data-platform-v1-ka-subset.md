@@ -1,5 +1,7 @@
 # Data Platform v1 — the subset Knowledge Acquisition needs (KA-maintained; research-03 R11)
 
+> **Superseded 2026-10-10** by [`data-platform-v1-real.md`](data-platform-v1-real.md) (the real service). This document stays for `KA_DP_API=ka-subset` only.
+
 Status: proposed by KA on 2026-10-09 as executable fixtures (`ka/tests/fixtures/dp_contract/*.json`), implemented at the wire level by
 `ka/data_platform/fake.py` and consumed by `ka/data_platform/__init__.py::DataPlatformClient`. The Data Platform may adopt these as
 acceptance tests or hand KA an OpenAPI to generate from (research-03 R14 of the open questions). Headers on every call:

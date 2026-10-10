@@ -63,8 +63,10 @@ class KnowledgeAcquisition:
         # [block plan-21] research-03 R5: inbound Data Platform events ride on the worker's tick (DP backend only)
         from ka.data_platform.inbound import InboundEvents
         self.inbound = InboundEvents(self.repo, self.bus, self.auditor, None)      # the connectors service is attached below
-        if self.physical.name == "data_platform":
+        # [block plan-32] the real Data Platform has no events feed: inbound polling only on the ka-subset API
+        if self.physical.name == "data_platform" and (config.get("KA_DP_API") or "v1").lower() == "ka-subset":
             self.outbox_worker.ticks.append(lambda: self.inbound.poll(self.physical.client))
+        # [/block plan-32]
         if self.physical.name == "data_platform" and start_workers:
             self.outbox_worker.start()
         # [/block plan-21]

@@ -183,3 +183,10 @@ declare("KA_KW_PUBLISH_WAIT_S", float, 30.0, "ka.knowledge_worker", "How long a 
 declare("KA_GRAMMAR_URL", str, "", "ka.grammar", "Knowledge Worker's GET /v1/graph-model URL. Set → the grammar is fetched over HTTP "
         "(bearer KA_KW_TOKEN) instead of read from KA_GRAMMAR_DIR / KA_ENTERPRISE_OS_ROOT.")
 # [/block plan-31]
+
+# [block plan-32] research-05 R9: the real Data Platform /v1
+declare("KA_DP_API", str, "v1", "ka.data_platform", "Which Data Platform API KA speaks: v1 (the real service, pankajkamble75/dataplatform) or "
+        "ka-subset (KA's 2026-10-09 contract and its fake; superseded).")
+declare("KA_DP_AUTH_MODE", str, "auto", "ka.data_platform", "auto (Bearer when KA_DP_SERVICE_TOKEN is set, else principal headers) | bearer | headers.")
+declare("KA_DP_PRINCIPAL", str, "ka", "ka.data_platform", "X-Principal-Id KA sends in the Data Platform's header auth mode.")
+# [/block plan-32]
