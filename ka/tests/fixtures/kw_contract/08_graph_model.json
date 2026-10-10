@@ -1,0 +1,19 @@
+{
+ "setup": {},
+ "request": {
+  "method": "GET",
+  "path": "/v1/graph-model",
+  "body": null
+ },
+ "expect": {
+  "status": 200,
+  "keys": [
+   "grammar",
+   "process_types",
+   "grammar_version",
+   "type_table_version",
+   "grammar_digest",
+   "type_table_digest"
+  ]
+ }
+}

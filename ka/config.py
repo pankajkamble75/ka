@@ -173,3 +173,13 @@ declare("KA_AGENTX_TOKEN", str, "", "ka.agentx", "Bearer token AgentX presents o
 declare("KA_AGENTX_URL", str, "", "ka.agentx", "AgentX base URL (e.g. http://127.0.0.1:8765). Set → KA pushes its capability list to "
         "{KA_AGENTX_URL}/api/v1/services/{KA_SERVICE_ID}/capabilities on start and on demand. Unset → AgentX pulls GET /v1/capabilities.")
 # [/block plan-30]
+
+# [block plan-31] research-05 R7, R8: Knowledge Worker over HTTP; the grammar over HTTP
+declare("KA_GRAPH_MODE", str, "auto", "ka.service", "Where governed graph changes go: memory | kw | eos-local | auto. auto = kw when KA_KW_URL is "
+        "set, else eos-local (legacy, deprecated: imports Enterprise OS) when KA_ENTERPRISE_OS_ROOT is set, else memory.")
+declare("KA_KW_URL", str, "", "ka.knowledge_worker", "Knowledge Worker base URL (e.g. http://127.0.0.1:8101); its /v1 intake receives KA's graph changes.")
+declare("KA_KW_TOKEN", str, "", "ka.knowledge_worker", "KA's bearer token for Knowledge Worker (scopes graph-changes:propose, graphs:read).")
+declare("KA_KW_PUBLISH_WAIT_S", float, 30.0, "ka.knowledge_worker", "How long a console apply waits for Knowledge Worker to apply a change.")
+declare("KA_GRAMMAR_URL", str, "", "ka.grammar", "Knowledge Worker's GET /v1/graph-model URL. Set → the grammar is fetched over HTTP "
+        "(bearer KA_KW_TOKEN) instead of read from KA_GRAMMAR_DIR / KA_ENTERPRISE_OS_ROOT.")
+# [/block plan-31]

@@ -2,6 +2,31 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 16:40 UTC — plan-31: Knowledge Worker over HTTP — KA's intake contract, a wire-level fake, the HTTP adapter, publication confirmed by KW, grammar over HTTP (research-05 R7, R8)
+
+**What changed** — `docs/contracts/knowledge-worker-v1-ka.md` (KA's side of the intake, accepted by the Knowledge Worker session the same day:
+`POST /v1/graph-changes`, `GET /v1/graph-changes/{id}`, `graphs:read` reads, KW's envelope, token scopes, error codes) and
+`ka/tests/fixtures/kw_contract/` (8 executable fixtures). `ka/knowledge_worker/` (new): `client.py` (stdlib HTTP, envelope, typed errors),
+`fake.py` (wire-level KW: instances/substructures, base digests/versions, idempotency, approval mode, scopes; in-process transport and
+`serve()`). `ka/graph_adapter.py`: NEW class `KnowledgeWorkerHTTPAdapter` (in-memory shadow as the read model; `submit`; `publish` waits for
+`applied` then mirrors to the shadow; rollback unsupported; base from `GET /v1/graph-versions`) — existing adapter methods untouched.
+`ka/service.py`: `KA_GRAPH_MODE` (auto → kw / legacy eos-local / memory). `ka/agentx/governance_caps.py`: `knowledge.publish` submits to KW
+and keeps the operation running ("awaiting Knowledge Worker") until KW applies, then calls KA's apply (an idempotent replay).
+`ka/grammar.py`: `KA_GRAMMAR_URL`. `ka/agentx/router.py`: health check reports the graph mode (eos-local as deprecated). `ka/config.py`:
+five settings. Tests (20 incl. fixture params), `e2e/plan31_kw_flow.py`. plan-28's regression gate no longer counts new untracked files as
+modified pre-wiki files (it flagged the new fixture folder).
+
+**Verification** — 462 passed, 2 skipped (exit checked); ruff F clean; `ka/graph_change.py` (protected) untouched; `ka/graph_adapter.py` diff
+is additive only (0 removed lines). Live flow 7/7: KA with no Enterprise OS root, graph mode kw, grammar from the fake KW with its digests;
+publish held "awaiting Knowledge Worker" until the fake approved, then succeeded; one KW proposal; lineage on every op. Product tests: PT1,
+PT6, PT8 PASS.
+
+**Follow-ups** — the live KA service still sets `KA_ENTERPRISE_OS_ROOT` (legacy eos-local) until Knowledge Worker implements the intake;
+switching it is setting `KA_KW_URL`, `KA_KW_TOKEN`, `KA_GRAMMAR_URL` in `.env`.
+
+**Decisions and questions** — BUILT: research-05 R7, R8. Coordination: the Knowledge Worker session will implement the intake from this
+contract.
+
 ## 2026-10-10 15:20 UTC — plan-30: review, conflict resolution and publication for AgentX; tasks; push registration and callbacks (research-05 R4, R5)
 
 **What changed** — `ka/agentx/governance_caps.py` (new): `knowledge.review` and `knowledge.resolve_conflict` open an AgentX interaction

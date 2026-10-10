@@ -59,5 +59,6 @@ def test_N2c_PT10_pre_wiki_test_files_are_byte_identical_to_the_last_pre_wiki_co
             mm = ASSIGN.match(m)
             assert mm and pl == "+" + mm.group(1) + mm.group(2), f"{path}: unexpected change {m!r} → {pl!r}"
     tracked = subprocess.run(["git", "status", "--short", "--", "ka/tests"], cwd=ROOT, capture_output=True, text=True).stdout.split("\n")
-    dirty = {l.split()[-1] for l in tracked if l.strip() and not re.search(r"plan(2[5-9]|[3-9][0-9])", l)}
+    # only files that existed before the wiki can be "pre-wiki files modified": new untracked files (`??`) are not (plan-31's fixtures)
+    dirty = {l.split()[-1] for l in tracked if l.strip() and not l.startswith("??") and not re.search(r"plan(2[5-9]|[3-9][0-9])", l)}
     assert not dirty, f"pre-wiki test files modified in the working tree: {sorted(dirty)}"

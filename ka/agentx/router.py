@@ -200,6 +200,10 @@ def agentx_error_handler(request: Request, exc: AgentXError) -> JSONResponse:
 def health_payload(ka) -> dict[str, Any]:
     checks = {"storage": "ok" if ka.repo.root.exists() else "down", "provider": getattr(ka.provider, "name", "?"),
               "grammar": "ok" if ka.grammar.loaded else "not_loaded"}
+    # [block plan-31] where graph changes go; the Enterprise OS import is reported as deprecated
+    mode = getattr(ka, "graph_mode", "custom")
+    checks["graph"] = f"{mode} (deprecated: imports Enterprise OS)" if mode == "eos-local" else mode
+    # [/block plan-31]
     status = "ok" if checks["storage"] == "ok" else "down"
     if status == "ok" and checks["grammar"] != "ok":
         status = "degraded"

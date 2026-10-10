@@ -607,3 +607,80 @@ class EnterpriseOSGraphAdapter:
         except StoreError as e:
             raise PublishRefused(type(e).__name__, str(e)) from e
     # [/block plan-05]
+
+
+# [block plan-31]
+class KnowledgeWorkerHTTPAdapter(InMemoryGraphAdapter):
+    """research-05 R7: publication to Knowledge Worker over HTTP (`docs/contracts/knowledge-worker-v1-ka.md`) — no `knowledge_worker` import.
+    KA's shadow graph (the in-memory adapter, persisted) stays the read model for lineage, impact and the console; Knowledge Worker is the
+    source of truth and decides. `publish` submits a proposal (idempotency key `ka:<KA proposal id>`), waits up to `KA_KW_PUBLISH_WAIT_S`
+    for `applied`, and only then applies the same changes to the shadow. `awaiting_approval` past the wait, or `refused`, raises
+    `PublishRefused` with KW's code — KA's AgentX publish capability waits for KW itself before calling apply (plan-31), so this path is an
+    idempotent replay there."""
+
+    def __init__(self, client: Any, *, path: "Path | None" = None, wait_s: float = 30.0, poll_s: float = 0.25) -> None:
+        super().__init__(path=path)
+        self.client, self.wait_s, self.poll_s = client, wait_s, poll_s
+
+    # -- the target and its base ------------------------------------------------------------------------------------------------
+    def kw_target(self, scope: Scope, base_version: str | None) -> dict[str, Any]:
+        if scope.scope_type == ScopeType.INSTANCE:
+            return {"kind": "instance", "id": scope.scope_id, **({"base_digest": base_version} if base_version else {})}
+        if scope.scope_type in (ScopeType.DOMAIN, ScopeType.PARENT_DOMAIN):
+            return {"kind": "substructure", "id": scope.scope_id, **({"base_version": base_version} if base_version else {})}
+        raise PublishRefused("author_only", f"{scope.key()}: structure-tier publication is author-only in Knowledge Worker")
+
+    def base_version(self, scope: Scope) -> str | None:
+        try:
+            v = self.client.graph_versions()
+        except Exception:  # noqa: BLE001 — no base is sent; KW then applies to its current graph
+            return None
+        if scope.scope_type == ScopeType.INSTANCE:
+            return ((v.get("instances") or {}).get(scope.scope_id) or {}).get("digest")
+        return ((v.get("substructures") or {}).get(scope.scope_id) or {}).get("version")
+
+    @staticmethod
+    def kw_request(changes: list[ElementChange]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+        from ka.graph_change import to_change_ops
+        refs, gcp = {}, None
+        for c in changes:
+            for ln in ((c.after or {}).get("props") or {}).get(LINEAGE_KEY, []):
+                ref = f"{ln.get('nugget_id')}:v{ln.get('version')}"
+                refs[ref] = {"nugget_ref": ref, "decision_id": ln.get("governance_decision_id")}
+                gcp = gcp or ln.get("graph_change_id")
+        return to_change_ops(changes), list(refs.values()), gcp
+
+    def submit(self, scope: Scope, changes: list[ElementChange], *, actor: str, reason: str, base_version: str | None,
+               graph_change_id: str | None = None) -> dict[str, Any]:
+        from ka.knowledge_worker.client import KnowledgeWorkerError
+        bad = [r for r in self.validate_change(changes) if not r["ok"]]
+        if bad:
+            raise PublishRefused("invalid_change", "; ".join(f"{b['element_id']}: {b['detail']}" for b in bad), bad)
+        ops, refs, gcp = self.kw_request(changes)
+        key = f"ka:{graph_change_id or gcp or 'unkeyed'}"
+        try:
+            return self.client.propose(target=self.kw_target(scope, base_version), ops=ops, reason=reason, actor=actor, knowledge_refs=refs,
+                                       idempotency_key=key, correlation_id=graph_change_id or gcp)
+        except KnowledgeWorkerError as e:
+            raise PublishRefused(e.code, e.message, [e.detail] if e.detail else []) from None
+
+    def publish(self, scope, changes, *, actor, reason, base_version, rollback=False):
+        import time as _t
+        from ka.knowledge_worker.client import KnowledgeWorkerError
+        if rollback:
+            raise PublishRefused("unsupported", "Knowledge Worker has no rollback through the KA intake; propose the inverse change instead")
+        res = self.submit(scope, changes, actor=actor, reason=reason, base_version=base_version)
+        end = _t.time() + self.wait_s
+        while res.get("status") == "awaiting_approval" and _t.time() < end:
+            _t.sleep(self.poll_s)
+            try:
+                res = self.client.get(res["proposal_id"])
+            except KnowledgeWorkerError as e:
+                raise PublishRefused(e.code, e.message) from None
+        if res.get("status") != "applied":
+            raise PublishRefused(str(res.get("status") or "refused"), f"Knowledge Worker proposal {res.get('proposal_id')} is {res.get('status')}",
+                                 [{"kw_proposal_id": res.get("proposal_id")}])
+        self.apply_change(changes)                                     # the shadow mirrors what KW applied
+        return PublishResult(applied=True, eos_proposal_id=res.get("proposal_id"), eos_status="applied", new_version=res.get("new_version"),
+                             pinned_instances=list(res.get("pinned_instances") or []), notes=[f"knowledge-worker {res.get('proposal_id')}"])
+# [/block plan-31]

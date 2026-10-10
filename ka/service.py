@@ -142,8 +142,23 @@ class KnowledgeAcquisition:
     # ---- wiring --------------------------------------------------------------------------------------
 
     def _default_adapter(self) -> GraphAdapter:
-        if config.get("KA_ENTERPRISE_OS_ROOT") and EnterpriseOSGraphAdapter.available():
+        # [block plan-31] research-05 R7: Knowledge Worker over HTTP; the Enterprise OS import only as an explicit (or legacy) local mode
+        mode = (config.get("KA_GRAPH_MODE") or "auto").lower()
+        if mode == "auto":
+            mode = "kw" if config.get("KA_KW_URL") else ("eos-local" if config.get("KA_ENTERPRISE_OS_ROOT") else "memory")
+        self.graph_mode = mode
+        if mode == "kw":
+            from ka.graph_adapter import KnowledgeWorkerHTTPAdapter
+            from ka.knowledge_worker.client import KnowledgeWorkerClient
+            client = KnowledgeWorkerClient.from_config()
+            if client is not None:
+                return KnowledgeWorkerHTTPAdapter(client, path=self.repo.root / "graph_shadow.json", wait_s=float(config.get("KA_KW_PUBLISH_WAIT_S")))
+            self.graph_mode = "memory"
+        if mode == "eos-local" and EnterpriseOSGraphAdapter.available():
             return EnterpriseOSGraphAdapter()
+        if mode == "eos-local":
+            self.graph_mode = "memory"
+        # [/block plan-31]
         return InMemoryGraphAdapter(path=self.repo.root / "graph_shadow.json")
 
     def _rebind_on_approval(self, ev: dict[str, Any]) -> None:      # plan-11

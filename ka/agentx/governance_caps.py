@@ -220,6 +220,11 @@ def publish(ka, ctx) -> dict[str, Any]:
     ctx.progress(0.2, "approving", graph_change_id=pid)
     if p.status == ProposalStatus.READY:
         ka.graph_change.approve(pid, by=by, reason=f"published through AgentX by {by}")
+    # [block plan-31] research-05 R7: with Knowledge Worker, success only when KW reports the change applied — submit, wait, then apply
+    from ka.graph_adapter import KnowledgeWorkerHTTPAdapter
+    if isinstance(ka.adapter, KnowledgeWorkerHTTPAdapter):
+        _await_kw(ka, ctx, pid, by)
+    # [/block plan-31]
     ctx.progress(0.5, "applying")
     ex = ka.graph_change.apply(pid, by=by)
     p = ka.repo.proposals.require(pid)
@@ -227,6 +232,41 @@ def publish(ka, ctx) -> dict[str, Any]:
         raise AgentXError("conflict", f"graph change {pid} did not apply ({p.status.value})", details={"status": p.status.value, "execution_id": ex.id})
     return PublishOut(kind="graph_change", proposal_id=pid, status=p.status.value, execution_id=ex.id, graph_ids=list(p.affected_graph_ids),
                       element_ids=list(p.affected_element_ids), lineage=list(p.knowledge_change_ids)).model_dump(mode="json")
+
+
+# [block plan-31]
+def _await_kw(ka, ctx, pid: str, by: str) -> None:
+    """Submit the approved change to Knowledge Worker and keep the operation running until KW applies it (or refuses). KA's own `apply`
+    afterwards replays the same idempotency key and records the result; KA's proposal stays APPROVED if KW refuses."""
+    import time as _t
+    from ka.graph_adapter import PublishRefused
+    from ka.knowledge_worker.client import KnowledgeWorkerError
+    p = ka.repo.proposals.require(pid)
+    for c in p.changes:                                              # the lineage carries KA's proposal id, as apply would set it
+        if c.after:
+            for ln in c.after.get("props", {}).get("knowledge_lineage", []):
+                if ln.get("graph_change_id") is None:
+                    ln["graph_change_id"] = pid
+    scope = ka.adapter.scope_for_graph(p.affected_graph_ids[0]) if p.affected_graph_ids else ka.repo.require_version(p.knowledge_change_ids[0]).scope
+    try:
+        res = ka.adapter.submit(scope, p.changes, actor=by, reason=p.reason, base_version=p.eos_base_version, graph_change_id=pid)
+    except PublishRefused as e:
+        raise AgentXError("unavailable" if e.code in ("UNAVAILABLE",) else ("forbidden" if e.code == "FORBIDDEN" else "conflict"),
+                          f"Knowledge Worker refused the change: {e}", details={"kw_code": e.code}) from None
+    ctx.progress(0.3, "awaiting Knowledge Worker", kw_proposal_id=res.get("proposal_id"))
+    while res.get("status") == "awaiting_approval":
+        if ctx.cancelled():
+            raise AgentXError("cancelled", "cancelled while Knowledge Worker had not applied the change")
+        _t.sleep(0.25)
+        try:
+            res = ka.adapter.client.get(res["proposal_id"])
+        except KnowledgeWorkerError as e:
+            if not e.retryable:
+                raise AgentXError("conflict", f"Knowledge Worker: {e}", details={"kw_code": e.code}) from None
+    if res.get("status") != "applied":
+        raise AgentXError("conflict", f"Knowledge Worker proposal {res.get('proposal_id')} is {res.get('status')}",
+                          details={"kw_proposal_id": res.get("proposal_id"), "kw_status": res.get("status")})
+# [/block plan-31]
 
 
 # ---- open review work --------------------------------------------------------------------------------------------------------

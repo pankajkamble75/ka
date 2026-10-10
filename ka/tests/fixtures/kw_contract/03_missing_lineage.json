@@ -1,0 +1,37 @@
+{
+ "setup": {
+  "instances": [
+   "acme"
+  ]
+ },
+ "request": {
+  "method": "POST",
+  "path": "/v1/graph-changes",
+  "body": {
+   "target": {
+    "kind": "instance",
+    "id": "acme"
+   },
+   "ops": [
+    {
+     "op": "add_node",
+     "node": {
+      "id": "n1",
+      "kind": "rule",
+      "name": "n1",
+      "props": {}
+     }
+    }
+   ],
+   "reason": "r",
+   "actor": "alice",
+   "knowledge_refs": [],
+   "idempotency_key": "ka:GCP-3"
+  }
+ },
+ "expect": {
+  "status": 422,
+  "envelope_status": "error",
+  "error_code": "INVALID_REQUEST"
+ }
+}

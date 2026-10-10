@@ -46,8 +46,16 @@ class GrammarRegistry:
 
     # ---- loading ------------------------------------------------------------------------------------
 
+    url: str | None = None                                  # plan-31: Knowledge Worker's GET /v1/graph-model
+
     @classmethod
     def from_config(cls, storage_root: Path) -> "GrammarRegistry":
+        # [block plan-31] research-05 R8: the grammar over HTTP from Knowledge Worker, no checkout needed
+        if config.get("KA_GRAMMAR_URL"):
+            reg = cls(dir=None, snapshot_path=storage_root / "grammar_snapshot.json", url=config.get("KA_GRAMMAR_URL"))
+            reg.load()
+            return reg
+        # [/block plan-31]
         raw = config.get("KA_GRAMMAR_DIR")
         if not raw and config.get("KA_ENTERPRISE_OS_ROOT"):
             raw = str(Path(config.get("KA_ENTERPRISE_OS_ROOT")) / "knowledge_worker" / "graph_model")
@@ -60,6 +68,20 @@ class GrammarRegistry:
         return bool(self.grammar) and bool(self.types)
 
     def _read(self) -> tuple[dict, dict, str, str]:
+        # [block plan-31] the URL source: KW's body carries the parsed files and their byte digests (KA uses them as the identity)
+        if self.url:
+            import json as _json
+            import urllib.request as _u
+            headers = {"Accept": "application/json"}
+            if config.get("KA_KW_TOKEN"):
+                headers["Authorization"] = f"Bearer {config.get('KA_KW_TOKEN')}"
+            with _u.urlopen(_u.Request(self.url, headers=headers), timeout=20) as r:
+                body = _json.loads(r.read())
+            g, t = body["grammar"], body["process_types"]
+            if not str(g.get("version", "")).startswith("grammar/") or not str(t.get("version", "")).startswith("process-types/"):
+                raise GrammarMismatch(f"{self.url}: versions {g.get('version')!r} / {t.get('version')!r} are not grammar / process-types versions")
+            return g, t, str(body["grammar_digest"]), str(body["type_table_digest"])
+        # [/block plan-31]
         g_path, t_path = self.dir / "grammar.json", self.dir / "process_types.json"
         g_bytes, t_bytes = g_path.read_bytes(), t_path.read_bytes()
         g, t = json.loads(g_bytes), json.loads(t_bytes)
@@ -73,12 +95,21 @@ class GrammarRegistry:
         """Load the files and reconcile with the snapshot. Same versions + different digest → stale (fail closed)."""
         self._stale_reason = None
         prior = GrammarSnapshot(**read_json(self.snapshot_path)) if self.snapshot_path.exists() else None
-        if self.dir is None or not (self.dir / "grammar.json").exists():
+        if self.url:                                       # plan-31: an unreachable URL leaves the grammar unloaded, as a missing directory does
+            try:
+                g, t, gd, td = self._read()
+            except Exception as e:  # noqa: BLE001
+                self.grammar, self.types, self.snapshot = {}, {}, prior
+                self._stale_reason = None
+                self.load_error = f"{type(e).__name__}: {e}"[:300]
+                return
+        elif self.dir is None or not (self.dir / "grammar.json").exists():
             self.grammar, self.types, self.snapshot = {}, {}, prior
             return
-        g, t, gd, td = self._read()
+        else:
+            g, t, gd, td = self._read()
         from ka.timeutil import now_iso
-        current = GrammarSnapshot(g["version"], t["version"], gd, td, now_iso(), str(self.dir))
+        current = GrammarSnapshot(g["version"], t["version"], gd, td, now_iso(), str(self.url or self.dir))
         if prior and (prior.grammar_version, prior.type_table_version) == (current.grammar_version, current.type_table_version) \
                 and (prior.grammar_digest, prior.type_table_digest) != (current.grammar_digest, current.type_table_digest):
             self._stale_reason = (f"grammar files changed under the same version strings ({prior.grammar_version}, "

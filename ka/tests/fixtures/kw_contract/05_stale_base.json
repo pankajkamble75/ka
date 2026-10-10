@@ -1,0 +1,47 @@
+{
+ "setup": {
+  "instances": [
+   "acme"
+  ]
+ },
+ "request": {
+  "method": "POST",
+  "path": "/v1/graph-changes",
+  "body": {
+   "target": {
+    "kind": "instance",
+    "id": "acme",
+    "base_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "ops": [
+    {
+     "op": "add_node",
+     "node": {
+      "id": "n1",
+      "kind": "rule",
+      "name": "n1",
+      "props": {
+       "knowledge_lineage": [
+        {
+         "nugget_id": "KN-001",
+         "version": 1,
+         "governance_decision_id": "GD-1",
+         "graph_change_id": "GCP-1"
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "reason": "r",
+   "actor": "alice",
+   "knowledge_refs": [],
+   "idempotency_key": "ka:GCP-5"
+  }
+ },
+ "expect": {
+  "status": 409,
+  "envelope_status": "error",
+  "error_code": "STALE_BASE"
+ }
+}
