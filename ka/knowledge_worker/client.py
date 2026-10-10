@@ -72,7 +72,9 @@ class KnowledgeWorkerClient:
         return self._call("GET", f"/v1/graph-changes/{proposal_id}")
 
     def graph_versions(self) -> dict[str, Any]:
-        return self._call("GET", "/v1/graph-versions", envelope=False)
+        """KW's real shape (KW session, 2026-10-10), enveloped: {domains: {id: {latest, versions[{version, digest, …}], pinned_by}},
+        instances: {id: {graph_digest, pins}}, library, import}."""
+        return self._call("GET", "/v1/graph-versions")
 
     def graph_model(self) -> dict[str, Any]:
         return self._call("GET", "/v1/graph-model", envelope=False)

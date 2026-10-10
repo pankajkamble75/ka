@@ -635,9 +635,10 @@ class KnowledgeWorkerHTTPAdapter(InMemoryGraphAdapter):
             v = self.client.graph_versions()
         except Exception:  # noqa: BLE001 — no base is sent; KW then applies to its current graph
             return None
-        if scope.scope_type == ScopeType.INSTANCE:
-            return ((v.get("instances") or {}).get(scope.scope_id) or {}).get("digest")
-        return ((v.get("substructures") or {}).get(scope.scope_id) or {}).get("version")
+        if scope.scope_type == ScopeType.INSTANCE:                   # KW's shape: instances[id].graph_digest; domains[id].latest
+            return ((v.get("instances") or {}).get(scope.scope_id) or {}).get("graph_digest")
+        latest = ((v.get("domains") or {}).get(scope.scope_id) or {}).get("latest")
+        return str(latest) if latest is not None else None
 
     @staticmethod
     def kw_request(changes: list[ElementChange]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:

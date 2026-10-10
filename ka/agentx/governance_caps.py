@@ -304,7 +304,10 @@ def extend(ka) -> dict[str, Capability]:
                    "Approve and apply a graph change compiled from approved knowledge (or publish a reviewed wiki edit). Succeeds only "
                    "when the change is applied. Requires a named person's approval (KA Q3).",
                    PublishIn, PublishOut, ["knowledge.publish"], "async", lambda ctx: publish(ka, ctx), ["publish", "graph", "apply"],
-                   ["Publish the approved refund rule to the domain graph"], idempotent=True, requires_approval=True),
+                   ["Publish the approved refund rule to the domain graph"], idempotent=True, requires_approval=True,
+                   # plan-31: the operation stays `running` while Knowledge Worker holds the change for its own approval, and AgentX counts
+                   # running time against operation_s (awaiting_input is not counted) — so allow as long as a review may take
+                   timeout={"request_s": 30, "operation_s": 604800}),
     ]
     return {c.id: c for c in caps}
 # [/block plan-30]

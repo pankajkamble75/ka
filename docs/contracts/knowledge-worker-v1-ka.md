@@ -73,8 +73,10 @@ Returns the same `result` object. KA polls until `applied` or `refused`. There i
   specialist API's own shape (not wrapped in the envelope), same body as enterprise-os `GET /api/knowledge-worker/graph-model`. KA setting
   `KA_GRAMMAR_URL`. The digests are sha256 of the files' bytes on KW's side; KA uses them as the snapshot identity (a same-version digest
   change → stale, fail closed). KA cannot recompute a byte digest from parsed JSON; integrity of the body rests on the token and transport.
-- `GET /v1/graph-versions` → each domain's (substructure's) latest version and digest, each instance's graph digest and pins. KA reads the
-  base it sends in `target`.
+- `GET /v1/graph-versions` → **enveloped**; `result` is KW's existing shape (AgentX already reads it, so KA maps to it — KW session,
+  2026-10-10): `{domains: {<domain_id>: {latest, versions: [{version, parent, digest, created_at, findings}], pinned_by: {<instance_id>:
+  version}}}, instances: {<instance_id>: {graph_digest, pins: {<domain_id>: version}}}, library, import}`. KA's base for a substructure target
+  is `domains[id].latest`; for an instance target, `instances[id].graph_digest`.
 
 ## 6. Reverse direction (already live)
 

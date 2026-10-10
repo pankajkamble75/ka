@@ -232,3 +232,24 @@ def test_N6_graph_change_covering_tests_are_unmodified():
     out = subprocess.run(["git", "diff", "--quiet", "beae3f1", "--", "ka/graph_change.py", "ka/tests/test_plan05_publication.py",
                           "ka/tests/test_plan10_governance_decisions.py"], cwd=ROOT, capture_output=True)
     assert out.returncode == 0
+
+
+def test_P2b_publish_declares_a_timeout_long_enough_to_wait_for_kw(tmp_path):
+    """AgentX cancels at timeout.operation_s and counts `running` time (AgentX session, 2026-10-10); a KW approval can take days."""
+    from ka.agentx.governance_caps import extend
+    ka = KnowledgeAcquisition(tmp_path / "s", provider=StubLLMProvider(), start_workers=False)
+    d = extend(ka)["knowledge.publish"].descriptor()
+    assert d["timeout"]["operation_s"] >= 7 * 24 * 3600
+
+
+def test_P4b_base_versions_read_kw_real_graph_versions_shape(tmp_path):
+    """KW's GET /v1/graph-versions is enveloped with `domains[id].latest` and `instances[id].graph_digest` (KW session, 2026-10-10)."""
+    from ka.model import Scope
+    from ka.vocab import ScopeType
+    fake = FakeKnowledgeWorker(token=TOKEN)
+    ka = _ka_with_kw(tmp_path, fake)
+    fake.add_instance("acme")
+    v = ka.adapter.client.graph_versions()
+    assert set(v) >= {"domains", "instances"} and "contract_version" not in v
+    assert ka.adapter.base_version(D) == fake.substructures["merchant-acquiring"]["version"]
+    assert ka.adapter.base_version(Scope(scope_type=ScopeType.INSTANCE, scope_id="acme")) == fake._digest(fake.instances["acme"])

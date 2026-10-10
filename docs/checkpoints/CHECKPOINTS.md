@@ -2,6 +2,24 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 19:30 UTC — research-05 follow-up from the peers: publish timeout for AgentX, Knowledge Worker's real graph-versions shape
+
+**What changed** — `ka/agentx/governance_caps.py`: `knowledge.publish` declares `timeout.operation_s = 604800` (was the 600 s default).
+AgentX (its session, 2026-10-10) cancels at `operation_s` and counts `running` time, and publication stays running while Knowledge Worker
+holds a change for its own approval. `ka/knowledge_worker/client.py`, `ka/graph_adapter.py` (`KnowledgeWorkerHTTPAdapter.base_version`,
+plan-31 block), `ka/knowledge_worker/fake.py`, `docs/contracts/knowledge-worker-v1-ka.md` §5: `GET /v1/graph-versions` is enveloped and uses
+KW's existing shape, which AgentX already reads. KA maps it: a substructure's base is `domains[id].latest`; an instance's is
+`instances[id].graph_digest`. Tests: plan-31 P2b, P4b.
+
+**Verification** — 487 passed, 2 skipped (exit checked); ruff F clean; plan-31 flow 7/7, two-process flow 11/11.
+
+**Follow-ups** — KW has minted KA's token (client `ka`); its value is outside this repository and is to be copied into KA's `.env` as
+`KA_KW_TOKEN` by the author, never committed. KW has not yet implemented `POST /v1/graph-changes`. The live KA stays in legacy eos-local mode
+until it does. AgentX confirmed path, auth, descriptors and the interaction flow match its registry. It polls operations and does not
+consume `/v1/events` or `/v1/tasks` in v1. Remote registration must be HTTPS.
+
+**Decisions and questions** — none raised; plan-30/31 corrections from peer contracts.
+
 ## 2026-10-10 19:00 UTC — plan-33: KA as a service — source inventory, the /v1/events view, service docs and OpenAPI, the two-process run (research-05 R1, R6, R11, R12) — research-05 complete
 
 **What changed** — `docs/integration/` (new): `source-inventory.md` (R1: the active KA is this repository, the author's decision of

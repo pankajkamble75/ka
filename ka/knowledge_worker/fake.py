@@ -87,9 +87,12 @@ class FakeKnowledgeWorker:
             return 200, {"grammar": self.grammar, "process_types": self.process_types, "grammar_version": self.grammar["version"],
                          "type_table_version": self.process_types["version"], "grammar_digest": gd, "type_table_digest": td,
                          "source": "knowledge_worker/graph_model"}
-        if method == "GET" and path == "/v1/graph-versions":
-            return 200, {"substructures": {k: {"version": v["version"], "digest": self._digest(v)} for k, v in self.substructures.items()},
-                         "instances": {k: {"digest": self._digest(v), "pins": {}} for k, v in self.instances.items()}}
+        if method == "GET" and path == "/v1/graph-versions":             # KW's real shape (its session, 2026-10-10), enveloped
+            return 200, _env({"domains": {k: {"latest": v["version"], "versions": [{"version": v["version"], "parent": None, "digest": self._digest(v),
+                                                                                     "created_at": None, "findings": []}], "pinned_by": {}}
+                                          for k, v in self.substructures.items()},
+                              "instances": {k: {"graph_digest": self._digest(v), "pins": {}} for k, v in self.instances.items()},
+                              "library": {"patterns": [], "data_objects": []}, "import": {}}, correlation_id=cid)
         if "graph-changes:propose" not in self.scopes:
             return 403, _env(correlation_id=cid, error={"status": 403, "code": "FORBIDDEN", "message": "graph-changes:propose required", "retryable": False})
         m = GRAPH_CHANGE.match(path)
