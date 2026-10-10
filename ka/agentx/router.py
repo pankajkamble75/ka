@@ -47,6 +47,12 @@ def build_router(get_ka) -> APIRouter:
         o = getattr(ka, "_agentx_ops", None)
         if o is None:
             o = ka._agentx_ops = Operations(ka.repo)
+        # [block plan-30] callbacks to AgentX ride the outbox
+        if getattr(o, "_ka_callbacks", None) is not ka:
+            from ka.agentx.registration import callback
+            o.on_change.append(lambda op, _ka=ka: callback(_ka, op))
+            o._ka_callbacks = ka
+        # [/block plan-30]
         return o
 
     def invoke(ka, capability_id: str, req: InvokeRequest, idem: Optional[str] = None) -> tuple[int, dict[str, Any]]:
@@ -82,11 +88,61 @@ def build_router(get_ka) -> APIRouter:
 
     @router.get("/operations/{operation_id}")
     def get_operation(operation_id: str, ka=Depends(get_ka)) -> dict[str, Any]:
-        return Operations.state(ops(ka).get(operation_id)).model_dump(mode="json")
+        op = ops(ka).get(operation_id)
+        # [block plan-30] an interaction whose subject was decided in KA's console completes on this poll
+        if op.status == "awaiting_input":
+            from ka.agentx.governance_caps import decided_elsewhere
+            op = ops(ka).refresh(op, lambda o: decided_elsewhere(ka, o))
+        # [/block plan-30]
+        return Operations.state(op).model_dump(mode="json")
 
     @router.post("/operations/{operation_id}/cancel")
     def cancel_operation(operation_id: str, ka=Depends(get_ka)) -> dict[str, Any]:
         return Operations.state(ops(ka).cancel(operation_id)).model_dump(mode="json")
+
+    # [block plan-30] research-05 R4, R5: human input, open work, push registration
+    @router.post("/operations/{operation_id}/input")
+    def operation_input(operation_id: str, body: dict[str, Any], ka=Depends(get_ka),
+                        x_acting_user: Optional[str] = Header(None, alias="X-Acting-User")) -> dict[str, Any]:
+        from ka.agentx.governance_caps import resume_decision
+        iid = body.get("interaction_id")
+        values = body.get("values")
+        if not isinstance(iid, str) or not isinstance(values, dict):
+            raise AgentXError("schema_invalid", "OperationInput needs interaction_id (string) and values (object)")
+        op = ops(ka).submit_input(operation_id, iid, values, body.get("submitted_by") or x_acting_user,
+                                  lambda o, v, by: resume_decision(ka, o, v, by))
+        return Operations.state(op).model_dump(mode="json")
+
+    @router.get("/tasks")
+    def list_tasks(limit: int = 200, ka=Depends(get_ka)) -> dict[str, Any]:
+        from ka.agentx.governance_caps import tasks
+        return {"tasks": tasks(ka, limit=max(1, min(limit, 1000)))}
+
+    @router.post("/capabilities/register")
+    def register(ka=Depends(get_ka)) -> dict[str, Any]:
+        from ka.agentx.registration import push_capabilities
+        return push_capabilities(ka, [c.descriptor() for c in caps(ka).values()])
+
+    @router.post("/knowledge/{item_id}/review")
+    def knowledge_review(item_id: str, body: Optional[dict[str, Any]] = None, ka=Depends(get_ka)) -> JSONResponse:
+        b = dict(body or {})
+        conflict = bool(b.pop("conflict", False))
+        req = _req({"item_id": item_id}, b.get("idempotency_key"))
+        if b.get("caller"):
+            req.caller = Caller(**b["caller"])
+        status, state = invoke(ka, "knowledge.resolve_conflict" if conflict else "knowledge.review", req, req.idempotency_key)
+        return JSONResponse(state, status_code=status)
+
+    @router.post("/publications")
+    def publications(body: dict[str, Any], ka=Depends(get_ka), idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")) -> JSONResponse:
+        b = dict(body)
+        caller = b.pop("caller", None)
+        req = _req(b, idempotency_key)
+        if caller:
+            req.caller = Caller(**caller)
+        status, state = invoke(ka, "knowledge.publish", req, idempotency_key)
+        return JSONResponse(state, status_code=status)
+    # [/block plan-30]
 
     # ---- the requirements note's own paths, as aliases of the same code --------------------------------------------------------
 

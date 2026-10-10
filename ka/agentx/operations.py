@@ -50,6 +50,18 @@ class OperationContext:
     def cancelled(self) -> bool:
         return bool(self.ops.repo.operations.require(self.op.id).cancel_requested)
 
+    # [block plan-30] research-05 R5: a capability that needs a person opens an interaction and returns; input resumes it
+    def await_input(self, prompt: str, ui_schema: dict[str, Any], *, required_permission: Optional[str] = None, **references: Any) -> dict[str, Any]:
+        op = self.ops.repo.operations.require(self.op.id)
+        n = int(op.references.get("interactions", 0)) + 1
+        op.interaction = {"interaction_id": f"{op.id}:{n}", "prompt": prompt, "ui_schema": ui_schema, "required_permission": required_permission}
+        op.references.update({"interactions": n, **{k: v for k, v in references.items() if v is not None}})
+        op.status, op.message = "awaiting_input", prompt
+        self.ops._save(op)
+        self.op = op
+        return {}
+    # [/block plan-30]
+
 
 class Operations:
     def __init__(self, repo):
@@ -140,6 +152,33 @@ class Operations:
         if t is not None:
             t.join(timeout)
         return self.get(operation_id)
+
+    # [block plan-30] research-05 R5: human input and the decided-elsewhere refresh
+    def submit_input(self, operation_id: str, interaction_id: str, values: dict[str, Any], submitted_by: Optional[str],
+                     resume: Callable[[Operation, dict[str, Any], str], dict[str, Any]]) -> Operation:
+        op = self.get(operation_id)
+        if op.status != "awaiting_input" or not op.interaction:
+            raise AgentXError("conflict", f"operation {operation_id} is {op.status}, not awaiting input", details={"status": op.status})
+        if interaction_id != op.interaction.get("interaction_id"):
+            raise AgentXError("conflict", f"interaction {interaction_id!r} is not the open one", details={"open": op.interaction.get("interaction_id")})
+        if not submitted_by:
+            raise AgentXError("forbidden", "submitted_by is required: a decision is made by a named person")
+        result = resume(op, values, submitted_by)                    # raises AgentXError on refusal; the operation stays awaiting input
+        op = self.repo.operations.require(operation_id)
+        op.status, op.progress, op.result, op.interaction = "succeeded", 1.0, result, None
+        op.message = f"decided by {submitted_by}"
+        return self._save(op)
+
+    def refresh(self, op: Operation, check: Optional[Callable[[Operation], Optional[dict[str, Any]]]]) -> Operation:
+        """An open interaction whose subject was decided elsewhere (the console) completes on the next poll."""
+        if check is None or op.status != "awaiting_input":
+            return op
+        done = check(op)
+        if done is None:
+            return op
+        op.status, op.progress, op.result, op.interaction, op.message = "succeeded", 1.0, done, None, "decided elsewhere"
+        return self._save(op)
+    # [/block plan-30]
 
     # ---- cancel ------------------------------------------------------------------------------------------------------
 

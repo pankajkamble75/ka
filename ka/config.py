@@ -168,3 +168,8 @@ declare("KA_SERVICE_ID", str, "knowledge-acquisition", "ka.agentx", "The service
 declare("KA_AGENTX_TOKEN", str, "", "ka.agentx", "Bearer token AgentX presents on /v1 (AgentX keeps it as AGENTX_KNOWLEDGE_ACQUISITION_TOKEN). "
         "Set → required on every /v1 call, also from loopback; unset → the console's access policy applies to /v1.")
 # [/block plan-29]
+
+# [block plan-30] research-05 R4: optional push registration and operation callbacks to AgentX
+declare("KA_AGENTX_URL", str, "", "ka.agentx", "AgentX base URL (e.g. http://127.0.0.1:8765). Set → KA pushes its capability list to "
+        "{KA_AGENTX_URL}/api/v1/services/{KA_SERVICE_ID}/capabilities on start and on demand. Unset → AgentX pulls GET /v1/capabilities.")
+# [/block plan-30]

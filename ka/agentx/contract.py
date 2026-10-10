@@ -62,8 +62,9 @@ class InvokeRequest(BaseModel):
 
 class Interaction(BaseModel):
     interaction_id: str
-    prompt: str
+    prompt: str = ""
     ui_schema: dict[str, Any]
+    required_permission: Optional[str] = None       # plan-30: AgentX lets only a holder answer (HumanInteraction, PROPOSED v1)
 
 
 class OperationState(BaseModel):

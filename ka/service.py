@@ -91,6 +91,12 @@ class KnowledgeAcquisition:
         from ka.wiki import WikiService
         self.wiki = WikiService(self.repo, self.profiles, self.registry, self.lineage, self.provider, self.bus, self.auditor)
         # [/block plan-25]
+        # [block plan-30] research-05 R4, R5: AgentX governance capabilities and the outbox handlers for push/callbacks
+        from ka.agentx.governance_caps import extend as _agentx_extend
+        from ka.agentx.registration import attach as _agentx_attach
+        self.agentx_extend = _agentx_extend
+        _agentx_attach(self)
+        # [/block plan-30]
         # [block plan-27] research-04 R6: a submitted draft becomes governance operations through the one pipeline
         from ka.wiki_reconcile import Reconciler
         self.wiki.reconciler = Reconciler(self.repo, self.governance, self.ingestion, self.wiki, self.governance.extractor)
@@ -119,6 +125,19 @@ class KnowledgeAcquisition:
         # [block plan-09] research-01 R11: an approved candidate from a gap's mission fulfils the request
         self.bus.subscribe("knowledge.approved", lambda ev: self.runtime_guard.fulfil_from_approval(ev["ref"]))
         # [/block plan-09]
+
+        # [block plan-30] research-05 R4: push the capability list to AgentX on start (background; the outbox keeps it if AgentX is down)
+        if start_workers and config.get("KA_AGENTX_URL"):
+            import threading
+            threading.Thread(target=self.agentx_push, name="ka-agentx-register", daemon=True).start()
+        # [/block plan-30]
+
+    def agentx_push(self) -> dict:
+        from ka.agentx.capabilities import registry
+        from ka.agentx.registration import push_capabilities
+        caps = registry(self)
+        caps.update(self.agentx_extend(self))
+        return push_capabilities(self, [c.descriptor() for c in caps.values()])
 
     # ---- wiring --------------------------------------------------------------------------------------
 

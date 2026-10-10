@@ -2,6 +2,27 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-10 15:20 UTC — plan-30: review, conflict resolution and publication for AgentX; tasks; push registration and callbacks (research-05 R4, R5)
+
+**What changed** — `ka/agentx/governance_caps.py` (new): `knowledge.review` and `knowledge.resolve_conflict` open an AgentX interaction
+(`awaiting_input`, `required_permission: knowledge.review`, a decision form in AgentX's UiSchema v1 with candidate/evidence/conflict views);
+`resume_decision` turns `OperationInput` into `governance.decide(by=submitted_by)` (agents and anonymous refused; MERGE needs a merged
+statement; wiki proposals publish or reject); `decided_elsewhere` completes a waiting operation decided in the console; `knowledge.publish`
+approves and applies a graph change (or publishes a wiki proposal) and succeeds only when APPLIED, with a named user; `tasks` lists open
+work with a ready invocation. `ka/agentx/registration.py` (new): `agentx_register` (PUT the full list to AgentX) and `agentx_callback`
+(POST `OperationEvent`) as outbox handlers. `ka/agentx/operations.py`: `await_input`, `submit_input`, `refresh`. `ka/agentx/router.py`:
+`POST /v1/operations/{id}/input` (also reads `X-Acting-User`), `GET /v1/tasks`, `POST /v1/capabilities/register`, aliases
+`POST /v1/knowledge/{id}/review`, `POST /v1/publications`; callbacks hooked on every status change. `ka/agentx/contract.py`:
+`Interaction.required_permission`. `ka/service.py`: extension + outbox handlers + background push on start when `KA_AGENTX_URL` is set.
+`ka/config.py`: `KA_AGENTX_URL`. Tests (14) and `e2e/plan30_agentx_review_flow.py`.
+
+**Verification** — 442 passed, 2 skipped (exit checked); ruff F clean; no protected code (`decide`, `approve`, `apply` called as they are).
+Recount 8/8 D, 8/8 P, 6/6 N. Live flow 9/9 with a fake AgentX server: push of seven conforming descriptors on start, review form valid
+against AgentX's UiSchema rules, 403 without a named user, approve by alice through governance, callbacks ending in succeeded, publish
+APPLIED with lineage, no stale task. Product tests: PT4, PT5 PASS; PT1 descriptors PASS (EOS-free start is plan-31); PT6 local half PASS.
+
+**Decisions and questions** — BUILT: research-05 R4, R5. No new question.
+
 ## 2026-10-10 14:10 UTC — plan-29: the AgentX contract core — capabilities, one invoke endpoint, durable operations, AgentX's envelope (research-05 R2, R3, R10)
 
 **What changed** — `ka/agentx/` (new package): `contract.py` (AgentX PROPOSED v1 models: `InvokeRequest`, `Caller`, `OperationState`,
