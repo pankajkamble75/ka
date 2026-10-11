@@ -380,3 +380,8 @@ it, over HTTP. Guide: [`docs/integration/README.md`](../integration/README.md). 
   Consumers de-duplicate by `event_id`.
 - **Unchanged.** Governance, versioning, provenance, the wiki and the protected code are untouched by this section's work, except
   `ka/graph_adapter.py`, which gained a new class and changed no existing method.
+- **NEXOS v1 (plan-34).** Only actually available capabilities are advertised: with no Knowledge Worker attached, `knowledge.publish` is
+  left out of `/v1/capabilities` and push registration, listed with its reason in `/healthz` `checks.capabilities_unavailable`, and refused
+  on invoke with `unavailable` (`ka/agentx/availability.py`). `GET /v1/screens` exposes the existing console screens in Knowledge Worker's
+  manifest shape, so AgentX links to them rather than duplicating them (`ka/agentx/screens.py`). `/healthz` accepts AgentX's token, which
+  opens nothing else. Evidence: `docs/user-notes/nexos-integration-v1/`.

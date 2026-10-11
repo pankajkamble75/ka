@@ -1,0 +1,9 @@
+{
+ "check": "restart recovery: an operation created before a service restart is still served after it",
+ "operation_id": "AXO-8de82d44",
+ "created_in": "20261011T201343Z",
+ "service_restarted_between": true,
+ "status_after_restart": "succeeded",
+ "capability_id": "knowledge.search",
+ "http": 200
+}

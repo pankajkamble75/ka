@@ -2,6 +2,36 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-11 20:30 UTC — plan-34: NEXOS integration v1 — honest capability availability, screen manifest, /healthz for AgentX, live G0/G1 evidence
+
+**What changed** — `ka/agentx/availability.py` (new): `knowledge.publish` is unavailable in graph mode memory (no Knowledge Worker). It is
+omitted from `/v1/capabilities` and from push registration, listed under `/healthz` `checks.capabilities_unavailable`, and refused on invoke
+with 503 `unavailable`. `ka/agentx/screens.py` (new) and `GET /v1/screens`: KW's manifest shape, six ids mapped to existing console routes.
+`ka/api.py`: `/healthz` on its own router accepting `KA_AGENTX_TOKEN`, which opens nothing else; found by the live probe.
+`ka/config.py`: `KA_AGENTX_LOCAL_PUBLISH`, `KA_PUBLIC_BASE_URL`. `conftest.py` (repository level): the suite's opt-in, since
+`ka/tests/conftest.py` is pinned by plan-28's gate. `tools/nexos_evidence.py` and `tools/nexos_screenshots.py` (new).
+`docs/user-notes/nexos-integration-v1/`: handoff copy, `source-audit.md`, `api-matrix.md`, `test-results.md`, `implementation-report.md`,
+6 real screenshots, raw evidence. Architecture §13 bullet; `docs/integration/openapi-v1.json` regenerated (17 paths).
+
+**Why** — the NEXOS v1 handoff (`pankajkamble75/knowledge-acquisition@4c579c0e`) asks KA to prove its source and runtime (G0), conform
+live (G1), register only available capabilities, and let AgentX link to the specialist UI.
+
+**Verification** — suite 499 passed, 2 skipped (exit checked); plan-34 tests 12/12; ruff F clean. LIVE service: conformance probe 15/15
+against AgentX's schemas, after the first run (14/15) exposed the `/healthz` defect, which is fixed. Restart recovery verified (operation
+`AXO-8de82d44` served after a restart). REAL Data Platform `d5eefbd` 8/8. MOCK-peer flows: two-process 11/11, KW publish 7/7.
+Screenshots: 6/6 rendered, 0 JS errors.
+
+**Runtime actions** — the KA DEV service (`enterprise-os-ka`) had been running pre-`/v1` code since 2026-10-09. It was restarted on current
+code (three times on 2026-10-11, 20:08–20:14 UTC) after backing up `ka_storage` to `/root/ka-storage-backup-20261011T200721Z.tgz`. A
+dedicated `KA_AGENTX_TOKEN` was added to the gitignored `.env`.
+
+**Follow-ups / risks** — BLOCKED on operator networking (WireGuard or TLS) between `srv1886827` and `srv2050509` for real AgentX ↔ KA, and
+on KW reachability plus KA's KW token for real publication. The DEV store holds leftover records from earlier end-to-end runs. There is no
+dedicated publications list screen, and `embed_url` is null until `frame-ancestors` is set.
+
+**Decisions and questions** — contract shapes agreed with the AgentX session (unavailable capability, screen manifest). Network choice is
+the operator's, listed in the implementation report.
+
 ## 2026-10-10 20:00 UTC — Knowledge Worker contract: KW v1's envelope exactly
 
 **What changed** — at the Knowledge Worker session's request, KA's intake contract now uses KW v1's envelope as AgentX does. The fields

@@ -1,0 +1,9 @@
+# REAL Data Platform (/root/dataplatform @ d5eefbd, started on 127.0.0.1:8110 with a fresh /tmp data root, stopped afterwards); KA a real separate process. 2026-10-11T20:16:50Z @ 295f185
+PASS  the real Data Platform started (own root, port 8110)
+PASS  KA's physical store is the Data Platform
+PASS  the bytes committed on the DP (available, DP ids)
+PASS  the DP serves the same bytes
+PASS  the nugget version is a DP derived asset
+PASS  of type nugget, scope from its parent
+PASS  whose parent is the source's asset version
+PASS  the Data Platform was stopped

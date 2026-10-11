@@ -139,7 +139,9 @@ class KnowledgeAcquisition:
         from ka.agentx.registration import push_capabilities
         caps = registry(self)
         caps.update(self.agentx_extend(self))
-        return push_capabilities(self, [c.descriptor() for c in caps.values()])
+        from ka.agentx.availability import unavailable                  # plan-34: push only what is actually available
+        gone = unavailable(self)
+        return push_capabilities(self, [c.descriptor() for c in caps.values() if c.id not in gone])
 
     # ---- wiring --------------------------------------------------------------------------------------
 

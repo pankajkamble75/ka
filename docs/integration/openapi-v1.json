@@ -989,6 +989,29 @@
     ]
    }
   },
+  "/api/knowledge-acquisition/v1/screens": {
+   "get": {
+    "operationId": "screens_route_api_knowledge_acquisition_v1_screens_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Screens Route Api Knowledge Acquisition V1 Screens Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Screens Route",
+    "tags": [
+     "agentx-v1"
+    ]
+   }
+  },
   "/api/knowledge-acquisition/v1/tasks": {
    "get": {
     "operationId": "list_tasks_api_knowledge_acquisition_v1_tasks_get",

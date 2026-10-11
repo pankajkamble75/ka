@@ -190,3 +190,10 @@ declare("KA_DP_API", str, "v1", "ka.data_platform", "Which Data Platform API KA 
 declare("KA_DP_AUTH_MODE", str, "auto", "ka.data_platform", "auto (Bearer when KA_DP_SERVICE_TOKEN is set, else principal headers) | bearer | headers.")
 declare("KA_DP_PRINCIPAL", str, "ka", "ka.data_platform", "X-Principal-Id KA sends in the Data Platform's header auth mode.")
 # [/block plan-32]
+
+# [block plan-34] NEXOS v1: honest availability; where AgentX launches KA's screens
+declare("KA_AGENTX_LOCAL_PUBLISH", bool, False, "ka.agentx", "Advertise knowledge.publish to AgentX even with no Knowledge Worker (graph mode "
+        "memory), where publication only updates KA's shadow graph. Development and tests only.")
+declare("KA_PUBLIC_BASE_URL", str, "", "ka.agentx", "The URL other hosts reach KA's prefix at (e.g. https://ka.example/api/knowledge-acquisition "
+        "is NOT it — give the origin, e.g. https://ka.example). Empty: the request's own base URL.")
+# [/block plan-34]

@@ -237,7 +237,23 @@ async def _read_capped(request: Request, file: UploadFile) -> bytes:
 # [/block plan-02]
 
 
-@router.get("/healthz")
+# [block plan-34] NEXOS v1: AgentX polls {base}/healthz with ITS token from another host; the console router accepts only KA_ACCESS_TOKEN
+# there. /healthz alone moves to a router that accepts either token (least privilege: AgentX's token still opens nothing else).
+def _require_health(request: Request) -> None:
+    import hmac
+    agentx = config.get("KA_AGENTX_TOKEN") or ""
+    header = request.headers.get("authorization", "")
+    presented = header[7:].strip() if header.lower().startswith("bearer ") else ""
+    if agentx and presented and hmac.compare_digest(presented, agentx):
+        return
+    require_access(request)
+
+
+health_router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"], dependencies=[Depends(_require_health)])
+# [/block plan-34]
+
+
+@health_router.get("/healthz")
 def healthz(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     from ka.agentx.router import health_payload          # plan-29 (research-05 R2): AgentX's Health keys, added beside the old ones
     return {"ok": True, "version": __version__, "provider": getattr(ka.provider, "name", "?"),
@@ -1300,6 +1316,7 @@ def create_app(ka: KnowledgeAcquisition | None = None) -> FastAPI:
         set_ka(ka)
     app = FastAPI(title="Enterprise OS — Knowledge Acquisition", version=__version__,
                   description="Acquire · Govern · Know · Compile · (Graph) · Operate · Observe/Correct")
+    app.include_router(health_router)                      # plan-34: /healthz with either token
     app.include_router(router)
     # [block plan-29] research-05 R2, R3, R10: the AgentX services contract under {PREFIX}/v1, with AgentX's error envelope
     from fastapi.exceptions import RequestValidationError

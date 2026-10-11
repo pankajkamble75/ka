@@ -57,6 +57,12 @@ def build_router(get_ka) -> APIRouter:
 
     def invoke(ka, capability_id: str, req: InvokeRequest, idem: Optional[str] = None) -> tuple[int, dict[str, Any]]:
         cap = caps(ka).get(capability_id)
+        # [block plan-34] an omitted (unavailable) capability is refused before anything is recorded
+        from ka.agentx.availability import unavailable
+        why = unavailable(ka).get(capability_id)
+        if cap is not None and why:
+            raise AgentXError("unavailable", f"{capability_id} is not available: {why}", retryable=False, details={"capability_id": capability_id})
+        # [/block plan-34]
         if cap is None:
             raise AgentXError("not_found", f"no capability {capability_id!r}", details={"capabilities": sorted(caps(ka))})
         if req.capability_version and req.capability_version.split(".")[0] != cap.version.split(".")[0]:
@@ -73,8 +79,10 @@ def build_router(get_ka) -> APIRouter:
 
     @router.get("/capabilities")
     def list_capabilities(ka=Depends(get_ka)) -> dict[str, Any]:
+        from ka.agentx.availability import unavailable                # plan-34: only actually available capabilities
+        gone = unavailable(ka)
         return {"service_id": config.get("KA_SERVICE_ID"), "schema_version": SCHEMA_VERSION,
-                "capabilities": [c.descriptor() for c in caps(ka).values()]}
+                "capabilities": [c.descriptor() for c in caps(ka).values() if c.id not in gone]}
 
     @router.post("/capabilities/{capability_id}/invoke")
     def invoke_route(capability_id: str, req: InvokeRequest, ka=Depends(get_ka),
@@ -120,8 +128,10 @@ def build_router(get_ka) -> APIRouter:
 
     @router.post("/capabilities/register")
     def register(ka=Depends(get_ka)) -> dict[str, Any]:
+        from ka.agentx.availability import unavailable
         from ka.agentx.registration import push_capabilities
-        return push_capabilities(ka, [c.descriptor() for c in caps(ka).values()])
+        gone = unavailable(ka)                                          # plan-34: the full AVAILABLE list (omitted ids are deactivated)
+        return push_capabilities(ka, [c.descriptor() for c in caps(ka).values() if c.id not in gone])
 
     @router.post("/knowledge/{item_id}/review")
     def knowledge_review(item_id: str, body: Optional[dict[str, Any]] = None, ka=Depends(get_ka)) -> JSONResponse:
@@ -197,6 +207,13 @@ def build_router(get_ka) -> APIRouter:
         return v1_events(ka, after=after, limit=limit)
     # [/block plan-33]
 
+    # [block plan-34] NEXOS v1: the screen manifest (KW's shape) pointing at KA's existing console
+    @router.get("/screens")
+    def screens_route(request: Request) -> dict[str, Any]:
+        from ka.agentx.screens import manifest
+        return manifest(str(request.base_url))
+    # [/block plan-34]
+
     router.ka_ops = ops                                              # tests and plan-30 reach the store through the router
     router.ka_caps = caps
     return router
@@ -213,6 +230,8 @@ def health_payload(ka) -> dict[str, Any]:
     mode = getattr(ka, "graph_mode", "custom")
     checks["graph"] = f"{mode} (deprecated: imports Enterprise OS)" if mode == "eos-local" else mode
     # [/block plan-31]
+    from ka.agentx.availability import unavailable                      # plan-34: AgentX shows the reason on Services
+    checks["capabilities_unavailable"] = unavailable(ka)
     status = "ok" if checks["storage"] == "ok" else "down"
     if status == "ok" and checks["grammar"] != "ok":
         status = "degraded"

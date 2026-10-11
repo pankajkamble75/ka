@@ -1,0 +1,2428 @@
+{
+ "taken_at": "20261011T201503Z",
+ "host": "srv1886827",
+ "repo": "pankajkamble75/ka",
+ "sha": "295f185",
+ "service_started": "Sun 2026-10-11 20:14:52 UTC",
+ "base": "http://127.0.0.1:8011",
+ "public": "http://2.25.98.235:8011",
+ "capabilities": [
+  "knowledge.acquire",
+  "knowledge.search",
+  "knowledge.read",
+  "knowledge.revise",
+  "knowledge.review",
+  "knowledge.resolve_conflict"
+ ],
+ "capabilities_unavailable": {
+  "knowledge.publish": "no Knowledge Worker is attached (graph mode memory): a publication would only update KA's own shadow graph, not propose a graph change to Knowledge Worker; set KA_KW_URL and KA_KW_TOKEN"
+ },
+ "checks": [
+  {
+   "check": "health",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/healthz",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 1023,
+   "schema": "Health.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "ok": true,
+    "version": "0.1.0",
+    "provider": "anthropic",
+    "adapter": "InMemoryGraphAdapter",
+    "storage": "/root/ka/ka_storage",
+    "status": "ok",
+    "service_id": "knowledge-acquisition",
+    "checks": {
+     "storage": "ok",
+     "provider": "anthropic",
+     "grammar": "ok",
+     "graph": "memory",
+     "capabilities_unavailable": {
+      "knowledge.publish": "no Knowledge Worker is attached (graph mode memory): a publication would only update KA's own shadow graph, not propose a graph change to Knowledge Worker; set KA_KW_URL and KA_KW_TOKEN"
+     }
+    }
+   }
+  },
+  {
+   "check": "capability discovery",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/capabilities",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 110,
+   "schema": "CapabilityList.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "service_id": "knowledge-acquisition",
+    "schema_version": "1",
+    "capabilities": [
+     {
+      "id": "knowledge.acquire",
+      "version": "1.0.0",
+      "title": "Acquire knowledge",
+      "description": "Ingest content (text, note, link), start a research mission, or raise a knowledge gap. Extracted statements become CANDIDATE nuggets awaiting human review \u2014 nothing becomes governed knowledge or changes a graph here.",
+      "input_schema": {
+       "$defs": {
+        "AuthorityType": {
+         "description": "\u00a713 \u2014 configurable categories; rank is stored separately and is configurable.",
+         "enum": [
+          "Regulation",
+          "Approved Enterprise Policy",
+          "Approved Standard",
+          "Approved Architecture",
+          "Operating Procedure",
+          "Vendor / Network Documentation",
+          "Project Documentation",
+          "User Knowledge",
+          "External Reference",
+          "Internet Research",
+          "LLM-Generated Knowledge"
+         ],
+         "title": "AuthorityType",
+         "type": "string"
+        },
+        "ScopeIn": {
+         "additionalProperties": false,
+         "properties": {
+          "scope_type": {
+           "$ref": "#/$defs/ScopeType"
+          },
+          "scope_id": {
+           "minLength": 1,
+           "title": "Scope Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "scope_type",
+          "scope_id"
+         ],
+         "title": "ScopeIn",
+         "type": "object"
+        },
+        "ScopeType": {
+         "description": "\u00a77 \u2014 knowledge MUST be explicitly scoped. Ordered broadest \u2192 narrowest.",
+         "enum": [
+          "STRUCTURE",
+          "PARENT_DOMAIN",
+          "DOMAIN",
+          "INSTANCE"
+         ],
+         "title": "ScopeType",
+         "type": "string"
+        },
+        "TargetIn": {
+         "additionalProperties": false,
+         "properties": {
+          "structure_id": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Structure Id"
+          },
+          "instance_id": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Instance Id"
+          },
+          "leaf_id": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Leaf Id"
+          }
+         },
+         "title": "TargetIn",
+         "type": "object"
+        },
+        "Visibility": {
+         "description": "\u00a742 \u2014 knowledge access, scoped independently from graph access.",
+         "enum": [
+          "PERSONAL",
+          "TEAM",
+          "DOMAIN",
+          "INSTANCE",
+          "ENTERPRISE"
+         ],
+         "title": "Visibility",
+         "type": "string"
+        }
+       },
+       "additionalProperties": false,
+       "properties": {
+        "kind": {
+         "default": "text",
+         "enum": [
+          "text",
+          "note",
+          "link",
+          "research",
+          "gap"
+         ],
+         "title": "Kind",
+         "type": "string"
+        },
+        "name": {
+         "default": "Acquired content",
+         "maxLength": 300,
+         "title": "Name",
+         "type": "string"
+        },
+        "raw_content": {
+         "anyOf": [
+          {
+           "maxLength": 2000000,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Raw Content"
+        },
+        "uri": {
+         "anyOf": [
+          {
+           "maxLength": 4000,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Uri"
+        },
+        "question": {
+         "anyOf": [
+          {
+           "maxLength": 4000,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "research/gap: what knowledge is missing",
+         "title": "Question"
+        },
+        "scope": {
+         "$ref": "#/$defs/ScopeIn"
+        },
+        "authority": {
+         "$ref": "#/$defs/AuthorityType",
+         "default": "User Knowledge"
+        },
+        "visibility": {
+         "$ref": "#/$defs/Visibility",
+         "default": "ENTERPRISE"
+        },
+        "target": {
+         "anyOf": [
+          {
+           "$ref": "#/$defs/TargetIn"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        },
+        "metadata": {
+         "additionalProperties": true,
+         "title": "Metadata",
+         "type": "object"
+        }
+       },
+       "required": [
+        "scope"
+       ],
+       "title": "AcquireIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "$defs": {
+        "Refusal": {
+         "properties": {
+          "statement": {
+           "title": "Statement",
+           "type": "string"
+          },
+          "reason": {
+           "title": "Reason",
+           "type": "string"
+          }
+         },
+         "required": [
+          "statement",
+          "reason"
+         ],
+         "title": "Refusal",
+         "type": "object"
+        }
+       },
+       "properties": {
+        "source_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Source Id"
+        },
+        "source_version_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Source Version Id"
+        },
+        "candidates": {
+         "description": "nugget version refs awaiting review (knowledge.review)",
+         "items": {
+          "type": "string"
+         },
+         "title": "Candidates",
+         "type": "array"
+        },
+        "refusals": {
+         "items": {
+          "$ref": "#/$defs/Refusal"
+         },
+         "title": "Refusals",
+         "type": "array"
+        },
+        "mission_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Mission Id"
+        },
+        "request_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Request Id"
+        },
+        "mapped_into": {
+         "description": "always empty here: a graph change needs governance first (knowledge.publish)",
+         "items": {
+          "type": "string"
+         },
+         "title": "Mapped Into",
+         "type": "array"
+        }
+       },
+       "title": "AcquireOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.acquire"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "ingest",
+        "document",
+        "source",
+        "research",
+        "gap"
+       ],
+       "examples": [
+        "Add this SOP to the merchant-acquiring domain"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 600
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "async"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false
+     },
+     {
+      "id": "knowledge.search",
+      "version": "1.0.0",
+      "title": "Search governed knowledge",
+      "description": "Search ACTIVE governed nuggets and computed wiki articles. A governance/research read, not a runtime answer path (runtime answers navigate the graph \u2014 KA Invariant 1).",
+      "input_schema": {
+       "$defs": {
+        "ScopeIn": {
+         "additionalProperties": false,
+         "properties": {
+          "scope_type": {
+           "$ref": "#/$defs/ScopeType"
+          },
+          "scope_id": {
+           "minLength": 1,
+           "title": "Scope Id",
+           "type": "string"
+          }
+         },
+         "required": [
+          "scope_type",
+          "scope_id"
+         ],
+         "title": "ScopeIn",
+         "type": "object"
+        },
+        "ScopeType": {
+         "description": "\u00a77 \u2014 knowledge MUST be explicitly scoped. Ordered broadest \u2192 narrowest.",
+         "enum": [
+          "STRUCTURE",
+          "PARENT_DOMAIN",
+          "DOMAIN",
+          "INSTANCE"
+         ],
+         "title": "ScopeType",
+         "type": "string"
+        }
+       },
+       "additionalProperties": false,
+       "properties": {
+        "query": {
+         "maxLength": 2000,
+         "minLength": 1,
+         "title": "Query",
+         "type": "string"
+        },
+        "scope": {
+         "anyOf": [
+          {
+           "$ref": "#/$defs/ScopeIn"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null
+        },
+        "instance_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Instance Id"
+        },
+        "domain_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Domain Id"
+        },
+        "kind": {
+         "default": "all",
+         "enum": [
+          "nugget",
+          "article",
+          "all"
+         ],
+         "title": "Kind",
+         "type": "string"
+        },
+        "limit": {
+         "default": 20,
+         "maximum": 100,
+         "minimum": 1,
+         "title": "Limit",
+         "type": "integer"
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        }
+       },
+       "required": [
+        "query"
+       ],
+       "title": "SearchIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "$defs": {
+        "Hit": {
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "kind": {
+           "title": "Kind",
+           "type": "string"
+          },
+          "title": {
+           "title": "Title",
+           "type": "string"
+          },
+          "snippet": {
+           "title": "Snippet",
+           "type": "string"
+          },
+          "status": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Status"
+          },
+          "scope": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Scope"
+          },
+          "provenance": {
+           "$ref": "#/$defs/Provenance"
+          }
+         },
+         "required": [
+          "id",
+          "kind",
+          "title",
+          "snippet"
+         ],
+         "title": "Hit",
+         "type": "object"
+        },
+        "Provenance": {
+         "properties": {
+          "source_ids": {
+           "items": {
+            "type": "string"
+           },
+           "title": "Source Ids",
+           "type": "array"
+          },
+          "decision_id": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Decision Id"
+          },
+          "evidence": {
+           "items": {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           "title": "Evidence",
+           "type": "array"
+          }
+         },
+         "title": "Provenance",
+         "type": "object"
+        }
+       },
+       "properties": {
+        "hits": {
+         "items": {
+          "$ref": "#/$defs/Hit"
+         },
+         "title": "Hits",
+         "type": "array"
+        }
+       },
+       "required": [
+        "hits"
+       ],
+       "title": "SearchOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.read"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "find",
+        "lookup",
+        "knowledge"
+       ],
+       "examples": [
+        "What do we know about refund approval?"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 30
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "sync"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false
+     },
+     {
+      "id": "knowledge.read",
+      "version": "1.0.0",
+      "title": "Read knowledge with provenance",
+      "description": "Read one nugget (by ref or canonical id) or one computed wiki article, with its provenance chain: sources, evidence spans, governance decisions, lineage and graph usage.",
+      "input_schema": {
+       "additionalProperties": false,
+       "properties": {
+        "item_id": {
+         "description": "a nugget ref (KN-001:v2), a canonical id (KN-001), or a wiki key (process:<key>, subject:<key>, scope:<T>|<id>)",
+         "minLength": 1,
+         "title": "Item Id",
+         "type": "string"
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        }
+       },
+       "required": [
+        "item_id"
+       ],
+       "title": "ReadIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "properties": {
+        "kind": {
+         "title": "Kind",
+         "type": "string"
+        },
+        "item": {
+         "additionalProperties": true,
+         "title": "Item",
+         "type": "object"
+        },
+        "provenance": {
+         "additionalProperties": true,
+         "title": "Provenance",
+         "type": "object"
+        }
+       },
+       "required": [
+        "kind",
+        "item",
+        "provenance"
+       ],
+       "title": "ReadOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.read"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "provenance",
+        "lineage",
+        "evidence"
+       ],
+       "examples": [
+        "Why does KA say refunds need approval?"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 30
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "sync"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false
+     },
+     {
+      "id": "knowledge.revise",
+      "version": "1.0.0",
+      "title": "Propose a revision",
+      "description": "Propose a changed statement for a governed nugget, or request its retirement. Creates a candidate that awaits human review; the ACTIVE version is unchanged until a person decides.",
+      "input_schema": {
+       "$defs": {
+        "ChangeIn": {
+         "additionalProperties": false,
+         "properties": {
+          "statement": {
+           "anyOf": [
+            {
+             "maxLength": 4000,
+             "minLength": 1,
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "default": null,
+           "title": "Statement"
+          },
+          "retire": {
+           "default": false,
+           "title": "Retire",
+           "type": "boolean"
+          }
+         },
+         "title": "ChangeIn",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "properties": {
+        "item_id": {
+         "minLength": 1,
+         "title": "Item Id",
+         "type": "string"
+        },
+        "change": {
+         "$ref": "#/$defs/ChangeIn"
+        },
+        "rationale": {
+         "maxLength": 2000,
+         "minLength": 1,
+         "title": "Rationale",
+         "type": "string"
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        }
+       },
+       "required": [
+        "item_id",
+        "change",
+        "rationale"
+       ],
+       "title": "ReviseIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "properties": {
+        "proposal_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "description": "the candidate version ref that now awaits review",
+         "title": "Proposal Id"
+        },
+        "status": {
+         "title": "Status",
+         "type": "string"
+        },
+        "review_required": {
+         "default": true,
+         "title": "Review Required",
+         "type": "boolean"
+        },
+        "note": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Note"
+        }
+       },
+       "required": [
+        "status"
+       ],
+       "title": "ReviseOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.revise"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "correct",
+        "change",
+        "retire"
+       ],
+       "examples": [
+        "The refund threshold is now $750"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 30
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "sync"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false
+     },
+     {
+      "id": "knowledge.review",
+      "version": "1.0.0",
+      "title": "Review a candidate",
+      "description": "Ask a person to approve or reject a candidate nugget (or a wiki edit). The operation waits for input in AgentX's form; the decision is KA governance's own (`decide`), made by the submitting user \u2014 never by an agent.",
+      "input_schema": {
+       "additionalProperties": false,
+       "properties": {
+        "item_id": {
+         "description": "a PENDING_REVIEW / CONFLICT nugget ref, or a wiki proposal id (WP-\u2026)",
+         "minLength": 1,
+         "title": "Item Id",
+         "type": "string"
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        }
+       },
+       "required": [
+        "item_id"
+       ],
+       "title": "ReviewIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "properties": {
+        "decision_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Decision Id"
+        },
+        "outcome": {
+         "title": "Outcome",
+         "type": "string"
+        },
+        "decided_by": {
+         "title": "Decided By",
+         "type": "string"
+        },
+        "resulting_refs": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Resulting Refs",
+         "type": "array"
+        },
+        "graph_change_ids": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Graph Change Ids",
+         "type": "array"
+        },
+        "note": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Note"
+        }
+       },
+       "required": [
+        "outcome",
+        "decided_by"
+       ],
+       "title": "DecisionOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.review"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "approve",
+        "reject",
+        "review"
+       ],
+       "examples": [
+        "Review the pending refund candidate"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 604800
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "async"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false,
+      "ui_schema": {
+       "version": "1",
+       "title": "Review a candidate",
+       "forms": [
+        {
+         "id": "decision",
+         "title": "Your decision",
+         "fields": [
+          {
+           "name": "outcome",
+           "type": "select",
+           "label": "Decision",
+           "required": true,
+           "options": [
+            {
+             "value": "APPROVE",
+             "label": "Approve"
+            },
+            {
+             "value": "REJECT",
+             "label": "Reject"
+            },
+            {
+             "value": "REQUEST_MORE_RESEARCH",
+             "label": "Request more research"
+            }
+           ]
+          },
+          {
+           "name": "reason",
+           "type": "textarea",
+           "label": "Reason",
+           "required": true,
+           "max_length": 2000,
+           "help": "Recorded on the governance decision and in the audit trail."
+          }
+         ],
+         "submit": "submit"
+        }
+       ],
+       "views": [
+        {
+         "id": "candidate",
+         "type": "detail",
+         "title": "Candidate",
+         "binding": {
+          "source": "operation",
+          "path": "references.candidate"
+         }
+        },
+        {
+         "id": "evidence",
+         "type": "table",
+         "title": "Evidence",
+         "binding": {
+          "source": "operation",
+          "path": "references.evidence"
+         },
+         "columns": [
+          {
+           "key": "source_title",
+           "label": "Source"
+          },
+          {
+           "key": "locator",
+           "label": "Where"
+          },
+          {
+           "key": "excerpt",
+           "label": "Excerpt"
+          }
+         ]
+        },
+        {
+         "id": "conflicts",
+         "type": "table",
+         "title": "Conflicts",
+         "binding": {
+          "source": "operation",
+          "path": "references.conflicts"
+         },
+         "columns": [
+          {
+           "key": "existing_ref",
+           "label": "Existing"
+          },
+          {
+           "key": "relationship",
+           "label": "Relationship"
+          },
+          {
+           "key": "explanation",
+           "label": "Why"
+          }
+         ]
+        }
+       ],
+       "actions": [
+        {
+         "id": "submit",
+         "label": "Submit decision",
+         "kind": "submit",
+         "style": "primary"
+        }
+       ]
+      }
+     },
+     {
+      "id": "knowledge.resolve_conflict",
+      "version": "1.0.0",
+      "title": "Resolve a knowledge conflict",
+      "description": "Ask a person to resolve a candidate that contradicts governed knowledge: accept the new statement, keep the existing one, merge them, or keep both with context.",
+      "input_schema": {
+       "additionalProperties": false,
+       "properties": {
+        "item_id": {
+         "description": "a PENDING_REVIEW / CONFLICT nugget ref, or a wiki proposal id (WP-\u2026)",
+         "minLength": 1,
+         "title": "Item Id",
+         "type": "string"
+        },
+        "tenant_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Tenant Id"
+        }
+       },
+       "required": [
+        "item_id"
+       ],
+       "title": "ReviewIn",
+       "type": "object"
+      },
+      "output_schema": {
+       "properties": {
+        "decision_id": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Decision Id"
+        },
+        "outcome": {
+         "title": "Outcome",
+         "type": "string"
+        },
+        "decided_by": {
+         "title": "Decided By",
+         "type": "string"
+        },
+        "resulting_refs": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Resulting Refs",
+         "type": "array"
+        },
+        "graph_change_ids": {
+         "items": {
+          "type": "string"
+         },
+         "title": "Graph Change Ids",
+         "type": "array"
+        },
+        "note": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Note"
+        }
+       },
+       "required": [
+        "outcome",
+        "decided_by"
+       ],
+       "title": "DecisionOut",
+       "type": "object"
+      },
+      "permissions": [
+       "knowledge.review"
+      ],
+      "discovery": {
+       "category": "knowledge",
+       "tags": [
+        "knowledge-acquisition",
+        "governed-knowledge"
+       ],
+       "keywords": [
+        "conflict",
+        "merge"
+       ],
+       "examples": [
+        "Resolve the refund threshold conflict"
+       ],
+       "processes": []
+      },
+      "health_endpoint": "/healthz",
+      "timeout": {
+       "request_s": 30,
+       "operation_s": 604800
+      },
+      "retry": {
+       "max_attempts": 3,
+       "backoff_s": 2
+      },
+      "invocation": {
+       "endpoint": "/v1/capabilities/{capability_id}/invoke",
+       "mode": "async"
+      },
+      "idempotent": true,
+      "requires_approval": false,
+      "deprecated": false,
+      "ui_schema": {
+       "version": "1",
+       "title": "Resolve a conflict",
+       "forms": [
+        {
+         "id": "decision",
+         "title": "Your decision",
+         "fields": [
+          {
+           "name": "outcome",
+           "type": "select",
+           "label": "Decision",
+           "required": true,
+           "options": [
+            {
+             "value": "ACCEPT_NEW",
+             "label": "Accept the new statement"
+            },
+            {
+             "value": "KEEP_EXISTING",
+             "label": "Keep the existing statement"
+            },
+            {
+             "value": "MERGE",
+             "label": "Merge into one statement"
+            },
+            {
+             "value": "BOTH_VALID_ADD_CONTEXT",
+             "label": "Both valid (add context)"
+            },
+            {
+             "value": "REJECT",
+             "label": "Reject"
+            }
+           ]
+          },
+          {
+           "name": "reason",
+           "type": "textarea",
+           "label": "Reason",
+           "required": true,
+           "max_length": 2000,
+           "help": "Recorded on the governance decision and in the audit trail."
+          },
+          {
+           "name": "merged_statement",
+           "type": "textarea",
+           "label": "Merged statement",
+           "max_length": 4000,
+           "help": "Required when the decision is Merge: the single statement that replaces both."
+          }
+         ],
+         "submit": "submit"
+        }
+       ],
+       "views": [
+        {
+         "id": "candidate",
+         "type": "detail",
+         "title": "Candidate",
+         "binding": {
+          "source": "operation",
+          "path": "references.candidate"
+         }
+        },
+        {
+         "id": "evidence",
+         "type": "table",
+         "title": "Evidence",
+         "binding": {
+          "source": "operation",
+          "path": "references.evidence"
+         },
+         "columns": [
+          {
+           "key": "source_title",
+           "label": "Source"
+          },
+          {
+           "key": "locator",
+           "label": "Where"
+          },
+          {
+           "key": "excerpt",
+           "label": "Excerpt"
+          }
+         ]
+        },
+        {
+         "id": "conflicts",
+         "type": "table",
+         "title": "Conflicts",
+         "binding": {
+          "source": "operation",
+          "path": "references.conflicts"
+         },
+         "columns": [
+          {
+           "key": "existing_ref",
+           "label": "Existing"
+          },
+          {
+           "key": "relationship",
+           "label": "Relationship"
+          },
+          {
+           "key": "explanation",
+           "label": "Why"
+          }
+         ]
+        }
+       ],
+       "actions": [
+        {
+         "id": "submit",
+         "label": "Submit decision",
+         "kind": "submit",
+         "style": "primary"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "check": "screen manifest",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/screens",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 3,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "screens": [
+     {
+      "id": "ka.sources",
+      "title": "Sources",
+      "path": "/console/#/add",
+      "launch_url": "http://127.0.0.1:8011/console/#/add",
+      "embed_url": null,
+      "deep_link_params": [],
+      "requires": [
+       "knowledge.acquire"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Add sources (upload, paste, note, link, connectors); each source's versions, provenance and evidence at #/source/{source_id}."
+     },
+     {
+      "id": "ka.research",
+      "title": "Research",
+      "path": "/console/#/add",
+      "launch_url": "http://127.0.0.1:8011/console/#/add",
+      "embed_url": null,
+      "deep_link_params": [
+       "mission_id"
+      ],
+      "requires": [
+       "knowledge.acquire"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Start a research mission for a knowledge gap; a mission's runs, sources and candidates at #/mission/{mission_id}."
+     },
+     {
+      "id": "ka.wiki",
+      "title": "Knowledge Wiki",
+      "path": "/console/#/wiki",
+      "launch_url": "http://127.0.0.1:8011/console/#/wiki",
+      "embed_url": null,
+      "deep_link_params": [
+       "page_key"
+      ],
+      "requires": [
+       "knowledge.read"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Readable articles computed from governed nuggets; edits become governance proposals."
+     },
+     {
+      "id": "ka.nuggets",
+      "title": "Nuggets",
+      "path": "/console/#/nuggets?view=active",
+      "launch_url": "http://127.0.0.1:8011/console/#/nuggets?view=active",
+      "embed_url": null,
+      "deep_link_params": [
+       "nugget_ref"
+      ],
+      "requires": [
+       "knowledge.read"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Governed knowledge nuggets with versions, lineage and provenance; one nugget at #/nugget/{nugget_ref}."
+     },
+     {
+      "id": "ka.reviews",
+      "title": "Reviews",
+      "path": "/console/#/nuggets?view=pending",
+      "launch_url": "http://127.0.0.1:8011/console/#/nuggets?view=pending",
+      "embed_url": null,
+      "deep_link_params": [
+       "nugget_ref"
+      ],
+      "requires": [
+       "knowledge.review"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Candidates waiting for a person; conflicts at #/nuggets?view=conflicts and #/conflict/{nugget_ref}."
+     },
+     {
+      "id": "ka.publications",
+      "title": "Publications",
+      "path": "/console/#/nuggets?view=active",
+      "launch_url": "http://127.0.0.1:8011/console/#/nuggets?view=active",
+      "embed_url": null,
+      "deep_link_params": [
+       "proposal_id"
+      ],
+      "requires": [
+       "knowledge.publish"
+      ],
+      "provided_by": "knowledge-acquisition",
+      "description": "Approved knowledge and its graph change proposals; one proposal at #/change/{proposal_id}. No dedicated list screen yet."
+     }
+    ]
+   }
+  },
+  {
+   "check": "invoke knowledge.search (sync)",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.search/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 201,
+   "schema": "OperationState.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "operation_id": "AXO-b8b9b98c",
+    "capability_id": "knowledge.search",
+    "status": "succeeded",
+    "progress": 1.0,
+    "message": "",
+    "result": {
+     "hits": [
+      {
+       "id": "KN-002:v1",
+       "kind": "nugget",
+       "title": "Refunds above $500 require manager approval",
+       "snippet": "Refunds above $500 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-acec25fc"
+        ],
+        "decision_id": "GD-15d28770",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-006:v1",
+       "kind": "nugget",
+       "title": "Merchant A refunds above $1,000 require manager approval",
+       "snippet": "Merchant A refunds above $1,000 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "INSTANCE:merchant-a",
+       "provenance": {
+        "source_ids": [
+         "SRC-e7d7b1ec"
+        ],
+        "decision_id": "GD-94063f5c",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-101:v1",
+       "kind": "nugget",
+       "title": "Store flow1791489630 refunds above $900 require manager approval",
+       "snippet": "Store flow1791489630 refunds above $900 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-6a552bfa",
+         "SRC-877e9c2b"
+        ],
+        "decision_id": "GD-bbbee9b0",
+        "evidence": []
+       }
+      }
+     ]
+    },
+    "error": null,
+    "interaction": null,
+    "references": {}
+   }
+  },
+  {
+   "check": "operation status",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/operations/AXO-b8b9b98c",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 3,
+   "schema": "OperationState.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "operation_id": "AXO-b8b9b98c",
+    "capability_id": "knowledge.search",
+    "status": "succeeded",
+    "progress": 1.0,
+    "message": "",
+    "result": {
+     "hits": [
+      {
+       "id": "KN-002:v1",
+       "kind": "nugget",
+       "title": "Refunds above $500 require manager approval",
+       "snippet": "Refunds above $500 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-acec25fc"
+        ],
+        "decision_id": "GD-15d28770",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-006:v1",
+       "kind": "nugget",
+       "title": "Merchant A refunds above $1,000 require manager approval",
+       "snippet": "Merchant A refunds above $1,000 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "INSTANCE:merchant-a",
+       "provenance": {
+        "source_ids": [
+         "SRC-e7d7b1ec"
+        ],
+        "decision_id": "GD-94063f5c",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-101:v1",
+       "kind": "nugget",
+       "title": "Store flow1791489630 refunds above $900 require manager approval",
+       "snippet": "Store flow1791489630 refunds above $900 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-6a552bfa",
+         "SRC-877e9c2b"
+        ],
+        "decision_id": "GD-bbbee9b0",
+        "evidence": []
+       }
+      }
+     ]
+    },
+    "error": null,
+    "interaction": null,
+    "references": {}
+   }
+  },
+  {
+   "check": "idempotent replay (same key \u2192 same operation)",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.search/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 26,
+   "schema": "OperationState.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "operation_id": "AXO-973aa147",
+    "capability_id": "knowledge.search",
+    "status": "succeeded",
+    "progress": 1.0,
+    "message": "",
+    "result": {
+     "hits": [
+      {
+       "id": "KN-002:v1",
+       "kind": "nugget",
+       "title": "Refunds above $500 require manager approval",
+       "snippet": "Refunds above $500 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-acec25fc"
+        ],
+        "decision_id": "GD-15d28770",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-006:v1",
+       "kind": "nugget",
+       "title": "Merchant A refunds above $1,000 require manager approval",
+       "snippet": "Merchant A refunds above $1,000 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "INSTANCE:merchant-a",
+       "provenance": {
+        "source_ids": [
+         "SRC-e7d7b1ec"
+        ],
+        "decision_id": "GD-94063f5c",
+        "evidence": []
+       }
+      },
+      {
+       "id": "KN-101:v1",
+       "kind": "nugget",
+       "title": "Store flow1791489630 refunds above $900 require manager approval",
+       "snippet": "Store flow1791489630 refunds above $900 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "provenance": {
+        "source_ids": [
+         "SRC-6a552bfa",
+         "SRC-877e9c2b"
+        ],
+        "decision_id": "GD-bbbee9b0",
+        "evidence": []
+       }
+      }
+     ]
+    },
+    "error": null,
+    "interaction": null,
+    "references": {}
+   }
+  },
+  {
+   "check": "invoke knowledge.read",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.read/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 219,
+   "schema": "OperationState.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "operation_id": "AXO-05853201",
+    "capability_id": "knowledge.read",
+    "status": "succeeded",
+    "progress": 1.0,
+    "message": "",
+    "result": {
+     "kind": "nugget",
+     "item": {
+      "id": "KN-3f0c6e30",
+      "canonical_id": "KN-002",
+      "version": 1,
+      "title": "Refunds above $500 require manager approval",
+      "statement": "Refunds above $500 require manager approval.",
+      "normalized_meaning": "refund above 500 manager approval",
+      "scope_type": "DOMAIN",
+      "scope_id": "merchant-acquiring",
+      "domain_id": "merchant-acquiring",
+      "instance_id": null,
+      "parent_domain_id": "payment-processing",
+      "structure_id": "universal",
+      "knowledge_type": "rule",
+      "subject": null,
+      "predicate": null,
+      "object": null,
+      "status": "ACTIVE",
+      "authority_type": "Operating Procedure",
+      "authority_rank": 70,
+      "confidence": 0.8,
+      "visibility": "ENTERPRISE",
+      "effective_from": "2026-10-08T09:32:33.084887+00:00",
+      "effective_to": null,
+      "created_at": "2026-10-08T09:32:33.067537+00:00",
+      "created_by": "pankaj",
+      "approved_at": "2026-10-08T09:32:33.084282+00:00",
+      "approved_by": "governance-lead",
+      "activated_at": "2026-10-08T09:32:33.084887+00:00",
+      "supersedes": null,
+      "superseded_by": null,
+      "source_refs": [
+       "SRC-acec25fc"
+      ],
+      "evidence_refs": [
+       "EV-91498393"
+      ],
+      "relationships": [],
+      "tags": [],
+      "graph_group": "Refunds",
+      "governance_decision_id": "GD-15d28770",
+      "derived_graph_refs": [
+       {
+        "graph_id": "merchant-acquiring",
+        "element_id": "r.refunds_above_500_require_manager_approval",
+        "element_kind": "rule",
+        "graph_change_id": "GCP-40ed2ba2"
+       }
+      ],
+      "graph_change_refs": [
+       "GCP-40ed2ba2"
+      ],
+      "research_run_refs": [],
+      "correction_refs": [],
+      "channel": "CONTENT",
+      "inherited_from": null,
+      "inheritance_state": null,
+      "change_reason": null,
+      "comments": [],
+      "analysis": {
+       "analyzed_at": "2026-10-08T09:32:33.068178+00:00",
+       "findings": [],
+       "scope_decision": {
+        "alternatives": [],
+        "confidence": 1.0,
+        "rationale": [
+         "raised at graph location \u2192 DOMAIN:merchant-acquiring (+1.00)"
+        ],
+        "requires_approval": false,
+        "scope": "DOMAIN:merchant-acquiring"
+       }
+      }
+     },
+     "provenance": {
+      "sources": [
+       {
+        "id": "SRC-acec25fc",
+        "source_type": "markdown",
+        "channel": "CONTENT",
+        "title": "Merchant Operations Manual",
+        "original_location": null,
+        "original_filename": null,
+        "owner": "pankaj",
+        "author": null,
+        "ingested_at": "2026-10-08T09:32:33.058498+00:00",
+        "source_created_at": null,
+        "effective_date": null,
+        "checksum": "da3dd7ca4f1be504c123ea77412f65b993b1d680e12b21da22a7a0655ed9e024",
+        "visibility": "ENTERPRISE",
+        "permissions": [
+         "pankaj"
+        ],
+        "domain_id": "merchant-acquiring",
+        "instance_id": null,
+        "scope": {
+         "scope_type": "DOMAIN",
+         "scope_id": "merchant-acquiring"
+        },
+        "extraction_status": "EXTRACTED",
+        "content_version": 1,
+        "current_version_id": "SRV-8638e3d7",
+        "authority_type": "Operating Procedure",
+        "metadata": {},
+        "connection_id": null,
+        "revoked_at": null
+       }
+      ],
+      "evidence": [
+       {
+        "id": "EV-91498393",
+        "source_id": "SRC-acec25fc",
+        "source_version_id": "SRV-8638e3d7",
+        "locator": "Refunds",
+        "span_id": null,
+        "start": null,
+        "end": null,
+        "excerpt": "Refunds above $500 require manager approval.",
+        "created_at": "2026-10-08T09:32:33.066656+00:00",
+        "created_by": "pankaj",
+        "research_run_id": null,
+        "visibility": "ENTERPRISE"
+       }
+      ],
+      "decisions": [
+       {
+        "id": "GD-0c343e8c",
+        "subject_ref": "KN-086:v1",
+        "related_refs": [
+         "KN-002:v1"
+        ],
+        "outcome": "AUTO_RESOLVED_BY_AUTHORITY",
+        "decided_by": "ka.governance",
+        "decided_at": "2026-10-08T15:36:55.886470+00:00",
+        "reason": "candidate authority Internet Research (rank 20) contradicts ACTIVE KN-002:v1 of authority Operating Procedure (rank 70); gap \u2265 40 \u2014 kept existing automatically. Candidate preserved for review.",
+        "comments": null,
+        "automatic": true,
+        "resulting_refs": [],
+        "llm_recommendation": null,
+        "visibility_change": null
+       },
+       {
+        "id": "GD-15d28770",
+        "subject_ref": "KN-002:v1",
+        "related_refs": [],
+        "outcome": "APPROVE",
+        "decided_by": "governance-lead",
+        "decided_at": "2026-10-08T09:32:33.084272+00:00",
+        "reason": "matches the operations manual",
+        "comments": null,
+        "automatic": false,
+        "resulting_refs": [
+         "KN-002:v1"
+        ],
+        "llm_recommendation": null,
+        "visibility_change": null
+       },
+       {
+        "id": "GD-2a43f6af",
+        "subject_ref": "KN-089:v1",
+        "related_refs": [
+         "KN-002:v1"
+        ],
+        "outcome": "AUTO_RESOLVED_BY_AUTHORITY",
+        "decided_by": "ka.governance",
+        "decided_at": "2026-10-08T15:37:45.007145+00:00",
+        "reason": "candidate authority Internet Research (rank 20) contradicts ACTIVE KN-002:v1 of authority Operating Procedure (rank 70); gap \u2265 40 \u2014 kept existing automatically. Candidate preserved for review.",
+        "comments": null,
+        "automatic": true,
+        "resulting_refs": [],
+        "llm_recommendation": null,
+        "visibility_change": null
+       },
+       {
+        "id": "GD-331b9263",
+        "subject_ref": "KN-007:v1",
+        "related_refs": [
+         "KN-002:v1"
+        ],
+        "outcome": "AUTO_RESOLVED_BY_AUTHORITY",
+        "decided_by": "ka.governance",
+        "decided_at": "2026-10-08T09:32:33.135358+00:00",
+        "reason": "candidate authority Internet Research (rank 20) contradicts ACTIVE KN-002:v1 of authority Operating Procedure (rank 70); gap \u2265 40 \u2014 kept existing automatically. Candidate preserved for review.",
+        "comments": null,
+        "automatic": true,
+        "resulting_refs": [],
+        "llm_recommendation": null,
+        "visibility_change": null
+       },
+       {
+        "id": "GD-5725b902",
+        "subject_ref": "KN-092:v1",
+        "related_refs": [
+         "KN-002:v1"
+        ],
+        "outcome": "AUTO_RESOLVED_BY_AUTHORITY",
+        "decided_by": "ka.governance",
+        "decided_at": "2026-10-08T15:38:31.678037+00:00",
+        "reason": "candidate authority Internet Research (rank 20) contradicts ACTIVE KN-002:v1 of authority Operating Procedure (rank 70); gap \u2265 40 \u2014 kept existing automatically. Candidate preserved for review.",
+        "comments": null,
+        "automatic": true,
+        "resulting_refs": [],
+        "llm_recommendation": null,
+        "visibility_change": null
+       },
+       {
+        "id": "GD-cb0c0bea",
+        "subject_ref": "KN-095:v1",
+        "related_refs": [
+         "KN-002:v1"
+        ],
+        "outcome": "APPROVE",
+        "decided_by": "flow",
+        "decided_at": "2026-10-08T15:47:06.878093+00:00",
+        "reason": "flow",
+        "comments": null,
+        "automatic": false,
+        "resulting_refs": [
+         "KN-095:v1"
+        ],
+        "llm_recommendation": null,
+        "visibility_change": null
+       }
+      ],
+      "lineage": {
+       "nugget_id": "KN-002",
+       "version": 1,
+       "ref": "KN-002:v1",
+       "title": "Refunds above $500 require manager approval",
+       "statement": "Refunds above $500 require manager approval.",
+       "status": "ACTIVE",
+       "scope": "DOMAIN:merchant-acquiring",
+       "channel": "CONTENT",
+       "sources": [
+        {
+         "source_id": "SRC-acec25fc",
+         "title": "Merchant Operations Manual",
+         "type": "markdown",
+         "authority": "Operating Procedure",
+         "location": null
+        }
+       ],
+       "evidence": [
+        {
+         "evidence_id": "EV-91498393",
+         "source_id": "SRC-acec25fc",
+         "locator": "Refunds",
+         "excerpt": "Refunds above $500 require manager approval."
+        }
+       ],
+       "research_runs": [],
+       "corrections": [],
+       "governance_decision": {
+        "id": "GD-15d28770",
+        "outcome": "APPROVE",
+        "decided_by": "governance-lead",
+        "decided_at": "2026-10-08T09:32:33.084272+00:00",
+        "reason": "matches the operations manual"
+       },
+       "supersedes": null,
+       "superseded_by": null,
+       "graph_change_id": null,
+       "graph_change_refs": [
+        "GCP-40ed2ba2"
+       ],
+       "materialized_as": [
+        {
+         "graph_id": "merchant-acquiring",
+         "element_id": "r.refunds_above_500_require_manager_approval",
+         "element_kind": "rule",
+         "graph_change_id": "GCP-40ed2ba2"
+        }
+       ],
+       "inheritance_state": null,
+       "inherited_from": null
+      },
+      "graph_usage": [
+       {
+        "id": "DEP-c3b26940",
+        "graph_id": "merchant-acquiring",
+        "element_id": "r.refunds_above_500_require_manager_approval",
+        "element_kind": "rule",
+        "scope": {
+         "scope_type": "DOMAIN",
+         "scope_id": "merchant-acquiring"
+        },
+        "nugget_ref": "KN-002:v1",
+        "governance_decision_id": "GD-15d28770",
+        "graph_change_id": "GCP-40ed2ba2",
+        "inheritance_state": "LOCALLY_EXTENDED",
+        "created_at": "2026-10-08T09:32:33.088850+00:00",
+        "active": true
+       }
+      ],
+      "graph_changes": [
+       {
+        "id": "GCP-40ed2ba2",
+        "affected_element_ids": [
+         "r.refunds_above_500_require_manager_approval"
+        ],
+        "status": "APPLIED",
+        "created_at": "2026-10-08T09:32:33.085613+00:00",
+        "applied_at": "2026-10-08T09:32:33.090266+00:00"
+       }
+      ]
+     }
+    },
+    "error": null,
+    "interaction": null,
+    "references": {}
+   }
+  },
+  {
+   "check": "human tasks",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/tasks?limit=5",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 12,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "tasks": [
+     {
+      "task_id": "task:KN-008:v1",
+      "kind": "review_candidate",
+      "item_id": "KN-008:v1",
+      "title": "International refunds settle within 5 days",
+      "summary": "International refunds settle within 5 days.",
+      "scope": "DOMAIN:merchant-acquiring",
+      "created_at": "2026-10-08T09:32:33.138744+00:00",
+      "start": {
+       "capability": "knowledge.review",
+       "input": {
+        "item_id": "KN-008:v1"
+       }
+      }
+     },
+     {
+      "task_id": "task:KN-013:v1",
+      "kind": "review_candidate",
+      "item_id": "KN-013:v1",
+      "title": "Merchant underwriting is a decision process.",
+      "summary": "Merchant underwriting is a decision process.",
+      "scope": "DOMAIN:merchant-acquiring",
+      "created_at": "2026-10-08T14:58:42.277120+00:00",
+      "start": {
+       "capability": "knowledge.review",
+       "input": {
+        "item_id": "KN-013:v1"
+       }
+      }
+     },
+     {
+      "task_id": "task:KN-014:v1",
+      "kind": "review_candidate",
+      "item_id": "KN-014:v1",
+      "title": "Make credit decision approve, decline, or refer the\u2026",
+      "summary": "Make credit decision \u2014 approve, decline, or refer the application based on the risk score.",
+      "scope": "DOMAIN:merchant-acquiring",
+      "created_at": "2026-10-08T15:07:54.863846+00:00",
+      "start": {
+       "capability": "knowledge.review",
+       "input": {
+        "item_id": "KN-014:v1"
+       }
+      }
+     },
+     {
+      "task_id": "task:KN-015:v1",
+      "kind": "review_candidate",
+      "item_id": "KN-015:v1",
+      "title": "Communicate decision send the outcome to the merchant\u2026",
+      "summary": "Communicate decision \u2014 send the outcome to the merchant within two business days.",
+      "scope": "DOMAIN:merchant-acquiring",
+      "created_at": "2026-10-08T15:07:54.866186+00:00",
+      "start": {
+       "capability": "knowledge.review",
+       "input": {
+        "item_id": "KN-015:v1"
+       }
+      }
+     },
+     {
+      "task_id": "task:KN-016:v1",
+      "kind": "review_candidate",
+      "item_id": "KN-016:v1",
+      "title": "Applications with a risk score above 80 must\u2026",
+      "summary": "Applications with a risk score above 80 must be referred to the credit committee.",
+      "scope": "DOMAIN:merchant-acquiring",
+      "created_at": "2026-10-08T15:07:54.868371+00:00",
+      "start": {
+       "capability": "knowledge.review",
+       "input": {
+        "item_id": "KN-016:v1"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "check": "events (replayable)",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/events?after=0&limit=5",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 11,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "events": [
+     {
+      "event_id": "EVT-08637086",
+      "type": "knowledge.review.required",
+      "schema_version": "ka.v1",
+      "seq": 2,
+      "occurred_at": "2026-10-08T09:32:33.065719+00:00",
+      "subject": {
+       "canonical_id": "KN-001",
+       "ref": "KN-001:v1",
+       "scope": "DOMAIN:merchant-acquiring"
+      },
+      "provenance": {
+       "service_id": "knowledge-acquisition",
+       "source_event": "knowledge.candidate.created",
+       "ka_version": "0.1.0",
+       "log_version": "ka-events/0"
+      }
+     },
+     {
+      "event_id": "EVT-e9793c80",
+      "type": "knowledge.review.required",
+      "schema_version": "ka.v1",
+      "seq": 3,
+      "occurred_at": "2026-10-08T09:32:33.067921+00:00",
+      "subject": {
+       "canonical_id": "KN-002",
+       "ref": "KN-002:v1",
+       "scope": "DOMAIN:merchant-acquiring"
+      },
+      "provenance": {
+       "service_id": "knowledge-acquisition",
+       "source_event": "knowledge.candidate.created",
+       "ka_version": "0.1.0",
+       "log_version": "ka-events/0"
+      }
+     },
+     {
+      "event_id": "EVT-4cdda4fc",
+      "type": "knowledge.review.required",
+      "schema_version": "ka.v1",
+      "seq": 4,
+      "occurred_at": "2026-10-08T09:32:33.070132+00:00",
+      "subject": {
+       "canonical_id": "KN-003",
+       "ref": "KN-003:v1",
+       "scope": "DOMAIN:merchant-acquiring"
+      },
+      "provenance": {
+       "service_id": "knowledge-acquisition",
+       "source_event": "knowledge.candidate.created",
+       "ka_version": "0.1.0",
+       "log_version": "ka-events/0"
+      }
+     },
+     {
+      "event_id": "EVT-dd1047b9",
+      "type": "knowledge.review.required",
+      "schema_version": "ka.v1",
+      "seq": 5,
+      "occurred_at": "2026-10-08T09:32:33.072042+00:00",
+      "subject": {
+       "canonical_id": "KN-004",
+       "ref": "KN-004:v1",
+       "scope": "DOMAIN:merchant-acquiring"
+      },
+      "provenance": {
+       "service_id": "knowledge-acquisition",
+       "source_event": "knowledge.candidate.created",
+       "ka_version": "0.1.0",
+       "log_version": "ka-events/0"
+      }
+     },
+     {
+      "event_id": "EVT-c0adabf4",
+      "type": "knowledge.review.required",
+      "schema_version": "ka.v1",
+      "seq": 6,
+      "occurred_at": "2026-10-08T09:32:33.074592+00:00",
+      "subject": {
+       "canonical_id": "KN-005",
+       "ref": "KN-005:v1",
+       "scope": "DOMAIN:merchant-acquiring"
+      },
+      "provenance": {
+       "service_id": "knowledge-acquisition",
+       "source_event": "knowledge.candidate.created",
+       "ka_version": "0.1.0",
+       "log_version": "ka-events/0"
+      }
+     }
+    ],
+    "next_after": 6,
+    "schema_version": "ka.v1"
+   }
+  },
+  {
+   "check": "error: no token",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/capabilities",
+   "via": "http://2.25.98.235:8011",
+   "auth": "none",
+   "expect": 401,
+   "status": 401,
+   "ms": 2,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "error": {
+     "code": "unauthorized",
+     "message": "a bearer token for AgentX is required (KA_AGENTX_TOKEN)",
+     "retryable": false,
+     "details": {}
+    }
+   }
+  },
+  {
+   "check": "error: wrong token",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/v1/capabilities",
+   "via": "http://127.0.0.1:8011",
+   "auth": "wrong bearer",
+   "expect": 401,
+   "status": 401,
+   "ms": 1,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "error": {
+     "code": "unauthorized",
+     "message": "a bearer token for AgentX is required (KA_AGENTX_TOKEN)",
+     "retryable": false,
+     "details": {}
+    }
+   }
+  },
+  {
+   "check": "error: unknown capability",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.nope/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 404,
+   "status": 404,
+   "ms": 2,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "error": {
+     "code": "not_found",
+     "message": "no capability 'knowledge.nope'",
+     "retryable": false,
+     "details": {
+      "capabilities": [
+       "knowledge.acquire",
+       "knowledge.publish",
+       "knowledge.read",
+       "knowledge.resolve_conflict",
+       "knowledge.review",
+       "knowledge.revise",
+       "knowledge.search"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "check": "error: schema_invalid input",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.search/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 400,
+   "status": 400,
+   "ms": 2,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "error": {
+     "code": "schema_invalid",
+     "message": "input does not match knowledge.search 1.0.0",
+     "retryable": false,
+     "details": {
+      "errors": [
+       {
+        "type": "missing",
+        "loc": [
+         "query"
+        ],
+        "msg": "Field required",
+        "input": {
+         "nope": 1
+        }
+       },
+       {
+        "type": "extra_forbidden",
+        "loc": [
+         "nope"
+        ],
+        "msg": "Extra inputs are not permitted",
+        "input": 1
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "check": "error: unavailable capability (publish, no KW)",
+   "method": "POST",
+   "path": "/api/knowledge-acquisition/v1/capabilities/knowledge.publish/invoke",
+   "via": "http://127.0.0.1:8011",
+   "auth": "AgentX bearer",
+   "expect": 503,
+   "status": 503,
+   "ms": 2,
+   "schema": null,
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "error": {
+     "code": "unavailable",
+     "message": "knowledge.publish is not available: no Knowledge Worker is attached (graph mode memory): a publication would only update KA's own shadow graph, not propose a graph change to Knowledge Worker; set KA_KW_URL and KA_KW_TOKEN",
+     "retryable": false,
+     "details": {
+      "capability_id": "knowledge.publish"
+     }
+    }
+   }
+  },
+  {
+   "check": "public interface, AgentX bearer",
+   "method": "GET",
+   "path": "/api/knowledge-acquisition/healthz",
+   "via": "http://2.25.98.235:8011",
+   "auth": "AgentX bearer",
+   "expect": 200,
+   "status": 200,
+   "ms": 1,
+   "schema": "Health.schema.json",
+   "conformance_errors": [],
+   "pass": true,
+   "body": {
+    "ok": true,
+    "version": "0.1.0",
+    "provider": "anthropic",
+    "adapter": "InMemoryGraphAdapter",
+    "storage": "/root/ka/ka_storage",
+    "status": "ok",
+    "service_id": "knowledge-acquisition",
+    "checks": {
+     "storage": "ok",
+     "provider": "anthropic",
+     "grammar": "ok",
+     "graph": "memory",
+     "capabilities_unavailable": {
+      "knowledge.publish": "no Knowledge Worker is attached (graph mode memory): a publication would only update KA's own shadow graph, not propose a graph change to Knowledge Worker; set KA_KW_URL and KA_KW_TOKEN"
+     }
+    }
+   }
+  }
+ ]
+}

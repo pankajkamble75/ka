@@ -1,0 +1,8 @@
+# MOCK Knowledge Worker (wire-level fake over real HTTP); KA a real separate process. 2026-10-11T20:16:40Z @ 295f185
+PASS  KA runs with no Enterprise OS root, graph mode kw
+PASS  the grammar loaded from Knowledge Worker
+PASS  its snapshot carries KW's digests
+PASS  publish waits while KW holds the change
+PASS  KW received lineage on every op and KA's key
+PASS  after KW applies, publish succeeds
+PASS  one KW proposal (apply replayed the key)

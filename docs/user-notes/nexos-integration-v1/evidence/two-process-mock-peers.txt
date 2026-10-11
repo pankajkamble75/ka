@@ -1,0 +1,12 @@
+# MOCK peers: fake AgentX + fake Knowledge Worker over real HTTP; KA a real separate process. 2026-10-11T20:16:38Z @ 295f185
+PASS  PT1 KA up with no Enterprise OS root (graph kw, grammar from KW)
+PASS  PT1 KA pushed seven capabilities to AgentX with its token
+PASS  a wrong token is refused
+PASS  PT2 acquire: 202 with an operation id, then succeeded with a candidate
+PASS  callbacks reached AgentX
+PASS  PT4 review waits for a person with a form
+PASS  an answer with no named person is refused
+PASS  PT4 approval went through decide by alice; the nugget is ACTIVE
+PASS  PT6 publish succeeded after KW applied, lineage on every op
+PASS  PT7 the event feed has the note's events with ids, schema and provenance
+PASS  PT7 replay by after= returns the same event ids
