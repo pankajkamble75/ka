@@ -4,6 +4,7 @@ registration → acquire (callback) → review by a named person (an anonymous a
 event feed, replayed. Governance is unchanged: the approval is `decide` with the person's name.
 
     .venv/bin/python e2e/plan33_two_process_flow.py
+    FLOW_LIVE_LLM=1 .venv/bin/python e2e/plan33_two_process_flow.py     # extraction by Claude with ANTHROPIC_API_KEY from .env (paid, cents)
 """
 from __future__ import annotations
 
@@ -83,6 +84,11 @@ def main() -> int:
     env.update({"KA_STORAGE_ROOT": str(store), "KA_BACKEND_PORT": "8027", "KA_LLM_PROVIDER": "stub", "KA_ACCESS_POLICY": "open",
                 "KA_AGENTX_TOKEN": AX, "KA_AGENTX_URL": ax.url, "KA_KW_URL": kw_url, "KA_KW_TOKEN": KW, "KA_GRAMMAR_URL": kw_url + "/v1/graph-model",
                 "KA_ENTERPRISE_OS_ROOT": "", "KA_RESEARCH_INTERNET": "0", "KA_SEARCH_PROVIDER": "none", "ANTHROPIC_API_KEY": "", "KA_STORAGE_BACKEND": "local"})
+    live = os.environ.get("FLOW_LIVE_LLM") == "1"
+    if live:                                                           # the real key, read from KA's gitignored .env; never printed
+        dotenv = Path(__file__).resolve().parents[1] / ".env"
+        key = next((l.split("=", 1)[1].strip().strip('"') for l in dotenv.read_text().splitlines() if l.startswith("ANTHROPIC_API_KEY=")), "")
+        env.update({"KA_LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": key})
     proc = subprocess.Popen([sys.executable, "-m", "ka", "serve"], cwd=str(Path(__file__).resolve().parents[1]), env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     r: list[tuple[str, bool]] = []
@@ -93,6 +99,8 @@ def main() -> int:
             except Exception:
                 time.sleep(0.25)
         _, h = call("GET", "/healthz", token=None)
+        if live:
+            r.append(("the LLM provider is Anthropic (real key), not the stub", h["checks"].get("provider") == "anthropic"))
         r.append(("PT1 KA up with no Enterprise OS root (graph kw, grammar from KW)", h.get("status") == "ok" and h["checks"]["graph"] == "kw"
                   and h["checks"]["grammar"] == "ok"))
         for _ in range(40):
@@ -107,9 +115,20 @@ def main() -> int:
         call("POST", "/scopes", {"scope_type": "DOMAIN", "scope_id": "merchant-acquiring", "name": "Merchant Acquiring"}, token=None)
         s, op = invoke("knowledge.acquire", {"kind": "text", "name": "Refund SOP", "raw_content": "Refunds above $500 require manager approval.",
                                              "scope": {"scope_type": "DOMAIN", "scope_id": "merchant-acquiring"}}, callback_url=ax.url + "/callbacks")
-        acq = poll(op["operation_id"], until=("succeeded", "failed"))
+        acq = poll(op["operation_id"], until=("succeeded", "failed"), timeout=120)
         ref = (acq.get("result") or {}).get("candidates", [None])[0]
         r.append(("PT2 acquire: 202 with an operation id, then succeeded with a candidate", s == 202 and acq["status"] == "succeeded" and bool(ref)))
+        if live:
+            _, n = call("GET", f"/nugget/{ref}", token=None)
+            def find(o, k):
+                if isinstance(o, dict):
+                    if k in o and not isinstance(o[k], (dict, list)):
+                        return o[k]
+                    return next((x for x in (find(v, k) for v in o.values()) if x is not None), None)
+                if isinstance(o, list):
+                    return next((x for x in (find(v, k) for v in o) if x is not None), None)
+                return None
+            print("   Claude extracted:", json.dumps({k: find(n, k) for k in ("statement", "knowledge_type", "confidence", "title")})[:500])
         time.sleep(0.5)
         r.append(("callbacks reached AgentX", any(c["path"] == "/callbacks" and c["body"]["operation"]["status"] == "succeeded" for c in ax.calls)))
         _, rv = invoke("knowledge.review", {"item_id": ref})
