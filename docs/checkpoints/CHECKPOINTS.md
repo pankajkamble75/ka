@@ -2,6 +2,27 @@
 
 Dated notes written by `upload` before each push. Newest first.
 
+## 2026-10-12 01:10 UTC — plan-35: KA no longer answers on the public IP (VPN-only bind)
+
+**What changed** — `KA_BACKEND_HOST` (`ka/config.py`, default `0.0.0.0`) and multi-address serving (`ka/__main__.py`: `bind_hosts`,
+`_listen`). Tests: `ka/tests/test_plan35_bind.py` (2). Live `.env` (gitignored): `KA_BACKEND_HOST=10.77.0.2,127.0.0.1`,
+`KA_PUBLIC_BASE_URL=http://10.77.0.2:8011`; the previous `.env` is backed up outside the repository. Service restarted. Rollback:
+`docs/user-notes/nexos-integration-v1/ROLLBACK-bind.md`. `KA_AGENTX_TOKEN` was written to `/root/ka-agentx.token` (600, root) for the
+operator's SSH copy; it is not in the repository. `tools/nexos_evidence.py` now defaults `--public` to the WireGuard address.
+`CHATGPT-HANDOFF.md` has an update section; gap #2 is resolved.
+
+**Why** — ChatGPT review priority 1 (relayed by AgentX); approved by the author on 2026-10-12. The author's decisions: VPN-only listeners
+with loopback and a rollback; operator-controlled secret transfer; no temporary receiver.
+
+**Verification** — suite 512 passed, 5 skipped (exit checked). Live: listeners are only `10.77.0.2:8011` and `127.0.0.1:8011`; over
+WireGuard with the bearer, `/healthz` 200 and `/v1/capabilities` 200; without a token 401; `2.25.98.235:8011` connection refused (curl exit 7)
+from this host. Live conformance probe over WireGuard 15/15 (`evidence/live-20261012T010422Z.json`).
+
+**Follow-ups** — the operator copies the token to `srv2050509:/root/nexos-operator/ka.token`. Then set `KA_AGENTX_URL=http://10.77.0.1:8765`
+(push and callbacks). KW's WireGuard listener and KA's KW token come next. AgentX confirms the public refusal from `srv2050509`.
+
+**Decisions and questions** — none raised; the author approved this change.
+
 ## 2026-10-11 20:30 UTC — plan-34: NEXOS integration v1 — honest capability availability, screen manifest, /healthz for AgentX, live G0/G1 evidence
 
 **What changed** — `ka/agentx/availability.py` (new): `knowledge.publish` is unavailable in graph mode memory (no Knowledge Worker). It is

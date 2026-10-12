@@ -5,6 +5,33 @@
 
 Facts below are **verified** (inspected or measured today) unless marked *assumption*. Evidence links are relative to this folder.
 
+
+## Update 2026-10-12 ~01:05 UTC — ChatGPT priority 1 done: KA no longer answers on the public IP
+
+Ordered by the ChatGPT review (relayed by AgentX) and approved by KA's author. Done in this order:
+
+1. **Rebind (plan-35).** A new setting, `KA_BACKEND_HOST` (comma list; default `0.0.0.0` unchanged), is set in KA's gitignored `.env` to
+   `10.77.0.2,127.0.0.1`, with `KA_PUBLIC_BASE_URL=http://10.77.0.2:8011`. The service was restarted. Listeners are now **`10.77.0.2:8011`**
+   (WireGuard) and **`127.0.0.1:8011`** (loopback) only. Auth is unchanged. Rollback: [`ROLLBACK-bind.md`](ROLLBACK-bind.md). The previous
+   `.env` is backed up outside the repository (mode 600).
+2. **Verified** ([`evidence/bind-vpn-only.txt`](evidence/bind-vpn-only.txt)): over `10.77.0.2` with AgentX's bearer, `/healthz` → 200 and
+   `/v1/capabilities` → 200 (6 capabilities); without a token → 401; loopback `/healthz` → 200. **`2.25.98.235:8011` → connection refused
+   (curl exit 7).** That was checked from this host; AgentX confirms from `srv2050509`. `/v1/screens` launch URLs now use
+   `http://10.77.0.2:8011`.
+3. **Token handover (operator-controlled, as decided).** AgentX's one-time receiver was not used; it is shut down. `KA_AGENTX_TOKEN` is
+   written to **`/root/ka-agentx.token`** on `srv1886827` (mode 600, root). The operator copies it over SSH to
+   `srv2050509:/root/nexos-operator/ka.token`. The value is not in this repository, any log or any message.
+4. **Not yet done, by design:** `KA_AGENTX_URL=http://10.77.0.1:8765` (push registration and callbacks) is set only after the operator
+   confirms AgentX holds the token; a push before that would be refused and dead-lettered. AgentX's gateway answers over WireGuard
+   (`GET http://10.77.0.1:8765/healthz` → 200). Knowledge Worker's WireGuard listener (`10.77.0.1:8101`) is not up yet, so `knowledge.publish`
+   stays unavailable.
+
+Effect on §6: gap #2 (public plain HTTP) is **resolved**. Traffic between the VPSes runs over WireGuard; HTTP inside the tunnel is
+encrypted by WireGuard. Gap #1 (no private network) is **resolved at the network layer** and now waits on credentials and KW's listener.
+
+This repository has a single ChatGPT file, this one (`CHATGPT-HANDOFF.md`). The "four CHATGPT-* files" AgentX mentions are presumably the
+other services' files plus this one.
+
 ---
 
 ## 1. Executive status
@@ -146,7 +173,7 @@ and plan-34's account in [`implementation-report.md`](implementation-report.md).
 | # | issue | class | severity |
 |---|---|---|---|
 | 1 | No private network or TLS between the VPSes: the real AgentX and KW can't reach KA, so G2–G4 can't be shown | infrastructure | **Critical** |
-| 2 | KA serves plain HTTP on `0.0.0.0:8011` with the host firewall inactive. Bearer tokens would cross the public internet in clear if used remotely (AgentX rightly refuses) | security | **High** |
+| 2 | ~~KA serves plain HTTP on `0.0.0.0:8011`, publicly reachable~~ **RESOLVED 2026-10-12**: bound to `10.77.0.2` + `127.0.0.1` only (plan-35). The host firewall is still inactive (not KA's to change) | security | ~~High~~ resolved |
 | 3 | Real KW round trip unverified: KW hasn't run KA's fixtures against its live intake; KA has only MOCK evidence | integration | **High** |
 | 4 | Single shared service token per peer; no per-user identity. AgentX asserts the user (interim Q1/Q4); KA trusts the assertion for `submitted_by` | security / contract | **High** |
 | 5 | KW's DEV setting `KW_HOTL_MODE=auto` would apply KA's changes immediately and push them to KW's `graphs/dev` git branch. A first live publish would be unreviewed on KW's side | governance across services | **High** |

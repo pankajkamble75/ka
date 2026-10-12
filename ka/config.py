@@ -45,6 +45,8 @@ def declare(name: str, type_: Callable[[str], Any], default: Any, owner: str, do
 
 declare("KA_STORAGE_ROOT", str, "", "ka.repository", "Directory for the JSON object store. Default: <repo>/ka_storage.")
 declare("KA_BACKEND_PORT", int, 8011, "ka.api", "Port the Knowledge Console backend listens on.")
+declare("KA_BACKEND_HOST", str, "0.0.0.0", "ka.api", "Address(es) to listen on, comma-separated (plan-35, NEXOS: e.g. 10.77.0.2,127.0.0.1 "
+        "for the WireGuard address plus loopback). Default 0.0.0.0 = every interface, including the public one.")
 declare("KA_LLM_PROVIDER", str, "", "ka.llm", "anthropic | stub. Empty: anthropic when ANTHROPIC_API_KEY is set, else stub.")
 declare("ANTHROPIC_API_KEY", str, "", "ka.llm", "Anthropic API key (secret).")
 declare("KA_LLM_MODEL", str, "claude-sonnet-4-6", "ka.llm", "Default model for extraction, synthesis and conflict explanation.")

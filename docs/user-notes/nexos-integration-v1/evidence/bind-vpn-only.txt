@@ -1,0 +1,14 @@
+# plan-35 VPN-only bind — verified 2026-10-12T01:03:58Z on srv1886827 @ da61578+working tree (KA_BACKEND_HOST=10.77.0.2,127.0.0.1)
+## listeners (ss -ltn | grep :8011)
+127.0.0.1:8011
+10.77.0.2:8011
+## WireGuard 10.77.0.2, AgentX bearer
+GET /healthz          -> 200
+GET /v1/capabilities  -> 200  ids: knowledge.acquire,knowledge.search,knowledge.read,knowledge.revise,knowledge.review,knowledge.resolve_conflict
+GET /v1/screens launch_url[0] -> http://10.77.0.2:8011/console/#/add
+## WireGuard 10.77.0.2, no token
+GET /v1/capabilities  -> 401
+## loopback 127.0.0.1
+GET /healthz          -> 200
+## public 2.25.98.235 (must not answer)
+GET /healthz          -> 000 curl_exit=7

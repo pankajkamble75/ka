@@ -5,7 +5,7 @@ schemas (`ka/agentx/schemas`), and write `docs/user-notes/nexos-integration-v1/e
 It invokes only READ capabilities on the live service (knowledge.search, knowledge.read): no knowledge is created, decided or published.
 The token is read from KA's gitignored `.env` and never written to the evidence.
 
-    .venv/bin/python tools/nexos_evidence.py [--base http://127.0.0.1:8011] [--public http://2.25.98.235:8011]
+    .venv/bin/python tools/nexos_evidence.py [--base http://127.0.0.1:8011] [--public http://10.77.0.2:8011]
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def call(base, method, path, body=None, token=None, headers=None):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8011")
-    ap.add_argument("--public", default="http://2.25.98.235:8011")
+    ap.add_argument("--public", default="http://10.77.0.2:8011")             # plan-35: the WireGuard address (the public IP no longer answers)
     a = ap.parse_args()
     tok = dotenv("KA_AGENTX_TOKEN")
     if not tok:
