@@ -1,0 +1,26 @@
+# Only pyproject.toml, README.md, the lockfiles and ka/ are copied; keep everything else out of the context.
+.git
+.github
+.claude
+.venv
+.env
+.env.*
+**/__pycache__
+**/*.pyc
+*.egg-info
+build
+dist
+.pytest_cache
+.ruff_cache
+ka_storage
+ka/tests
+e2e
+docs
+tools
+deploy
+conftest.py
+CLAUDE.md
+knowledge-acquisition-requirements.md
+*.pem
+*.key
+**/secrets
