@@ -18,6 +18,36 @@ changes no GCP resource.
 Why one instance with CPU always allocated: KA keeps in-process caches of the store and runs background threads; two
 instances writing the same NFS directory would each serve a stale cache.
 
+## Single writer: the writer lease (SCRIPT #025)
+
+`max-instances=1` does not stop two processes writing the store: a revision rollout overlaps the old and new instance,
+and the seed job writes the same directory. KA therefore takes an exclusive **writer lease**, the file
+`$KA_STORAGE_ROOT/.writer.lock` (JSON: `owner_id`, `host`, `pid`, `revision` from `K_REVISION`/`CLOUD_RUN_EXECUTION`,
+`role`, `acquired_at`), created only by an atomic exclusive create. Nothing ever replaces it and there is no automatic
+stale takeover.
+
+- **Startup.** `serve` starts in **standby**: the readiness probe (`/api/knowledge-acquisition/ready`, also `/readyz`)
+  answers `200 {"status": "standby"}` so Cloud Run can shift traffic and SIGTERM the old revision; every other route
+  answers `503` with `Retry-After: 5`. Nothing is read from the store (no cache) until the lease is held. It retries every
+  `KA_LOCK_POLL_SECONDS` (3) for `KA_LOCK_WAIT_SECONDS` (600), then exits non-zero.
+- **Writes.** Every write re-reads the lock and compares `owner_id`. On a mismatch the write is refused, the process turns
+  `lost` (all routes 503, readiness `503 {"status": "lost"}`) and SIGTERMs itself. Cached collections also compare on
+  write: each collection directory has a `.version` counter, and a write from a cache loaded at an older version is refused
+  (`StaleCacheError`), so a stale cache cannot overwrite an acknowledged update. Event `seq` numbers are derived from
+  `events.jsonl` on disk under the lease.
+- **Shutdown** (SIGTERM, scale to zero): writes stop, then the lock is removed if it is still ours.
+- **Crash** (SIGKILL, OOM): the lock stays. The next instance waits in standby and exits after `KA_LOCK_WAIT_SECONDS`.
+  This is deliberate (fail safe).
+- **Break-glass.** After confirming the old writer is gone (no running instance/execution with that `revision`/`pid`):
+
+  ```sh
+  knowledge-acquisition writer-lock-status                       # shows the holder's owner_id
+  knowledge-acquisition break-writer-lock --owner-id <owner_id>  # removes the lock only if owner_id matches
+  ```
+
+  Run it as a one-off job with the same NFS mount (`--args=break-writer-lock,--owner-id,<id>`).
+- `KA_WRITER_LOCK=off` disables the lease: local development and tests only.
+
 ## Environment
 
 | Variable | Value on Cloud Run | Notes |
@@ -57,7 +87,8 @@ explicit `refresh(force=True)`.
 ## Probes
 
 Cloud Run probes send no bearer, and `/healthz` needs one. The unauthenticated readiness route returns only
-`{"status": "ready"}` (200) or `{"status": "not_ready"}` (503). It is ready when the store directory exists, the grammar
+`{"status": "ready"}` (200), `{"status": "standby"}` (200, waiting for the writer lease; see above) or
+`{"status": "not_ready"}` / `"lost"` / `"failed"` (503). It is ready when the store directory exists, the grammar
 is loaded and the grammar is not stale. It reveals no version, path or check.
 
 - `GET /api/knowledge-acquisition/ready`: use this one.
@@ -109,8 +140,11 @@ source whose candidates exist, and it only approves candidates an interrupted ru
 
 ### Running it against the NFS store
 
-Because KA caches the store in process, run the seed as a Cloud Run **job** from the same image, with the same NFS volume
-and env. Run it **before** the service first starts, or start a new service revision afterwards.
+Run the seed as a Cloud Run **job** from the same image, with the same NFS volume and env. The job takes the writer
+lease with a short wait (`KA_SEED_LOCK_WAIT_SECONDS`, 10 s). If a service instance holds it, the job writes nothing and
+exits **3** with `seed-demo: refused, the writer lock ... is held by owner_id=...`. Run it before the service first
+starts, or while the service is scaled to zero. An instance that starts while the job runs waits in standby and then
+loads the seeded store.
 
 ```sh
 gcloud run jobs create ka-seed-demo --region=$REGION --image=$KA_IMAGE \
@@ -121,12 +155,9 @@ gcloud run jobs create ka-seed-demo --region=$REGION --image=$KA_IMAGE \
   --command=knowledge-acquisition --args=seed-demo,copper-kettle \
   --max-retries=0 --tasks=1
 gcloud run jobs execute ka-seed-demo --region=$REGION --wait
-# if the service was already running, roll a new revision so it reloads the store:
-gcloud run services update $KA_SERVICE --region=$REGION --update-labels=ka-demo-seed=copper-kettle-v1
 ```
 
-Use the same network, subnet and NFS values as the service. The job needs no token secret. Never run the job while a
-service revision is writing; with `max-instances=1` this means seeding before go-live or during a quiet window.
+Use the same network, subnet and NFS values as the service. The job needs no token secret.
 
 ## The search that returns it
 
@@ -161,5 +192,5 @@ Scope matching is exact, and `instance_id` wins over `domain_id`:
 - **Loopback containment.** `KA_ACCESS_POLICY=token` lets loopback peers through without a token. On Cloud Run, requests
   arrive from the platform's proxy address, not 127.0.0.1. Confirm that a console route returns 401 without
   `KA_ACCESS_TOKEN`.
-- **Single writer.** Revision rollouts can overlap two instances briefly. Avoid seeding or heavy writes during a
-  rollout.
+- **Single writer.** Enforced by the writer lease (above). During a rollout the new revision answers 503 until the old
+  one has released the lease. A SIGKILLed instance needs the break-glass step before KA can serve again.
