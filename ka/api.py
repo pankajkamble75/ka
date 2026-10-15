@@ -253,6 +253,25 @@ health_router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"], depende
 # [/block plan-34]
 
 
+# [block plan-36] NEXOS Cloud Run MVP: an UNAUTHENTICATED readiness probe for the platform (probes carry no bearer). It says
+# ready / not ready and nothing else: no version, paths, provider or checks. Cloud Run reserves "some paths ending with z" at its
+# front end, so the same answer is also served at /ready, the path to use from outside the container.
+readiness_router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"])
+
+
+@readiness_router.get("/readyz", include_in_schema=False)
+@readiness_router.get("/ready", include_in_schema=False)
+def readyz():
+    from fastapi.responses import JSONResponse as _JSON
+    try:
+        ka = get_ka()
+        ready = ka.repo.root.is_dir() and ka.grammar.loaded and not ka.grammar.is_stale()
+    except Exception:  # noqa: BLE001 — a store that cannot open is "not ready", never a stack trace
+        ready = False
+    return _JSON({"status": "ready" if ready else "not_ready"}, status_code=200 if ready else 503)
+# [/block plan-36]
+
+
 @health_router.get("/healthz")
 def healthz(ka: KnowledgeAcquisition = Depends(get_ka)) -> dict[str, Any]:
     from ka.agentx.router import health_payload          # plan-29 (research-05 R2): AgentX's Health keys, added beside the old ones
@@ -1317,6 +1336,7 @@ def create_app(ka: KnowledgeAcquisition | None = None) -> FastAPI:
     app = FastAPI(title="Enterprise OS — Knowledge Acquisition", version=__version__,
                   description="Acquire · Govern · Know · Compile · (Graph) · Operate · Observe/Correct")
     app.include_router(health_router)                      # plan-34: /healthz with either token
+    app.include_router(readiness_router)                   # plan-36: unauthenticated ready / not ready, for the platform's probes
     app.include_router(router)
     # [block plan-29] research-05 R2, R3, R10: the AgentX services contract under {PREFIX}/v1, with AgentX's error envelope
     from fastapi.exceptions import RequestValidationError

@@ -1,4 +1,4 @@
-# Only pyproject.toml, README.md, the lockfiles and ka/ are copied; keep everything else out of the context.
+# Only pyproject.toml, README.md, the lockfiles, ka/ and deploy/grammar/ are copied; keep everything else out of the context.
 .git
 .github
 .claude
@@ -17,7 +17,8 @@ ka/tests
 e2e
 docs
 tools
-deploy
+deploy/*
+!deploy/grammar
 conftest.py
 CLAUDE.md
 knowledge-acquisition-requirements.md

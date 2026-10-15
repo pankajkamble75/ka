@@ -9,7 +9,13 @@
 #     so config.py finds no .env next to it);
 #   * the store on an explicit path outside the code (KA_STORAGE_ROOT=/data/ka_storage);
 #   * no secrets in the image (ANTHROPIC_API_KEY, KA_ACCESS_TOKEN, KA_AGENTX_TOKEN, … come from Secret Manager);
-#   * non-root, binds 0.0.0.0 on Cloud Run's $PORT (default 8080) via KA_BACKEND_PORT.
+#   * non-root, binds 0.0.0.0 on Cloud Run's $PORT (default 8080) via KA_BACKEND_PORT;
+#   * the graph grammar bundled read-only at /opt/ka/grammar (KA_GRAMMAR_DIR), so the service is ready without an
+#     Enterprise OS checkout or a Knowledge Worker call: grammar.json + process_types.json copied verbatim from
+#     pankajkamble75/knowledge-worker knowledge_worker/graph_model (see docs/deploy/cloud-run-mvp.md).
+#
+# NEXOS Cloud Run MVP: KA_STORAGE_ROOT is set at deploy time to the NFS v4 mount (/mnt/nfs/ka/ka_storage); see
+# docs/deploy/cloud-run-mvp.md for the env vars, probes and the one-off demo seed.
 
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 
@@ -36,12 +42,18 @@ ENV PATH=/opt/venv/bin:$PATH \
     PORT=8080 \
     KA_BACKEND_HOST=0.0.0.0 \
     KA_STORAGE_ROOT=/data/ka_storage \
-    KA_ACCESS_POLICY=token
+    KA_ACCESS_POLICY=token \
+    KA_GRAMMAR_DIR=/opt/ka/grammar
 RUN groupadd --system --gid ${KA_UID} ka \
  && useradd --system --uid ${KA_UID} --gid ka --home-dir /data --shell /usr/sbin/nologin ka \
  && mkdir -p /data/ka_storage \
  && chown -R ka:ka /data
 COPY --from=build /opt/venv /opt/venv
+# root-owned and read-only for uid 10001; the load check fails the build if either file is not a grammar / process-types version
+COPY deploy/grammar/grammar.json deploy/grammar/process_types.json /opt/ka/grammar/
+RUN chmod 0444 /opt/ka/grammar/*.json \
+ && python -I -c "import json; g=json.load(open('/opt/ka/grammar/grammar.json')); t=json.load(open('/opt/ka/grammar/process_types.json')); \
+assert g['version'].startswith('grammar/') and t['version'].startswith('process-types/'), (g['version'], t['version'])"
 WORKDIR /data
 USER ka
 VOLUME ["/data"]

@@ -3,6 +3,8 @@
     python -m ka serve            start on KA_BACKEND_HOST (default 0.0.0.0; comma list allowed) : KA_BACKEND_PORT (default 8011)
     python -m ka demo [DIR]       seed a storage dir with the §47 example and print the lineage
     python -m ka env              list the declared settings and whether each is set
+    python -m ka seed-demo copper-kettle [DIR]
+                                  seed SYNTHETIC governed demo knowledge (idempotent) into DIR (default KA_STORAGE_ROOT)
 """
 from __future__ import annotations
 
@@ -60,6 +62,17 @@ def main(argv: list[str] | None = None) -> int:
         for n in ka.repo.nuggets.all():
             print(f"  {n.ref:12} {n.status.value:14} {n.scope.key():34} {n.statement}")
         return 0
+    # [block plan-36] NEXOS Cloud Run MVP: synthetic demo knowledge through KA's own governed flow
+    if cmd == "seed-demo":
+        import json
+
+        from ka.demo_copper_kettle import seed as seed_demo
+        if len(argv) < 2:
+            print("usage: knowledge-acquisition seed-demo copper-kettle [STORAGE_DIR]")
+            return 2
+        print(json.dumps(seed_demo(argv[1], argv[2] if len(argv) > 2 else None), indent=2))
+        return 0
+    # [/block plan-36]
     print(__doc__)
     return 1
 
