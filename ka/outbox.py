@@ -15,6 +15,7 @@ from ka import config
 from ka.data_platform import DataPlatformError
 from ka.model import PendingOp
 from ka.timeutil import now_iso
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
 
 NON_RETRYABLE = {400, 401, 403, 404, 409, 413, 422}
 
@@ -122,6 +123,7 @@ class Outbox:
             self.repo.physical_bindings.put(b)
             spool = op.payload.get("spool_path")
             if spool and Path(spool).exists():
+                _guard_write(spool)
                 Path(spool).unlink()
 
     # ---- handlers -------------------------------------------------------------------------------------------------
@@ -141,6 +143,7 @@ class Outbox:
         b.status, b.reason, b.locator = ref.state, None, ref.locator
         b.dp_asset_id, b.dp_asset_version_id, b.last_synced_at = ref.asset_id, ref.asset_version_id, now_iso()
         self.repo.physical_bindings.put(b)
+        _guard_write(spool)
         spool.unlink(missing_ok=True)
         self.bus.emit("physical.binding.available", binding_id=b.id, source_version_id=b.source_version_id)
         self.auditor.record(who=op.by, what="physical.binding.available", why=f"outbox {op.kind} after {op.attempts} retries", source=b.ka_source_id,

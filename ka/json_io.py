@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Iterator
 
+from ka.writer_lock import guard
+
 
 def read_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
@@ -14,6 +16,7 @@ def read_json(path: Path) -> Any:
 
 
 def write_json(path: Path, data: Any) -> None:
+    guard(path)                                   # SCRIPT #025: only the writer-lease holder writes the store
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=path.name, suffix=".tmp", dir=str(path.parent))
     try:
@@ -26,6 +29,7 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def append_jsonl(path: Path, record: dict[str, Any]) -> None:
+    guard(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")

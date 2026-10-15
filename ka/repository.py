@@ -5,6 +5,8 @@ here: storage is dumb on purpose so the invariant lives in one place.
 """
 from __future__ import annotations
 
+import os
+import threading
 from pathlib import Path
 from typing import Callable, Generic, Iterable, Iterator, TypeVar
 
@@ -12,6 +14,7 @@ from pydantic import BaseModel
 
 from ka import config
 from ka.json_io import append_jsonl, read_json, read_jsonl, write_json
+from ka.writer_lock import guard
 from ka.model import (
     AuditRecord,
     Connection,
@@ -46,26 +49,76 @@ from ka.vocab import NuggetStatus, ScopeType
 T = TypeVar("T", bound=BaseModel)
 
 
+class StaleCacheError(RuntimeError):
+    """SCRIPT #025 (spec item 6): the collection changed on disk since this process cached it; the write is refused so a stale
+    cache can never erase an update another writer already acknowledged."""
+
+
+VERSION_FILE = ".version"
+_LOG_MUTEXES: dict[str, threading.RLock] = {}
+_LOG_MUTEXES_MU = threading.Lock()
+
+
+def _log_mutex(root: Path) -> threading.RLock:
+    """One mutex per store root for the whole process, so two handles on one store cannot interleave seq derivation and append."""
+    key = os.path.realpath(root)
+    with _LOG_MUTEXES_MU:
+        return _LOG_MUTEXES.setdefault(key, threading.RLock())
+
+
 class Collection(Generic[T]):
     def __init__(self, root: Path, name: str, model: type[T], id_field: str = "id"):
         self.dir = root / name
         self.model = model
         self.id_field = id_field
         self._cache: dict[str, T] | None = None
+        self._version: int = 0                     # the on-disk collection version the cache was loaded at
+        self._mu = threading.RLock()
+
+    # [block s025] compare-on-write: <collection>/.version counts committed writes; the cache remembers the value it was loaded at
+    def _disk_version(self) -> int:
+        try:
+            return int((self.dir / VERSION_FILE).read_text(encoding="utf-8").strip() or 0)
+        except FileNotFoundError:
+            return 0
+        except (OSError, ValueError) as e:
+            raise StaleCacheError(f"{self.dir / VERSION_FILE} is unreadable ({e}); refusing to write {self.dir.name}") from e
+
+    def _write_version(self, v: int) -> None:
+        path = self.dir / VERSION_FILE
+        guard(path)
+        tmp = self.dir / f"{VERSION_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
+        tmp.write_text(f"{v}\n", encoding="utf-8")
+        os.replace(tmp, path)
+    # [/block s025]
 
     def _load(self) -> dict[str, T]:
         if self._cache is None:
-            self._cache = {}
-            if self.dir.exists():
-                for p in sorted(self.dir.glob("*.json")):
-                    obj = self.model.model_validate(read_json(p))
-                    self._cache[getattr(obj, self.id_field)] = obj
+            with self._mu:
+                if self._cache is None:
+                    # read the version BEFORE the objects: a write racing the load makes the cache stale, never fresh
+                    version = self._disk_version()
+                    cache: dict[str, T] = {}
+                    if self.dir.exists():
+                        for p in sorted(self.dir.glob("*.json")):
+                            obj = self.model.model_validate(read_json(p))
+                            cache[getattr(obj, self.id_field)] = obj
+                    self._version, self._cache = version, cache
         return self._cache
 
     def put(self, obj: T) -> T:
         oid = getattr(obj, self.id_field)
-        write_json(self.dir / f"{oid}.json", obj.model_dump(mode="json"))
-        self._load()[oid] = obj
+        with self._mu:
+            guard(self.dir / f"{oid}.json")                  # spec item 3 first: are we still the writer?
+            cache = self._load()
+            on_disk = self._disk_version()                   # spec item 6: has the collection moved since we cached it?
+            if on_disk != self._version:
+                raise StaleCacheError(f"{self.model.__name__} collection {self.dir} is at version {on_disk} on disk but this process "
+                                      f"cached version {self._version}; refusing to write {oid!r} over a newer store")
+            write_json(self.dir / f"{oid}.json", obj.model_dump(mode="json"))
+            self._write_version(on_disk + 1)
+            self._version = on_disk + 1
+            cache[oid] = obj
         return obj
 
     def get(self, oid: str) -> T | None:
@@ -140,6 +193,9 @@ class Repository:
         # [/block plan-03]
         self.audit_log = r / "audit.jsonl"
         self.event_log = r / "events.jsonl"
+        self._log_mu = _log_mutex(r)                         # SCRIPT #025: one appender per store's logs at a time in this process
+        self._seq: int = 0
+        self._seq_mark: tuple[int, int] | None = None
 
     # ---- nugget queries -------------------------------------------------------------------------
 
@@ -252,7 +308,8 @@ class Repository:
     # ---- logs -----------------------------------------------------------------------------------
 
     def append_audit(self, rec: AuditRecord) -> None:
-        append_jsonl(self.audit_log, rec.model_dump(mode="json"))
+        with self._log_mu:
+            append_jsonl(self.audit_log, rec.model_dump(mode="json"))
 
     def audit(self) -> list[AuditRecord]:
         return [AuditRecord.model_validate(r) for r in read_jsonl(self.audit_log)]
@@ -285,18 +342,33 @@ class Repository:
     EVENTS_VERSION = "ka-events/1"
 
     def _last_seq(self) -> int:
-        if getattr(self, "_seq", None) is None:
-            n = 0
-            for i, r in enumerate(read_jsonl(self.event_log), start=1):
-                n = max(n, int(r.get("seq") or i))
-            self._seq = n
-        return self._seq
+        """SCRIPT #025: derived from DISK under the log mutex (and the writer lease), never from a counter that another process
+        or thread may have moved. The scan is skipped when the file is exactly as this process left it (same size and inode)."""
+        try:
+            st = os.stat(self.event_log)
+        except FileNotFoundError:
+            self._seq_mark = None
+            return 0
+        mark = (st.st_ino, st.st_size)
+        if getattr(self, "_seq_mark", None) == mark:
+            return self._seq
+        n = 0
+        for i, r in enumerate(read_jsonl(self.event_log), start=1):
+            n = max(n, int(r.get("seq") or i))
+        self._seq, self._seq_mark = n, mark
+        return n
 
     def append_event(self, rec: dict) -> None:
-        seq = self._last_seq() + 1
-        rec = {**rec, "seq": seq, "version": self.EVENTS_VERSION}
-        append_jsonl(self.event_log, rec)
-        self._seq = seq
+        with self._log_mu:
+            seq = self._last_seq() + 1
+            rec = {**rec, "seq": seq, "version": self.EVENTS_VERSION}
+            append_jsonl(self.event_log, rec)
+            self._seq = seq
+            try:
+                st = os.stat(self.event_log)
+                self._seq_mark = (st.st_ino, st.st_size)
+            except OSError:
+                self._seq_mark = None
 
     def events(self, after: int | None = None, limit: int | None = None, tail: bool = False) -> list[dict]:
         out = []

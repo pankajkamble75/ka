@@ -20,6 +20,7 @@ from ka import config
 from ka.extraction import normalize
 from ka.security import is_safe_url
 from ka.timeutil import now_iso
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
 
 USER_AGENT = "enterprise-os-ka"
 _TRACKING = re.compile(r"^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$|ref$)", re.I)
@@ -103,6 +104,7 @@ class SearchMeter:
     def record(self, n: int = 1) -> int:
         data = self._load()
         data[self.month()] = int(data.get(self.month(), 0)) + n
+        _guard_write(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
         return data[self.month()]

@@ -199,3 +199,12 @@ declare("KA_AGENTX_LOCAL_PUBLISH", bool, False, "ka.agentx", "Advertise knowledg
 declare("KA_PUBLIC_BASE_URL", str, "", "ka.agentx", "The URL other hosts reach KA's prefix at (e.g. https://ka.example/api/knowledge-acquisition "
         "is NOT it — give the origin, e.g. https://ka.example). Empty: the request's own base URL.")
 # [/block plan-34]
+
+# [block s025] SCRIPT #025: the exclusive-writer lease on the store (ka.writer_lock)
+declare("KA_WRITER_LOCK", str, "on", "ka.writer_lock", "on | off. on: one writer per store via <KA_STORAGE_ROOT>/.writer.lock "
+        "(serve waits in standby, seed-demo refuses while it is held). off: local development and tests only.")
+declare("KA_LOCK_WAIT_SECONDS", float, 600.0, "ka.writer_lock",
+        "How long `serve` stays in standby waiting for the writer lock before exiting non-zero.")
+declare("KA_LOCK_POLL_SECONDS", float, 3.0, "ka.writer_lock", "How often a standby `serve` retries the writer lock.")
+declare("KA_SEED_LOCK_WAIT_SECONDS", float, 10.0, "ka.writer_lock", "How long seed-demo / demo wait for the writer lock before failing.")
+# [/block s025]

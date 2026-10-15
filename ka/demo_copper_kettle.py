@@ -111,10 +111,15 @@ def seed(dataset: str, storage: str | Path | None = None) -> dict[str, Any]:
     from ka.service import KnowledgeAcquisition
     if dataset not in DATASETS:
         raise SystemExit(f"unknown demo dataset {dataset!r}; known: {', '.join(sorted(DATASETS))}")
+    from ka import writer_lock
     root = Path(storage) if storage else config.storage_root()
-    # The stub provider makes the extraction deterministic and needs no outbound call (the heuristic pass).
-    ka = KnowledgeAcquisition(root, provider=StubLLMProvider(), start_workers=False)
-    out = DATASETS[dataset](ka)
-    out["storage"] = str(ka.repo.root)
+    # SCRIPT #025: the seed is a one-shot writer — it takes the store's writer lease with a short wait (KA_SEED_LOCK_WAIT_SECONDS)
+    # and raises writer_lock.LockHeld (nothing opened, nothing written) while the service or another job holds it.
+    with writer_lock.one_shot(root, float(config.get("KA_SEED_LOCK_WAIT_SECONDS")), role="seed-demo") as lease:
+        # The stub provider makes the extraction deterministic and needs no outbound call (the heuristic pass).
+        ka = KnowledgeAcquisition(root, provider=StubLLMProvider(), start_workers=False)
+        out = DATASETS[dataset](ka)
+        out["storage"] = str(ka.repo.root)
+        out["writer_lock"] = "held" if lease is not None else "off"
     return out
 # [/block plan-36]
