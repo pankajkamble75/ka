@@ -12,6 +12,7 @@ from typing import Any
 
 from ka.data_platform import DataPlatformClient, DataPlatformError
 from ka.timeutil import now_iso
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
 
 HANDLED_KEEP = 5000
 
@@ -33,6 +34,7 @@ class InboundEvents:
 
     def _save(self) -> None:
         self.state["handled"] = self.state["handled"][-HANDLED_KEEP:]
+        _guard_write(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.state), encoding="utf-8")
 

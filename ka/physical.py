@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from ka import config
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
 
 _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -57,6 +58,7 @@ class LocalPhysicalStore:
         suffix = Path(filename_hint).suffix if filename_hint else ".bin"
         asset_id = _SAFE.sub("_", idempotency_key.rsplit(":", 1)[-1])      # the caller's last key segment: the version id
         path = self.blob_dir / f"{asset_id}{suffix or '.bin'}"
+        _guard_write(path)
         path.write_bytes(data)
         return PhysicalRef(backend=self.name, asset_id=asset_id, asset_version_id="1", sha256=sha256, state="available", locator=str(path),
                            content_type=content_type, byte_size=len(data))
@@ -71,6 +73,7 @@ class LocalPhysicalStore:
         d.mkdir(parents=True, exist_ok=True)
         key = _SAFE.sub("_", idempotency_key)
         path = d / f"{key}.json"
+        _guard_write(path)
         path.write_bytes(payload)
         return PhysicalRef(backend=self.name, asset_id=f"{kind}:{key}", asset_version_id="1", sha256=hashlib.sha256(payload).hexdigest(),
                            state="available", locator=str(path), content_type="application/json", byte_size=len(payload))

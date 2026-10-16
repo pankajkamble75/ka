@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Quer
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 
-from ka import __version__, config, images
+from ka import __version__, config, images, writer_lock
 from ka.governance import GovernanceError
 from ka.graph_adapter import PublishRefused
 from ka.graph_change import ChangeError
@@ -28,11 +28,17 @@ PREFIX = "/api/knowledge-acquisition"
 CONSOLE_DIR = Path(__file__).resolve().parent / "console"
 
 _ka: KnowledgeAcquisition | None = None
+RETRY_AFTER_S = 5
+READY_PATHS = (PREFIX + "/ready", PREFIX + "/readyz")     # SCRIPT #025: the only routes answered while not the writer
 
 
 def get_ka() -> KnowledgeAcquisition:
     global _ka
     if _ka is None:
+        # SCRIPT #025: the store (and every collection cache) is opened only once this process holds the writer lease
+        state = writer_lock.service_state()
+        if state != writer_lock.ACTIVE:
+            raise HTTPException(503, f"knowledge-acquisition is {state} (writer lease)", headers={"Retry-After": str(RETRY_AFTER_S)})
         _ka = KnowledgeAcquisition()
     return _ka
 
@@ -251,6 +257,32 @@ def _require_health(request: Request) -> None:
 
 health_router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"], dependencies=[Depends(_require_health)])
 # [/block plan-34]
+
+
+# [block plan-36] NEXOS Cloud Run MVP: an UNAUTHENTICATED readiness probe for the platform (probes carry no bearer). It says
+# ready / not ready and nothing else: no version, paths, provider or checks. Cloud Run reserves "some paths ending with z" at its
+# front end, so the same answer is also served at /ready, the path to use from outside the container.
+readiness_router = APIRouter(prefix=PREFIX, tags=["knowledge-acquisition"])
+
+
+@readiness_router.get("/readyz", include_in_schema=False)
+@readiness_router.get("/ready", include_in_schema=False)
+def readyz():
+    from fastapi.responses import JSONResponse as _JSON
+    # SCRIPT #025: waiting for the writer lease is "started, standby" (200) so Cloud Run can shift traffic and stop the old
+    # revision, which releases the lease; lost/failed/stopping are 503.
+    state = writer_lock.service_state()
+    if state == writer_lock.STANDBY:
+        return _JSON({"status": "standby"}, status_code=200)
+    if state != writer_lock.ACTIVE:
+        return _JSON({"status": state}, status_code=503, headers={"Retry-After": str(RETRY_AFTER_S)})
+    try:
+        ka = get_ka()
+        ready = ka.repo.root.is_dir() and ka.grammar.loaded and not ka.grammar.is_stale()
+    except Exception:  # noqa: BLE001 — a store that cannot open is "not ready", never a stack trace
+        ready = False
+    return _JSON({"status": "ready" if ready else "not_ready"}, status_code=200 if ready else 503)
+# [/block plan-36]
 
 
 @health_router.get("/healthz")
@@ -1316,7 +1348,28 @@ def create_app(ka: KnowledgeAcquisition | None = None) -> FastAPI:
         set_ka(ka)
     app = FastAPI(title="Enterprise OS — Knowledge Acquisition", version=__version__,
                   description="Acquire · Govern · Know · Compile · (Graph) · Operate · Observe/Correct")
+    # [block s025] SCRIPT #025: standby / lost → every route but the readiness probe answers 503 + Retry-After
+    @app.middleware("http")
+    async def _writer_lease_gate(request: Request, call_next):
+        state = writer_lock.service_state()
+        if state != writer_lock.ACTIVE and request.url.path not in READY_PATHS:
+            from fastapi.responses import JSONResponse as _JSON503
+            return _JSON503({"status": state, "detail": f"knowledge-acquisition is {state}: it does not hold the store's writer lease"},
+                            status_code=503, headers={"Retry-After": str(RETRY_AFTER_S)})
+        return await call_next(request)
+
+    async def _no_lease(request, exc):
+        from fastapi.responses import JSONResponse as _JSONLease
+        return _JSONLease({"status": writer_lock.service_state(), "detail": str(exc)}, status_code=503,
+                          headers={"Retry-After": str(RETRY_AFTER_S)})
+    from ka.repository import StaleCacheError
+    app.add_exception_handler(writer_lock.WriterLockError, _no_lease)
+    app.add_exception_handler(StaleCacheError, _no_lease)
+    app.add_event_handler("startup", writer_lock.start_service)      # no-op unless `serve` configured a lease
+    app.add_event_handler("shutdown", writer_lock.stop_service)      # stop writes, then remove the lock if it is ours
+    # [/block s025]
     app.include_router(health_router)                      # plan-34: /healthz with either token
+    app.include_router(readiness_router)                   # plan-36: unauthenticated ready / not ready, for the platform's probes
     app.include_router(router)
     # [block plan-29] research-05 R2, R3, R10: the AgentX services contract under {PREFIX}/v1, with AgentX's error envelope
     from fastapi.exceptions import RequestValidationError

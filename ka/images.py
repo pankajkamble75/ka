@@ -18,6 +18,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
+
 MAX_BYTES = 10 * 1024 * 1024
 TYPES = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
 _LOCK = threading.Lock()
@@ -48,6 +50,7 @@ def _index(root: Path) -> list[dict[str, Any]]:
 
 def _write_index(root: Path, rows: list[dict[str, Any]]) -> None:
     path = folder(root) / "index.json"
+    _guard_write(path)
     tmp = path.with_name("index.json.tmp")
     tmp.write_text(json.dumps(rows, indent=1))
     tmp.replace(path)
@@ -71,6 +74,7 @@ def save(root: Path, *, data_b64: str, name: str = "pasted image", caption: str 
         rows = _index(root)
         number = max([r["number"] for r in rows] or [0]) + 1
         path = dir_ / f"{number:04d}.{ext}"
+        _guard_write(path)
         path.write_bytes(data)
         path.chmod(0o600)
         row = dict(number=number, path=str(path), name=name.strip()[:255] or "pasted image", caption=caption.strip(), mime=TYPES[ext],
@@ -128,6 +132,7 @@ def delete(root: Path, number: int) -> dict[str, Any]:
         row = next((r for r in rows if r["number"] == number and not r.get("deleted")), None)
         if row is None:
             raise ValueError(f"Image #{number} does not exist.")
+        _guard_write(row["path"])
         Path(row["path"]).unlink(missing_ok=True)
         _write_index(root, [r for r in rows if r["number"] != number] + [dict(number=number, deleted=True, created_at=row["created_at"], deleted_at=time.time())])
         return dict(number=number, deleted=True)

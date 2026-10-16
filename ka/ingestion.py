@@ -18,6 +18,7 @@ from ka.repository import Repository
 from ka.security import UnsafeURL, is_safe_url, safe_fetch
 from ka.timeutil import now_iso as _now_iso
 from ka.vocab import AcquisitionChannel, AuthorityType, ExtractionStatus, SourceType, Visibility
+from ka.writer_lock import guard as _guard_write  # SCRIPT #025
 
 
 @dataclass
@@ -206,6 +207,7 @@ class IngestionService:
                 if retryable and self.physical.name == "data_platform" and self.outbox is not None:
                     spool = self.repo.root / "spool" / f"{ver.id}.bin"
                     spool.parent.mkdir(parents=True, exist_ok=True)
+                    _guard_write(spool)
                     spool.write_bytes(data)
                     binding.status, binding.reason = "pending", f"{getattr(e, 'code', type(e).__name__)}: queued for retry"
                     self._pending_op = (key, {"binding_id": binding.id, "source_version_id": ver.id, "spool_path": str(spool),
