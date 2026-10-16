@@ -292,6 +292,9 @@ class KnowledgeCorrection(BaseModel):
     status: CorrectionStatus = CorrectionStatus.SUBMITTED
     candidate_ref: str | None = None
     decision_id: str | None = None
+    # §9/§24: set when the correction is scoped narrower than the knowledge it corrects — an instance-level override (a new
+    # nugget that SPECIALIZES this ref). None means a revision of the nugget itself at its own scope.
+    override_of: str | None = None
 
 
 # ---------------------------------------------------------------- research (§16, §17)

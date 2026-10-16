@@ -16,7 +16,7 @@ from ka.lineage import LineageService
 from ka.model import InheritanceEffect, KnowledgeNuggetVersion, Scope
 from ka.repository import Repository
 from ka.scope import ScopeRegistry
-from ka.vocab import GraphElementKind, InheritanceState, KnowledgeType, ScopeType
+from ka.vocab import GraphElementKind, InheritanceState, KnowledgeType, ScopeType, is_broader
 
 
 @dataclass
@@ -73,7 +73,9 @@ class GraphImpactService:
                 continue
             state = self.adapter.calculate_inheritance(el.scope).get(el.element_id, InheritanceState.LOCALLY_EXTENDED)
             own = el.scope.key() == v.scope.key()
-            if own or state in {InheritanceState.INHERITED, InheritanceState.LOCALLY_EXTENDED}:
+            if not own and is_broader(el.scope.scope_type, v.scope.scope_type):
+                action = "review only"      # narrower knowledge never rewrites a broader scope's element (§9: changes flow downward)
+            elif own or state in {InheritanceState.INHERITED, InheritanceState.LOCALLY_EXTENDED}:
                 action = "proposed update"
             else:
                 action = "review only"

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ka.extraction import TextExtraction
-from ka.grammar import GrammarRegistry
+from ka.grammar import DATA_LAYER_KINDS, GrammarRegistry
 from ka.llm import LLMProvider, complete_json
 from ka.vocab import PREDICATES
 
@@ -118,7 +118,7 @@ class ProcessExtractor:
 
     def _lists(self) -> dict[str, list[str]]:
         g = self.grammar
-        return {"kinds": g.node_kinds() if g and g.loaded else ["process", "entity", "actor", "rule", "event", "state"],
+        return {"kinds": g.assertable_kinds() if g and g.loaded else ["process", "entity", "actor", "rule", "event", "state"],
                 "predicates": list(PREDICATES), "types": g.type_names() if g and g.loaded else [],
                 "slots": g.slots() if g and g.loaded else []}
 
@@ -141,6 +141,10 @@ class ProcessExtractor:
                 if pred not in PREDICATES:
                     out.dropped.append({"item": it, "reason": f"predicate {pred!r} not in the closed list", "span_id": sp.span_id})
                     continue
+                obj_kind = it.get("object_kind") or None
+                if kind in DATA_LAYER_KINDS or obj_kind in DATA_LAYER_KINDS:
+                    out.dropped.append({"item": it, "reason": "physical sources are data-layer facts, never asserted from documents", "span_id": sp.span_id})
+                    continue
                 if kind not in lists["kinds"]:
                     out.dropped.append({"item": it, "reason": f"subject kind {kind!r} not an EOS node kind", "span_id": sp.span_id})
                     continue
@@ -151,7 +155,6 @@ class ProcessExtractor:
                 if excerpt and excerpt not in text:
                     out.dropped.append({"item": {"excerpt": excerpt}, "reason": "excerpt not found in span; replaced by span text", "span_id": sp.span_id, "kept": True})
                     excerpt = text[:600]
-                obj_kind = it.get("object_kind") or None
                 if obj_kind and obj_kind not in lists["kinds"]:
                     obj_kind = None
                 a = AssertionCandidate(subject_kind=kind, subject_name=str(it["subject_name"]).strip(), predicate=pred, span_id=sp.span_id,

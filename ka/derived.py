@@ -102,7 +102,11 @@ class DerivedPublisher:
         parent = PhysicalRef(backend=self.physical.name, asset_id=p["parent_asset_id"], asset_version_id=p["parent_asset_version_id"] or "", sha256="") if p.get("parent_asset_id") else None
         body = json.dumps(p["payload"], sort_keys=True, ensure_ascii=False).encode("utf-8")
         ref = self.physical.put_derived(ASSET_FAMILIES["nugget"], body, parent=parent, idempotency_key=op.idempotency_key,
-                                        provenance={"producer": "ka", "event": p.get("event"), "ka_version": __version__, "ref": p.get("ref")})
+                                        provenance={"producer": "ka", "event": p.get("event"), "ka_version": __version__, "ref": p.get("ref"),
+                                                    # §11: the same ids a graph node's knowledge_lineage carries, so DP lineage joins on them
+                                                    # (DP keeps scalar metadata only, hence the comma-joined list)
+                                                    "governance_decision_id": p["payload"].get("governance_decision_id"),
+                                                    "graph_change_refs": ",".join(p["payload"].get("graph_change_refs") or []) or None})
         art.state, art.dp_asset_id, art.dp_asset_version_id, art.sha256 = "available", ref.asset_id, ref.asset_version_id, ref.sha256
         art.parent_asset_id, art.locator, art.published_at = parent.asset_id if parent else None, ref.locator, now_iso()
         self.repo.derived_artefacts.put(art)

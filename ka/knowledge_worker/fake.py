@@ -123,7 +123,7 @@ class FakeKnowledgeWorker:
         if not isinstance(ops, list) or not key or t.get("kind") not in ("instance", "substructure") or not t.get("id"):
             return err(422, "INVALID_REQUEST", "target {kind, id}, ops[] and idempotency_key are required")
         for op in ops:
-            el = op.get("node") or op.get("edge")
+            el = op.get("node") or op.get("edge") or (op if op.get("op") == "set_props" else None)   # set_props carries props at the top level
             if el is not None and not op.get("op", "").startswith("remove") and not (el.get("props") or {}).get("knowledge_lineage"):
                 return err(422, "INVALID_REQUEST", f"{el.get('id')}: props.knowledge_lineage is required", detail={"element": el.get("id")})
         bh = hashlib.sha256(json.dumps(req, sort_keys=True).encode()).hexdigest()

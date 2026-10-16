@@ -14,7 +14,7 @@ them without touching any governed version (Inv. 3). The LLM is not consulted he
 from __future__ import annotations
 
 from ka.conflict import similarity
-from ka.grammar import GrammarMismatch, GrammarRegistry
+from ka.grammar import DATA_LAYER_KINDS, GrammarMismatch, GrammarRegistry
 from ka.model import GrammarBinding, KnowledgeNuggetVersion
 from ka.repository import Repository
 from ka.vocab import PREDICATES, AuthorityType, BindingStatus, NuggetStatus
@@ -71,6 +71,11 @@ class Binder:
             b.binding_status, b.reasons = BindingStatus.STALE, [reg.stale_reason() or "stale"]
             return b
 
+        data_kinds = sorted({k for k in (v.subject.kind if v.subject else None, v.object.kind if v.object else None) if k in DATA_LAYER_KINDS})
+        if data_kinds:
+            b.binding_status, b.reasons = BindingStatus.UNRESOLVED, [f"{', '.join(data_kinds)} is a data-layer kind: a physical mapping is established "
+                                                                       "by the Data Platform, never by knowledge"]
+            return b
         kinds = reg.node_kinds()
         if v.subject is not None and v.subject.kind not in kinds:
             b.binding_status, b.reasons = BindingStatus.UNRESOLVED, [f"subject kind {v.subject.kind!r} is not an EOS node kind ({', '.join(kinds)})"]
@@ -109,6 +114,9 @@ class Binder:
         b.edge, b.slot = edge, reg.slot_for_edge(edge) or slot
         b.binding_status, b.confidence = BindingStatus.BOUND, 1.0
         b.reasons = [f"{pred!r} → edge {edge!r} ({', '.join(spec.get('from', []))} → {', '.join(spec.get('to', []))}), slot {b.slot!r}"]
+        if v.subject is not None and spec.get("from") and v.subject.kind not in spec["from"]:
+            b.binding_status, b.confidence = BindingStatus.PROPOSED, 0.6
+            b.reasons.append(f"subject kind {v.subject.kind!r} is not an allowed source ({', '.join(spec['from'])})")
         if v.object is not None and v.object.kind and spec.get("to") and v.object.kind not in spec["to"]:
             b.binding_status, b.confidence = BindingStatus.PROPOSED, 0.6
             b.reasons.append(f"object kind {v.object.kind!r} is not an allowed target ({', '.join(spec['to'])})")

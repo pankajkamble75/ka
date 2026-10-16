@@ -645,10 +645,14 @@ class KnowledgeWorkerHTTPAdapter(InMemoryGraphAdapter):
         from ka.graph_change import to_change_ops
         refs, gcp = {}, None
         for c in changes:
-            for ln in ((c.after or {}).get("props") or {}).get(LINEAGE_KEY, []):
+            lineage = ((c.after or {}).get("props") or {}).get(LINEAGE_KEY, [])
+            for ln in lineage:
                 ref = f"{ln.get('nugget_id')}:v{ln.get('version')}"
                 refs[ref] = {"nugget_ref": ref, "decision_id": ln.get("governance_decision_id")}
-                gcp = gcp or ln.get("graph_change_id")
+            # The proposal's own entry is the LAST one (`_merged_lineage` keeps other nuggets' entries first, carrying the ids of the
+            # proposals that wrote them); keying on the first would reuse an earlier proposal's idempotency key.
+            if lineage:
+                gcp = gcp or lineage[-1].get("graph_change_id")
         return to_change_ops(changes), list(refs.values()), gcp
 
     def submit(self, scope: Scope, changes: list[ElementChange], *, actor: str, reason: str, base_version: str | None,

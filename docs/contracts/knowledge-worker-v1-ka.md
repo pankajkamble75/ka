@@ -28,7 +28,7 @@ proposals**, every node and edge carrying `props.knowledge_lineage`, and learns 
 {
   "target": {"kind": "instance", "id": "acme", "base_digest": "<instance graph digest KA saw>"},
   "ops": [{"op": "add_node", "node": {"id": "n_refund_approval", "kind": "rule", "name": "Refund approval",
-           "props": {"knowledge_lineage": [{"nugget_id": "KN-001", "nugget_version": 1, "nugget_ref": "KN-001:v1",
+           "props": {"knowledge_lineage": [{"nugget_id": "KN-001", "version": 1,
                                             "governance_decision_id": "GD-1a2b", "graph_change_id": "GCP-9f8e"}]}}}],
   "reason": "governed knowledge KN-001:v1 activated",
   "actor": "alice",
@@ -39,9 +39,14 @@ proposals**, every node and edge carrying `props.knowledge_lineage`, and learns 
 
 - `target.kind = "instance"` → KW's `propose_instance_change(instance_id, ops, base_digest=, idempotency_key=)` (EOS plan-1033 semantics).
 - `target.kind = "substructure"` → `propose_promotion(substructure_id, base_version, ops)`; `base_version` instead of `base_digest`.
-- `ops` are KW `ChangeOp`s (`add_node`, `update_node`, `remove_node`, `add_edge`, `update_edge`, `remove_edge`). **Every node and edge that is
-  added or updated carries `props.knowledge_lineage`** (a list; each entry names the nugget version and its governance decision). KW may
-  refuse an op without it (`INVALID_REQUEST`).
+- `ops` are KW `ChangeOp`s as KA emits them: `add_node`, `add_edge`, `set_props` (`{op, id, props}` — KW reads it as its node/edge update),
+  `remove_node`, `remove_edge`. A node's description change travels as `props.description_text` (`set_props` cannot change the top-level
+  field). **Every node and edge that is added or updated carries `props.knowledge_lineage`** (a list; each entry is
+  `{nugget_id, version, governance_decision_id, graph_change_id}` — the ref is `<nugget_id>:v<version>`). KW may refuse an op without it
+  (`INVALID_REQUEST`).
+- An element that several nuggets describe carries one lineage entry per nugget; the submitting proposal's own entry is the last one, and
+  `idempotency_key` is always `ka:<that proposal's id>` (corrected 2026-10-16, plan-36: it was taken from the first entry, so a second
+  assertion about the same element reused an earlier proposal's key and KW answered `CONFLICT`).
 - **KW decides.** It may apply at once (its HOTL policy) or hold for its own approval.
 
 Result (`200`, `status: "OK"`):

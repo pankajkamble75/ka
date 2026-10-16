@@ -52,19 +52,28 @@ class Collection(Generic[T]):
         self.model = model
         self.id_field = id_field
         self._cache: dict[str, T] | None = None
+        self._extras: dict[str, dict] = {}
 
     def _load(self) -> dict[str, T]:
         if self._cache is None:
             self._cache = {}
             if self.dir.exists():
                 for p in sorted(self.dir.glob("*.json")):
-                    obj = self.model.model_validate(read_json(p))
-                    self._cache[getattr(obj, self.id_field)] = obj
+                    raw = read_json(p)
+                    obj = self.model.model_validate(raw)
+                    oid = getattr(obj, self.id_field)
+                    self._cache[oid] = obj
+                    # Fields this revision does not know (written by a newer one) are kept and written back on the next put,
+                    # so rolling the service back never erases them.
+                    extra = {k: v for k, v in raw.items() if k not in self.model.model_fields} if isinstance(raw, dict) else {}
+                    if extra:
+                        self._extras[oid] = extra
         return self._cache
 
     def put(self, obj: T) -> T:
         oid = getattr(obj, self.id_field)
-        write_json(self.dir / f"{oid}.json", obj.model_dump(mode="json"))
+        self._load()
+        write_json(self.dir / f"{oid}.json", {**self._extras.get(oid, {}), **obj.model_dump(mode="json")})
         self._load()[oid] = obj
         return obj
 

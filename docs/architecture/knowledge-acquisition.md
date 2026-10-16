@@ -194,7 +194,11 @@ are `INTERNET_RESEARCH`; model answers stay `LLM_GENERATED`, so a model answer i
 
 `CorrectionService.submit` resolves lineage from the registry *and* from the element's `props.knowledge_lineage`, records the form as a
 `Source(type=correction)` + `Evidence`, stores Note / Upload / URL / Existing Source evidence, asks the Scope Decision Engine, and creates
-the candidate (next version of the resolved nugget, or a new nugget). `PromotionService.detect(parent)` clusters ACTIVE instance nuggets
+the candidate (next version of the resolved nugget, or a new nugget). **Correction level (plan-36, 2026-10-16).** A correction scoped
+narrower than the knowledge it corrects (an instance correcting inherited domain knowledge) is an **override**: a new nugget at that scope
+that SPECIALIZES the original (`KnowledgeCorrection.override_of`). The domain version stays ACTIVE, and only the instance's realized copy
+changes. A correction at the knowledge's own scope is a **revision** (next version). `GraphImpactService` never proposes an update to a
+broader-scope element for a narrower version. `PromotionService.detect(parent)` clusters ACTIVE instance nuggets
 shared by ≥ `KA_PROMOTION_MIN_INSTANCES` instances and proposes; `decide(approve=True)` creates a *candidate* at the parent scope.
 
 ## 8. Console and API (§27–§35) — `ka/api.py`, `ka/console/`
@@ -330,7 +334,11 @@ plan-01 and tracked as a question.
   (DP's indexing output; KA records its id from `data.index.ready.v1`, it does not publish it) and `nugget_version` (plan-22's derived
   artefacts). EOS's instance data — rows, snapshots, `realized_by` field maps (`data-layer.md` §3) — are other families on the same
   platform. **KA never stores rows; EOS never reads KA documents as data.** The one shared thing is the lineage id vocabulary: a graph
-  node's `knowledge_lineage` and a DP asset's `provenance` (`ref`, `governance_decision_id`, `graph_change_refs`) join on the same ids.
+  node's `knowledge_lineage` and a DP asset's `provenance` (`ref`, `governance_decision_id`, `graph_change_refs` comma-joined — DP keeps
+  scalar metadata only; sent since plan-36) join on the same ids. **Knowledge never asserts a physical mapping (plan-36):** `physical_source`
+  is a data-layer kind (`ka/grammar.py::DATA_LAYER_KINDS`). The process pass neither offers nor accepts it, and discloses each drop. The
+  binder leaves any assertion touching it `unresolved`. Where a business's data lives is established by the instance data graph and the
+  Data Platform, never by a document.
 - **Backfill and rollback (R14, ✅ plan-23).** `tools/backfill_physical.py --storage <root> [--apply] [--publish-active]` binds every
   legacy version to the configured backend with SHA-256 verification (`failed: sha mismatch` is never available), `failed` bindings for
   byte-less versions, derived publication of ACTIVE nuggets through the outbox, idempotent by key; dry-run by default; refused on the local

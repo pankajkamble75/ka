@@ -10,10 +10,10 @@ from ka.governance import CandidateInput, GovernanceService
 from ka.graph_adapter import GraphAdapter
 from ka.ingestion import IngestionService
 from ka.lineage import LineageService
-from ka.model import Evidence, KnowledgeCorrection, Scope
+from ka.model import Evidence, KnowledgeCorrection, KnowledgeRelationship, Scope
 from ka.repository import Repository
 from ka.scope import ScopeDecisionEngine, ScopeRegistry
-from ka.vocab import AcquisitionChannel, AuthorityType, CorrectionStatus, SourceType, Visibility
+from ka.vocab import AcquisitionChannel, AuthorityType, CorrectionStatus, RelationshipType, SourceType, Visibility, is_broader
 
 
 class CorrectionService:
@@ -83,7 +83,22 @@ class CorrectionService:
         # 4. Create the knowledge correction proposal — a candidate (new version or new nugget) in governance.
         statement = correct_value if len(correct_value.split()) > 3 else (
             f"{original.title}: {correct_value}" if original else f"{what_is_incorrect} → {correct_value}")
-        if original:
+        # A correction scoped narrower than the knowledge it corrects (an instance correcting inherited domain knowledge) is an
+        # override (§9): a NEW nugget at the narrow scope that SPECIALIZES the original. Revising the original's canonical id
+        # instead would supersede the domain version for every instance and publish the local value to the domain graph.
+        if original and is_broader(original.scope_type, decision.scope.scope_type):
+            c.override_of = original.ref
+            cand = self.governance.ingest_candidate(CandidateInput(
+                title=original.title, statement=statement, scope=decision.scope, source_ids=c.source_refs, evidence_ids=evidence_ids,
+                knowledge_type=original.knowledge_type.value, authority_type=AuthorityType.USER_KNOWLEDGE, confidence=0.6,
+                tags=original.tags, graph_group=original.graph_group, channel=AcquisitionChannel.FEEDBACK, created_by=by,
+                correction_id=c.id, change_reason=f"correction {c.id}: {decision.scope.key()} override of {original.ref}: {reason}"))
+            if not any(r.from_ref == cand.ref and r.to_ref == original.ref and r.relationship_type == RelationshipType.SPECIALIZES
+                       for r in self.repo.relationships_for(cand.ref)):
+                self.repo.relationships.put(KnowledgeRelationship(
+                    from_ref=cand.ref, to_ref=original.ref, relationship_type=RelationshipType.SPECIALIZES, created_by=by,
+                    explanation=f"{decision.scope.key()} correction overrides {original.scope.key()} knowledge (§9); the original stays ACTIVE"))
+        elif original:
             cand = self.governance.ingest_candidate(CandidateInput(
                 title=original.title, statement=statement, scope=decision.scope, source_ids=c.source_refs, evidence_ids=evidence_ids,
                 knowledge_type=original.knowledge_type.value, authority_type=AuthorityType.USER_KNOWLEDGE, confidence=0.6,
@@ -98,7 +113,8 @@ class CorrectionService:
         c.status = CorrectionStatus.GOVERNED
         self.repo.corrections.put(c)
         self.auditor.record(who=by, what="correction.submitted", why=reason, scope=decision.scope, source=rec.source.id,
-                            affected=[c.id, cand.ref] + c.resolved_lineage)
+                            affected=[c.id, cand.ref] + c.resolved_lineage,
+                            after={"level": "override" if c.override_of else "revision", "override_of": c.override_of})
         return c
 
     def pending(self, scope: Scope | None = None) -> list[KnowledgeCorrection]:

@@ -18,6 +18,12 @@ from ka import config
 from ka.json_io import read_json, write_json
 
 
+
+# A physical source says where one business's data actually lives (EOS three-tier rule: instance graphs only). That is a
+# data-layer fact the Data Platform / the instance's data graph establishes; a document saying so is a claim, so knowledge
+# never asserts these kinds — otherwise a governed statement would read on the graph as a verified physical mapping.
+DATA_LAYER_KINDS: frozenset[str] = frozenset({"physical_source"})
+
 class GrammarMismatch(RuntimeError):
     """The files on disk differ from the snapshot under the same version string."""
 
@@ -144,6 +150,10 @@ class GrammarRegistry:
 
     def node_kinds(self) -> list[str]:
         return [k["name"] if isinstance(k, dict) else k for k in self.grammar.get("node_kinds", [])]
+
+    def assertable_kinds(self) -> list[str]:
+        """The node kinds document knowledge may assert: every grammar kind except the data layer's (`DATA_LAYER_KINDS`)."""
+        return [k for k in self.node_kinds() if k not in DATA_LAYER_KINDS]
 
     def edge_pairs(self) -> list[dict[str, Any]]:
         out = []
