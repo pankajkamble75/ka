@@ -1,0 +1,14 @@
+# NEXOS Composable Process Intelligence
+Date: 2026-10-18. Status: proposed cross-repository contract, pending reconciliation/approval by Knowledge Worker and consumers.
+Scenario: compose tenant Inventory Management business knowledge + reusable Build Dashboard universal skill + Power BI technology skill. Reuse Build Dashboard unchanged for Sales.
+Contract proposal: ProcessRef {id,version,digest,role,scope,owner,tenant_id?}; SkillContract {ref,input_schema,output_schema,preconditions,effects,dependencies,acceptance_criteria}; Binding {consumer_input,producer_ref,producer_output,semantic_ref?,data_product_ref?,evidence_refs[]}; CompositionSpec {schema_version:"nexos.composition/v0",composition_id,tenant_id,intent,process_refs[],bindings[],steps[],required_approvals[],provenance,acceptance_criteria[],status}; ExecutionOutcome {composition_id,step_outcomes[],artifact_refs[],validation_results[],evidence_refs[],proposed_improvements[]}.
+KW owns canonical JSON Schema and semantics; consumers must reconcile existing versioned interfaces before adding APIs. Registered executor IDs only, no inline arbitrary code. Immutable pinned versions, identity/auth, tenant isolation, typed gaps, provenance, governed approvals, idempotency. No auto publishing/deployment. Work behind feature flags on isolated branches; independent Codex review; report SHA, tests, unresolved integration issues.
+
+# Knowledge Acquisition: agent requirements
+Preserve KA ownership of source content, Knowledge Nuggets, scope, provenance, versioning and approved graph-change proposals. Read existing KA↔KW contract first.
+1. Add optional classifications for candidate business_process, universal_skill, domain_skill and technology_skill; scope independent of role.
+2. Extract ordered procedures, typed inputs/outputs, tools, prerequisites, business rules, exceptions, acceptance criteria and source-linked evidence from approved manuals and SOPs. Distinguish generic Build Dashboard from Power BI implementation and tenant Inventory SOP.
+3. Store extracted candidates as governed nuggets; translate to proposed skill/process contracts via existing graph-change proposal interface. Never mutate KW graph/library directly.
+4. Surface conflicting instructions, ambiguous KPIs, insufficient source evidence, untrusted document instructions, license/reuse restrictions and tenant scope as gaps.
+5. Accept AgentX execution feedback as governed change candidates; never automatically upgrade a global skill from customer-specific evidence.
+Acceptance: sample dashboard manual and inventory SOP produce two separately versioned evidence-linked proposals; negative tests for poisoned documents, tenant leakage and premature approvals; prior nugget APIs pass.
